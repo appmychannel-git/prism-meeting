@@ -156,6 +156,9 @@ class _JoinScreenState extends State<JoinScreen> {
   @override
   Widget build(BuildContext context) {
     final isJoin = _tab == _Tab.join;
+    final size = MediaQuery.of(context).size;
+    final landscape = size.width > size.height; // 가로모드(TV 등)
+    final gap = landscape ? 10.0 : 16.0; // 항목 간 세로 간격
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -176,20 +179,23 @@ class _JoinScreenState extends State<JoinScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.video_camera_front_rounded,
-                      size: 64, color: Color(0xFF5B8DEF)),
-                  const SizedBox(height: 12),
+                  Icon(Icons.video_camera_front_rounded,
+                      size: landscape ? 40 : 60,
+                      color: const Color(0xFF5B8DEF)),
+                  SizedBox(height: landscape ? 6 : 10),
                   Text('Prism Meeting',
                       textAlign: TextAlign.center,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
+                      style: (landscape
+                              ? Theme.of(context).textTheme.headlineSmall
+                              : Theme.of(context).textTheme.headlineMedium)
                           ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('소규모 화상회의 · 웹 / 모바일 / 디스플레이',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall),
-                  const SizedBox(height: 28),
+                  if (!landscape) ...[
+                    const SizedBox(height: 4),
+                    Text('소규모 화상회의 · 웹 / 모바일 / 디스플레이',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                  SizedBox(height: landscape ? 16 : 24),
 
                   // 참여 / 만들기 탭
                   SegmentedButton<_Tab>(
@@ -206,13 +212,18 @@ class _JoinScreenState extends State<JoinScreen> {
                     selected: {_tab},
                     onSelectionChanged: (s) => setState(() => _tab = s.first),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: gap),
 
+                  // 방 코드/이름 — 영문·숫자·하이픈만 (한글 불가)
                   if (isJoin)
                     TextField(
                       controller: _codeCtrl,
                       focusNode: _codeFocus,
                       textInputAction: TextInputAction.next,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9-]')),
+                      ],
                       decoration: const InputDecoration(
                         labelText: '방 코드',
                         hintText: '예: abc-defg-hij',
@@ -225,49 +236,80 @@ class _JoinScreenState extends State<JoinScreen> {
                       controller: _customCtrl,
                       focusNode: _customFocus,
                       textInputAction: TextInputAction.next,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'[a-zA-Z0-9-]')),
+                      ],
                       decoration: const InputDecoration(
                         labelText: '방 이름 (선택)',
-                        hintText: '비우면 자동 코드 생성',
+                        hintText: '영문·숫자·- 만 (비우면 자동)',
                         prefixIcon: Icon(Icons.meeting_room_outlined),
                         border: OutlineInputBorder(),
                       ),
                     ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: gap),
 
-                  // 방 만들기: 비공개 방 체크 → 입장 코드 입력
+                  // 방 만들기: 비공개 체크 + (체크 시) 옆에 입장 코드
                   if (!isJoin)
-                    CheckboxListTile(
-                      value: _private,
-                      onChanged: (v) => setState(() => _private = v ?? false),
-                      title: const Text('비공개 방 (입장 코드 사용)'),
-                      subtitle: const Text('코드를 아는 사람만 입장',
-                          style: TextStyle(fontSize: 12)),
-                      controlAffinity: ListTileControlAffinity.leading,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _private,
+                          onChanged: (v) =>
+                              setState(() => _private = v ?? false),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () =>
+                                setState(() => _private = !_private),
+                            child: const Text('비공개 방 (입장 코드)',
+                                style: TextStyle(fontSize: 14)),
+                          ),
+                        ),
+                        if (_private)
+                          SizedBox(
+                            width: 140,
+                            child: TextField(
+                              controller: _pinCtrl,
+                              focusNode: _pinFocus,
+                              textInputAction: TextInputAction.next,
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(6),
+                              ],
+                              decoration: const InputDecoration(
+                                labelText: '입장 코드',
+                                hintText: '숫자 6자리',
+                                isDense: true,
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
 
-                  // 입장 코드 필드: 참여(선택) / 만들기(비공개일 때)
-                  if (isJoin || _private) ...[
+                  // 참여 탭: 입장 코드(선택) 전체폭
+                  if (isJoin) ...[
                     TextField(
                       controller: _pinCtrl,
                       focusNode: _pinFocus,
                       textInputAction: TextInputAction.next,
                       keyboardType: TextInputType.number,
                       inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly, // 숫자만
-                        LengthLimitingTextInputFormatter(6), // 최대 6자리
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(6),
                       ],
-                      decoration: InputDecoration(
-                        labelText: isJoin ? '입장 코드 (비공개 방일 경우)' : '입장 코드',
-                        hintText:
-                            isJoin ? '공개 방이면 비워두세요' : '숫자 6자리 (예: 123456)',
-                        prefixIcon: const Icon(Icons.password_outlined),
-                        border: const OutlineInputBorder(),
+                      decoration: const InputDecoration(
+                        labelText: '입장 코드 (비공개 방일 경우)',
+                        hintText: '공개 방이면 비워두세요',
+                        prefixIcon: Icon(Icons.password_outlined),
+                        border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 16),
                   ],
+                  SizedBox(height: gap),
 
                   TextField(
                     controller: _nameCtrl,
@@ -280,23 +322,8 @@ class _JoinScreenState extends State<JoinScreen> {
                     ),
                   ),
 
-                  if (!isJoin) ...[
-                    const SizedBox(height: 12),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF5B8DEF).withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        '💡 방을 만들면 회의 화면에서 "초대 링크 복사"로 참여자에게 링크를 보낼 수 있어요.',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-
                   if (_error != null) ...[
-                    const SizedBox(height: 16),
+                    SizedBox(height: gap),
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -308,12 +335,13 @@ class _JoinScreenState extends State<JoinScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 24),
+                  SizedBox(height: landscape ? 14 : 24),
                   FilledButton.icon(
                     autofocus: true,
                     onPressed: _connecting ? null : _join,
                     style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 18),
+                      padding: EdgeInsets.symmetric(
+                          vertical: landscape ? 14 : 18),
                     ),
                     icon: _connecting
                         ? const SizedBox(
