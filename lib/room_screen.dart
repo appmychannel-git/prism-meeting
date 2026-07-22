@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 // ChatMessage 는 우리 chat_panel.dart 의 것을 사용 (LiveKit 동명 클래스는 숨김)
 import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -299,6 +300,17 @@ class _RoomScreenState extends State<RoomScreen> {
     _exitToJoin();
   }
 
+  // 초대 링크를 클립보드에 복사 (참여자에게 전달 → 클릭하면 이 방으로 입장)
+  Future<void> _copyInviteLink() async {
+    final link = AppConfig.inviteLink(widget.roomName);
+    await Clipboard.setData(ClipboardData(text: link));
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('초대 링크 복사됨 (방: ${widget.roomName})')),
+      );
+    }
+  }
+
   // 저사양 모드 토글: 원격 영상 구독을 켜고/끈다.
   Future<void> _toggleReceiveVideo() async {
     setState(() => _receiveVideo = !_receiveVideo);
@@ -478,6 +490,11 @@ class _RoomScreenState extends State<RoomScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Center(child: Text('+$hidden명 참여중')),
             ),
+          IconButton(
+            tooltip: '초대 링크 복사',
+            onPressed: _copyInviteLink,
+            icon: const Icon(Icons.link),
+          ),
           IconButton(
             tooltip: _receiveVideo ? '영상 수신 끄기(저사양 기기용)' : '영상 수신 켜기',
             onPressed: _toggleReceiveVideo,

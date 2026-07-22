@@ -35,6 +35,23 @@ class AppConfig {
   /// 안드로이드TV/디스플레이 등 큰 화면 판별 기준(픽셀 폭).
   static const double tvBreakpointWidth = 1100;
 
+  /// 초대 링크 기본 주소 (웹 배포 위치). 링크 형식: [base]?room=[코드]
+  static const String inviteBaseUrl =
+      'https://androidtv.mychannel.co.kr/meeting/';
+
+  static String inviteLink(String room) =>
+      '$inviteBaseUrl?room=${Uri.encodeComponent(room)}';
+
+  /// 짧고 타이핑 가능한 랜덤 방 코드 생성 (예: abc-defg-hij).
+  /// 헷갈리는 문자(0 o 1 l i) 제외 → 추측 불가하면서도 입력하기 쉬움.
+  static String generateRoomCode() {
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    final r = Random();
+    String grp(int n) =>
+        List.generate(n, (_) => chars[r.nextInt(chars.length)]).join();
+    return '${grp(3)}-${grp(4)}-${grp(3)}';
+  }
+
   /// 이 기기의 고정 식별값(identity). 표시 이름과 분리한다.
   /// 앱 실행 중 한 번만 생성되어 유지 → 이름을 바꿔 재접속해도 identity는 동일하므로
   /// 서버가 "같은 사람 재접속"으로 보고 이전 세션을 즉시 교체(유령 참가자 방지).
