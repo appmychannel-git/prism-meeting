@@ -210,7 +210,10 @@ class _JoinScreenState extends State<JoinScreen> {
                           icon: Icon(Icons.add_circle_outline)),
                     ],
                     selected: {_tab},
-                    onSelectionChanged: (s) => setState(() => _tab = s.first),
+                    onSelectionChanged: (s) => setState(() {
+                      _tab = s.first;
+                      _pinCtrl.clear(); // 탭 바꾸면 입장코드 초기화(잔상 방지)
+                    }),
                   ),
                   SizedBox(height: gap),
 
@@ -252,24 +255,40 @@ class _JoinScreenState extends State<JoinScreen> {
                   // 방 만들기: 비공개 체크 + (체크 시) 옆에 입장 코드
                   if (!isJoin)
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Checkbox(
-                          value: _private,
-                          onChanged: (v) =>
-                              setState(() => _private = v ?? false),
-                        ),
+                        // 행 전체를 InkWell로 → 리모컨(D-pad) 포커스 이동 가능
                         Expanded(
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
+                          child: InkWell(
                             onTap: () =>
                                 setState(() => _private = !_private),
-                            child: const Text('비공개 방 (입장 코드)',
-                                style: TextStyle(fontSize: 14)),
+                            borderRadius: BorderRadius.circular(8),
+                            focusColor: Colors.white24,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  // 체크박스는 포커스 대상에서 제외(InkWell이 담당)
+                                  ExcludeFocus(
+                                    child: Checkbox(
+                                      value: _private,
+                                      onChanged: (v) => setState(
+                                          () => _private = v ?? false),
+                                    ),
+                                  ),
+                                  const Flexible(
+                                    child: Text('비공개 방 (입장 코드)',
+                                        style: TextStyle(fontSize: 14)),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        if (_private)
+                        if (_private) ...[
+                          const SizedBox(width: 8),
                           SizedBox(
-                            width: 140,
+                            width: 180,
                             child: TextField(
                               controller: _pinCtrl,
                               focusNode: _pinFocus,
@@ -282,11 +301,11 @@ class _JoinScreenState extends State<JoinScreen> {
                               decoration: const InputDecoration(
                                 labelText: '입장 코드',
                                 hintText: '숫자 6자리',
-                                isDense: true,
                                 border: OutlineInputBorder(),
                               ),
                             ),
                           ),
+                        ],
                       ],
                     ),
 
