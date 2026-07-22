@@ -253,10 +253,15 @@ class _JoinScreenState extends State<JoinScreen> {
                       controller: _pinCtrl,
                       focusNode: _pinFocus,
                       textInputAction: TextInputAction.next,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly, // 숫자만
+                        LengthLimitingTextInputFormatter(6), // 최대 6자리
+                      ],
                       decoration: InputDecoration(
-                        labelText:
-                            isJoin ? '입장 코드 (비공개 방일 경우)' : '입장 코드',
-                        hintText: isJoin ? '공개 방이면 비워두세요' : '예: 1234',
+                        labelText: isJoin ? '입장 코드 (비공개 방일 경우)' : '입장 코드',
+                        hintText:
+                            isJoin ? '공개 방이면 비워두세요' : '숫자 6자리 (예: 123456)',
                         prefixIcon: const Icon(Icons.password_outlined),
                         border: const OutlineInputBorder(),
                       ),
