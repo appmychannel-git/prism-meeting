@@ -24,12 +24,15 @@ class ConnectionService {
     required String roomName,
     required String participantName,
     required String identity,
+    String? pin,
   }) async {
-    final uri = Uri.parse(tokenServerUrl).replace(queryParameters: {
+    final params = {
       'room': roomName,
       'name': participantName,
       'identity': identity,
-    });
+    };
+    if (pin != null && pin.isNotEmpty) params['pin'] = pin;
+    final uri = Uri.parse(tokenServerUrl).replace(queryParameters: params);
 
     final http.Response resp;
     try {

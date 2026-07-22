@@ -39,8 +39,11 @@ class AppConfig {
   static const String inviteBaseUrl =
       'https://androidtv.mychannel.co.kr/meeting/';
 
-  static String inviteLink(String room) =>
-      '$inviteBaseUrl?room=${Uri.encodeComponent(room)}';
+  static String inviteLink(String room, {String? pin}) {
+    final params = <String, String>{'room': room};
+    if (pin != null && pin.isNotEmpty) params['pin'] = pin;
+    return '$inviteBaseUrl?${Uri(queryParameters: params).query}';
+  }
 
   /// 짧고 타이핑 가능한 랜덤 방 코드 생성 (예: abc-defg-hij).
   /// 헷갈리는 문자(0 o 1 l i) 제외 → 추측 불가하면서도 입력하기 쉬움.

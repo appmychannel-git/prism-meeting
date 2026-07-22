@@ -20,23 +20,28 @@ class _JoinScreenState extends State<JoinScreen> {
   final _nameCtrl = TextEditingController();
   final _codeCtrl = TextEditingController(); // 참여: 방 코드
   final _customCtrl = TextEditingController(); // 만들기: 지정 이름(선택)
+  final _pinCtrl = TextEditingController(); // 비공개 방 입장 코드
 
   late final FocusNode _codeFocus = _fieldNode();
   late final FocusNode _customFocus = _fieldNode();
+  late final FocusNode _pinFocus = _fieldNode();
   late final FocusNode _nameFocus = _fieldNode();
 
   _Tab _tab = _Tab.create;
+  bool _private = false; // 방 만들기: 비공개 방 여부
   bool _connecting = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    // 웹 초대 링크(...?room=코드)로 열리면 → 참여 탭 + 코드 자동 입력
+    // 웹 초대 링크(...?room=코드&pin=코드)로 열리면 → 참여 탭 + 자동 입력
     final linkedRoom = Uri.base.queryParameters['room'];
+    final linkedPin = Uri.base.queryParameters['pin'];
     if (linkedRoom != null && linkedRoom.trim().isNotEmpty) {
       _tab = _Tab.join;
       _codeCtrl.text = linkedRoom.trim();
+      if (linkedPin != null) _pinCtrl.text = linkedPin.trim();
     }
   }
 
@@ -65,14 +70,19 @@ class _JoinScreenState extends State<JoinScreen> {
     _nameCtrl.dispose();
     _codeCtrl.dispose();
     _customCtrl.dispose();
+    _pinCtrl.dispose();
     _codeFocus.dispose();
     _customFocus.dispose();
+    _pinFocus.dispose();
     _nameFocus.dispose();
     super.dispose();
   }
 
   bool get _anyFieldFocused =>
-      _codeFocus.hasFocus || _customFocus.hasFocus || _nameFocus.hasFocus;
+      _codeFocus.hasFocus ||
+      _customFocus.hasFocus ||
+      _pinFocus.hasFocus ||
+      _nameFocus.hasFocus;
 
   Future<bool> _ensurePermissions() async {
     if (kIsWeb) return true; // 웹은 브라우저가 직접 물어봄
@@ -86,14 +96,22 @@ class _JoinScreenState extends State<JoinScreen> {
       _connecting = true;
     });
     try {
-      // 방 코드 결정
+      // 방 코드 + 입장코드(pin) 결정
       final String room;
+      final String pin;
       if (_tab == _Tab.join) {
         room = _codeCtrl.text.trim();
         if (room.isEmpty) throw Exception('방 코드를 입력하세요.');
+        pin = _pinCtrl.text.trim(); // 공개방이면 서버가 무시
       } else {
         final custom = _customCtrl.text.trim();
         room = custom.isEmpty ? AppConfig.generateRoomCode() : custom;
+        if (_private) {
+          pin = _pinCtrl.text.trim();
+          if (pin.isEmpty) throw Exception('비공개 방은 입장 코드를 입력하세요.');
+        } else {
+          pin = '';
+        }
       }
 
       final name = _nameCtrl.text.trim().isEmpty
@@ -114,6 +132,7 @@ class _JoinScreenState extends State<JoinScreen> {
         roomName: room,
         participantName: name,
         identity: AppConfig.deviceIdentity,
+        pin: pin,
       );
 
       if (!mounted) return;
@@ -123,6 +142,7 @@ class _JoinScreenState extends State<JoinScreen> {
             details: details,
             roomName: room,
             displayName: name,
+            pin: pin,
           ),
         ),
       );
@@ -213,6 +233,36 @@ class _JoinScreenState extends State<JoinScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
+
+                  // 방 만들기: 비공개 방 체크 → 입장 코드 입력
+                  if (!isJoin)
+                    CheckboxListTile(
+                      value: _private,
+                      onChanged: (v) => setState(() => _private = v ?? false),
+                      title: const Text('비공개 방 (입장 코드 사용)'),
+                      subtitle: const Text('코드를 아는 사람만 입장',
+                          style: TextStyle(fontSize: 12)),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    ),
+
+                  // 입장 코드 필드: 참여(선택) / 만들기(비공개일 때)
+                  if (isJoin || _private) ...[
+                    TextField(
+                      controller: _pinCtrl,
+                      focusNode: _pinFocus,
+                      textInputAction: TextInputAction.next,
+                      decoration: InputDecoration(
+                        labelText:
+                            isJoin ? '입장 코드 (비공개 방일 경우)' : '입장 코드',
+                        hintText: isJoin ? '공개 방이면 비워두세요' : '예: 1234',
+                        prefixIcon: const Icon(Icons.password_outlined),
+                        border: const OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
 
                   TextField(
                     controller: _nameCtrl,

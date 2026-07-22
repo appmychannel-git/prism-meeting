@@ -25,12 +25,14 @@ class RoomScreen extends StatefulWidget {
   final ConnectionDetails details;
   final String roomName;
   final String displayName;
+  final String? pin; // 비공개 방이면 초대 링크에 포함
 
   const RoomScreen({
     super.key,
     required this.details,
     required this.roomName,
     required this.displayName,
+    this.pin,
   });
 
   @override
@@ -302,7 +304,7 @@ class _RoomScreenState extends State<RoomScreen> {
 
   // 초대 링크를 클립보드에 복사 (참여자에게 전달 → 클릭하면 이 방으로 입장)
   Future<void> _copyInviteLink() async {
-    final link = AppConfig.inviteLink(widget.roomName);
+    final link = AppConfig.inviteLink(widget.roomName, pin: widget.pin);
     await Clipboard.setData(ClipboardData(text: link));
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
