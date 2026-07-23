@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // ChatMessage 는 우리 chat_panel.dart 의 것을 사용 (LiveKit 동명 클래스는 숨김)
 import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'chat_panel.dart';
@@ -361,7 +362,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _exitToJoin();
   }
 
-  // 초대 링크를 클립보드에 복사 (참여자에게 전달 → 클릭하면 이 방으로 입장)
+  // 초대 링크를 클립보드에 복사
   Future<void> _copyInviteLink() async {
     final link = AppConfig.inviteLink(widget.roomName, pin: widget.pin);
     await Clipboard.setData(ClipboardData(text: link));
@@ -370,6 +371,60 @@ class _RoomScreenState extends State<RoomScreen> {
         SnackBar(content: Text('초대 링크 복사됨 (방: ${widget.roomName})')),
       );
     }
+  }
+
+  // QR 초대: TV 등에서 QR을 띄우면 휴대폰으로 스캔해 바로 입장
+  void _showInviteQr() {
+    final link = AppConfig.inviteLink(widget.roomName, pin: widget.pin);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('QR로 초대'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: QrImageView(
+                data: link,
+                size: 240,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('방 코드: ${widget.roomName}',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            if (widget.pin != null && widget.pin!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('입장 코드: ${widget.pin}',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            const SizedBox(height: 8),
+            const Text('휴대폰으로 QR을 스캔하면 이 방으로 입장합니다.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.white70)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: link));
+              Navigator.pop(ctx);
+            },
+            child: const Text('링크 복사'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
   }
 
   // 저사양 모드 토글: 원격 영상 구독을 켜고/끈다.
@@ -550,6 +605,11 @@ class _RoomScreenState extends State<RoomScreen> {
       appBar: AppBar(
         title: Text('${widget.roomName}  ·  ${allTiles.length}명'),
         actions: [
+          IconButton(
+            tooltip: 'QR 초대',
+            onPressed: _showInviteQr,
+            icon: const Icon(Icons.qr_code_2),
+          ),
           IconButton(
             tooltip: '초대 링크 복사',
             onPressed: _copyInviteLink,
