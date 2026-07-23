@@ -75,6 +75,7 @@ class _RoomScreenState extends State<RoomScreen> {
 
   // ---- 발표자 뷰 상태 ----
   bool _speakerView = false; // false=갤러리, true=발표자 뷰
+  int _page = 0; // 갤러리 페이지(참가자 많을 때)
   String? _pinnedIdentity; // 사용자가 고정한 참가자
   String? _spotlightIdentity; // 최근 발언자(자동 스포트라이트)
 
@@ -526,9 +527,13 @@ class _RoomScreenState extends State<RoomScreen> {
     }
 
     final allTiles = _buildTiles();
-    // 저사양 기기 보호: 실제 렌더는 상한선까지만. 나머지는 배지로 표시.
-    final visible = allTiles.take(AppConfig.maxVisibleTiles).toList();
-    final hidden = allTiles.length - visible.length;
+    // 갤러리 페이지네이션: 한 페이지에 maxVisibleTiles(6)명씩 → 저사양 기기 렌더 부하 고정.
+    final perPage = AppConfig.maxVisibleTiles;
+    final pageCount = (allTiles.length / perPage).ceil().clamp(1, 9999);
+    if (_page >= pageCount) _page = pageCount - 1; // 인원 줄면 페이지 보정
+    if (_page < 0) _page = 0;
+    final pageTiles =
+        allTiles.skip(_page * perPage).take(perPage).toList();
 
     return Scaffold(
       key: _scaffoldKey,
@@ -545,11 +550,6 @@ class _RoomScreenState extends State<RoomScreen> {
       appBar: AppBar(
         title: Text('${widget.roomName}  ·  ${allTiles.length}명'),
         actions: [
-          if (hidden > 0)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Center(child: Text('+$hidden명 참여중')),
-            ),
           IconButton(
             tooltip: '초대 링크 복사',
             onPressed: _copyInviteLink,
@@ -603,10 +603,35 @@ class _RoomScreenState extends State<RoomScreen> {
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: _speakerView
-                  ? _buildSpeakerView(visible)
-                  : _VideoGrid(tiles: visible, isTv: isTv),
+                  ? _buildSpeakerView(allTiles) // 발표자 뷰: 전체 중 발언자를 메인에
+                  : _VideoGrid(tiles: pageTiles, isTv: isTv),
             ),
           ),
+          // 갤러리 페이지 이동 (참가자가 한 페이지보다 많을 때)
+          if (!_speakerView && pageCount > 1)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  IconButton(
+                    tooltip: '이전',
+                    onPressed:
+                        _page > 0 ? () => setState(() => _page--) : null,
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  Text('${_page + 1} / $pageCount',
+                      style: const TextStyle(fontSize: 14)),
+                  IconButton(
+                    tooltip: '다음',
+                    onPressed: _page < pageCount - 1
+                        ? () => setState(() => _page++)
+                        : null,
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
+              ),
+            ),
           _ControlBar(
             micOn: _micOn,
             camOn: _camOn,
