@@ -133,6 +133,7 @@ class _JoinScreenState extends State<JoinScreen> {
         participantName: name,
         identity: AppConfig.deviceIdentity,
         pin: pin,
+        create: _tab == _Tab.create, // 방 만들기만 새 방 생성 허용
       );
 
       if (!mounted) return;

@@ -25,6 +25,7 @@ class ConnectionService {
     required String participantName,
     required String identity,
     String? pin,
+    bool create = false,
   }) async {
     final params = {
       'room': roomName,
@@ -32,6 +33,7 @@ class ConnectionService {
       'identity': identity,
     };
     if (pin != null && pin.isNotEmpty) params['pin'] = pin;
+    if (create) params['create'] = 'true';
     final uri = Uri.parse(tokenServerUrl).replace(queryParameters: params);
 
     final http.Response resp;
@@ -42,7 +44,13 @@ class ConnectionService {
     }
 
     if (resp.statusCode != 200) {
-      throw Exception('토큰 발급 실패 (HTTP ${resp.statusCode}).\n${resp.body}');
+      // 서버가 준 error 메시지를 깔끔히 표시
+      String msg = '접속 실패 (HTTP ${resp.statusCode})';
+      try {
+        final j = jsonDecode(resp.body);
+        if (j is Map && j['error'] != null) msg = j['error'].toString();
+      } catch (_) {}
+      throw Exception(msg);
     }
 
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
