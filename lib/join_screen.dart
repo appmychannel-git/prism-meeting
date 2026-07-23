@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,16 +35,44 @@ class _JoinScreenState extends State<JoinScreen> {
   bool _connecting = false;
   String? _error;
 
+  final _appLinks = AppLinks();
+  StreamSubscription<Uri>? _linkSub;
+
   @override
   void initState() {
     super.initState();
-    // 웹 초대 링크(...?room=코드&pin=코드)로 열리면 → 참여 탭 + 자동 입력
-    final linkedRoom = Uri.base.queryParameters['room'];
-    final linkedPin = Uri.base.queryParameters['pin'];
-    if (linkedRoom != null && linkedRoom.trim().isNotEmpty) {
+    if (kIsWeb) {
+      // 웹: 현재 URL(...?room=코드&pin=코드)에서 바로 읽음
+      _applyLinkUri(Uri.base);
+    } else {
+      // 네이티브(App Links): 초대 링크로 앱이 열리면 그 방으로
+      _initDeepLinks();
+    }
+  }
+
+  Future<void> _initDeepLinks() async {
+    try {
+      final initial = await _appLinks.getInitialLink();
+      if (initial != null) _applyLinkUri(initial, rebuild: true);
+    } catch (_) {}
+    _linkSub =
+        _appLinks.uriLinkStream.listen((uri) => _applyLinkUri(uri, rebuild: true));
+  }
+
+  // 초대 링크의 room/pin 을 참여 탭에 채운다.
+  void _applyLinkUri(Uri uri, {bool rebuild = false}) {
+    final room = uri.queryParameters['room'];
+    final pin = uri.queryParameters['pin'];
+    if (room == null || room.trim().isEmpty) return;
+    void assign() {
       _tab = _Tab.join;
-      _codeCtrl.text = linkedRoom.trim();
-      if (linkedPin != null) _pinCtrl.text = linkedPin.trim();
+      _codeCtrl.text = room.trim();
+      if (pin != null) _pinCtrl.text = pin.trim();
+    }
+    if (rebuild && mounted) {
+      setState(assign);
+    } else {
+      assign();
     }
   }
 
@@ -67,6 +98,7 @@ class _JoinScreenState extends State<JoinScreen> {
 
   @override
   void dispose() {
+    _linkSub?.cancel();
     _nameCtrl.dispose();
     _codeCtrl.dispose();
     _customCtrl.dispose();

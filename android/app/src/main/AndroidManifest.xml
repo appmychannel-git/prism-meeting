@@ -45,6 +45,16 @@
                 <!-- 안드로이드TV 런처에도 앱 아이콘이 뜨도록 -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
             </intent-filter>
+            <!-- App Links: 초대 링크(https://androidtv.mychannel.co.kr/meeting...) 클릭 시 이 앱으로 열기.
+                 도메인의 /.well-known/assetlinks.json 로 소유권 검증(autoVerify). -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https"
+                      android:host="androidtv.mychannel.co.kr"
+                      android:pathPrefix="/meeting"/>
+            </intent-filter>
         </activity>
         <meta-data
             android:name="flutterEmbedding"
