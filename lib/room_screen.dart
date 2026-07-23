@@ -115,7 +115,12 @@ class _RoomScreenState extends State<RoomScreen> {
 
   void _setupListeners() {
     _listener
-      ..on<RoomDisconnectedEvent>((e) => _exitToJoin())
+      ..on<RoomDisconnectedEvent>((e) {
+        // 방장(host)이 회의를 종료해 튕긴 경우 안내 (본인이 나간 게 아닐 때만)
+        final endedByHost =
+            !widget.isHost && e.reason == DisconnectReason.roomDeleted;
+        _exitToJoin(notice: endedByHost ? '호스트가 회의를 종료했습니다.' : null);
+      })
       ..on<RoomReconnectingEvent>((_) {
         if (mounted) setState(() => _reconnecting = true);
       })
@@ -293,10 +298,30 @@ class _RoomScreenState extends State<RoomScreen> {
   /// 회의 화면을 닫고 입장 화면으로 돌아간다.
   /// disconnect 시 _leave 와 RoomDisconnectedEvent 양쪽에서 불릴 수 있으므로
   /// 가드로 딱 한 번만 pop 되게 한다. (두 번 pop 되면 입장 화면까지 닫혀 앱 종료됨)
-  void _exitToJoin() {
+  void _exitToJoin({String? notice}) {
     if (_leaving) return;
     _leaving = true;
-    if (mounted) Navigator.of(context).maybePop();
+    if (!mounted) return;
+    if (notice != null) {
+      // 안내 다이얼로그 → 확인 시 입장 화면으로
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          title: const Text('회의 종료'),
+          content: Text(notice),
+          actions: [
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('확인')),
+          ],
+        ),
+      ).whenComplete(() {
+        if (mounted) Navigator.of(context).maybePop();
+      });
+    } else {
+      Navigator.of(context).maybePop();
+    }
   }
 
   // 나가기 버튼: 방장이면 종료 확인, 아니면 바로 나감
