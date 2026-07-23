@@ -21,7 +21,9 @@ class AppConfig {
   /// 비워두면 앱은 "직접 입력(수동)" 모드로만 동작합니다.
   static const String tokenServerUrl = String.fromEnvironment(
     'LK_TOKEN_URL',
-    defaultValue: '',
+    // 기본값 내장 → --dart-define 없이 (안드로이드 스튜디오에서) 빌드해도 동작.
+    // 필요 시 --dart-define=LK_TOKEN_URL=... 로 덮어쓸 수 있음.
+    defaultValue: 'https://prism-token-server.onrender.com/token',
   );
 
   /// 기본 방 이름 (입장 화면 기본값)
