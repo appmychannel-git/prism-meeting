@@ -144,6 +144,7 @@ class _JoinScreenState extends State<JoinScreen> {
             roomName: room,
             displayName: name,
             pin: pin,
+            isHost: _tab == _Tab.create, // 방 만든 사람이 방장
           ),
         ),
       );

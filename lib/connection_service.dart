@@ -62,6 +62,25 @@ class ConnectionService {
     return ConnectionDetails(serverUrl: url, token: token);
   }
 
+  /// 방장이 회의 종료 → 서버가 방 삭제(전원 퇴장).
+  /// tokenServerUrl 의 /token 을 /end 로 바꿔 호출한다.
+  static Future<void> endRoom({
+    required String tokenServerUrl,
+    required String roomName,
+    required String identity,
+  }) async {
+    final endUrl = tokenServerUrl.replaceFirst(RegExp(r'/token/?$'), '/end');
+    final uri = Uri.parse(endUrl).replace(queryParameters: {
+      'room': roomName,
+      'identity': identity,
+    });
+    try {
+      await http.get(uri).timeout(const Duration(seconds: 8));
+    } catch (_) {
+      // 종료 요청 실패해도 로컬 disconnect는 진행
+    }
+  }
+
   /// 수동 입력 방식(서버 URL + 토큰 직접 붙여넣기).
   static ConnectionDetails manual({
     required String serverUrl,

@@ -26,6 +26,7 @@ class RoomScreen extends StatefulWidget {
   final String roomName;
   final String displayName;
   final String? pin; // 비공개 방이면 초대 링크에 포함
+  final bool isHost; // 방을 만든 사람(방장) → 나가면 방 종료
 
   const RoomScreen({
     super.key,
@@ -33,6 +34,7 @@ class RoomScreen extends StatefulWidget {
     required this.roomName,
     required this.displayName,
     this.pin,
+    this.isHost = false,
   });
 
   @override
@@ -297,7 +299,38 @@ class _RoomScreenState extends State<RoomScreen> {
     if (mounted) Navigator.of(context).maybePop();
   }
 
+  // 나가기 버튼: 방장이면 종료 확인, 아니면 바로 나감
+  Future<void> _onLeavePressed() async {
+    if (widget.isHost) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('회의 종료'),
+          content: const Text('회의를 종료하면 모든 참가자가 나가게 됩니다. 종료할까요?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('취소')),
+            FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('종료')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    await _leave();
+  }
+
   Future<void> _leave() async {
+    // 방장이면 서버에 방 삭제 요청(전원 퇴장)
+    if (widget.isHost) {
+      await ConnectionService.endRoom(
+        tokenServerUrl: AppConfig.tokenServerUrl,
+        roomName: widget.roomName,
+        identity: AppConfig.deviceIdentity,
+      );
+    }
     await _room.disconnect();
     _exitToJoin();
   }
@@ -552,9 +585,10 @@ class _RoomScreenState extends State<RoomScreen> {
           _ControlBar(
             micOn: _micOn,
             camOn: _camOn,
+            isHost: widget.isHost,
             onMic: _toggleMic,
             onCam: _toggleCam,
-            onLeave: _leave,
+            onLeave: _onLeavePressed,
           ),
         ],
       ),
@@ -711,6 +745,7 @@ class _ParticipantTile extends StatelessWidget {
 class _ControlBar extends StatelessWidget {
   final bool micOn;
   final bool camOn;
+  final bool isHost;
   final VoidCallback onMic;
   final VoidCallback onCam;
   final VoidCallback onLeave;
@@ -718,6 +753,7 @@ class _ControlBar extends StatelessWidget {
   const _ControlBar({
     required this.micOn,
     required this.camOn,
+    required this.isHost,
     required this.onMic,
     required this.onCam,
     required this.onLeave,
@@ -749,7 +785,7 @@ class _ControlBar extends StatelessWidget {
             const SizedBox(width: 20),
             _RoundButton(
               icon: Icons.call_end,
-              label: '나가기',
+              label: isHost ? '회의 종료' : '나가기',
               active: true,
               danger: true,
               onTap: onLeave,
