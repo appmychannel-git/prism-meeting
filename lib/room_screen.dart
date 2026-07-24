@@ -118,6 +118,13 @@ class _RoomScreenState extends State<RoomScreen> {
   // false면 원격 영상을 구독 해제하고 아바타만 표시 → 프리즈 방지.
   bool _receiveVideo = true;
 
+  // ---- 카메라 선택(USB 외장 웹캠 포함) ----
+  // Camera2가 외장(USB) 카메라를 노출하는 기기에서, 목록 열거 후 선택/전환.
+  // 내장 카메라 없는 TV는 USB 카메라를 자동으로 잡는다.
+  List<MediaDevice> _cameras = [];
+  String? _currentCameraId;
+  StreamSubscription<List<MediaDevice>>? _deviceSub;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +132,10 @@ class _RoomScreenState extends State<RoomScreen> {
     WakelockPlus.enable();
     _room.addListener(_onRoomChange);
     _setupListeners();
+    // USB 카메라 연결/해제(핫플러그) 시 카메라 목록 갱신
+    _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
+      _loadCameras();
+    });
     _connect();
   }
 
@@ -132,6 +143,7 @@ class _RoomScreenState extends State<RoomScreen> {
   void dispose() {
     WakelockPlus.disable(); // 회의 나가면 화면 유지 해제
     _stopBackgroundService(); // 화면공유 포그라운드 서비스 정리
+    _deviceSub?.cancel();
     _rebuildTimer?.cancel();
     _room.removeListener(_onRoomChange);
     _listener.dispose();
@@ -263,13 +275,104 @@ class _RoomScreenState extends State<RoomScreen> {
     try {
       await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
     } catch (_) {
-      if (mounted) setState(() => _camOn = false);
+      // 기본(내장) 카메라 실패 → 외장/사용 가능한 카메라로 재시도.
+      // 내장 카메라 없는 TV에 USB 웹캠을 꽂은 경우 여기서 자동으로 잡힌다.
+      final ok = await _tryEnableAnyCamera();
+      if (!ok && mounted) setState(() => _camOn = false);
     }
     try {
       await lp.setMicrophoneEnabled(true).timeout(const Duration(seconds: 8));
     } catch (_) {
       if (mounted) setState(() => _micOn = false);
     }
+    // 라벨이 채워진(권한 허용 후) 카메라 목록 로드
+    await _loadCameras();
+  }
+
+  // 사용 가능한 카메라 목록을 불러온다(라벨은 권한 허용 후 채워짐).
+  Future<void> _loadCameras() async {
+    try {
+      final cams = await Hardware.instance.videoInputs();
+      if (!mounted) return;
+      setState(() => _cameras = cams);
+    } catch (_) {}
+  }
+
+  // 내장 카메라 기본 켜기가 실패했을 때, 열거된 카메라 중 하나(외장 우선)로 켠다.
+  Future<bool> _tryEnableAnyCamera() async {
+    final lp = _room.localParticipant;
+    if (lp == null) return false;
+    try {
+      final cams = await Hardware.instance.videoInputs();
+      if (cams.isEmpty) return false;
+      final pick = _preferExternal(cams);
+      await lp
+          .setCameraEnabled(true,
+              cameraCaptureOptions:
+                  CameraCaptureOptions(deviceId: pick.deviceId))
+          .timeout(const Duration(seconds: 8));
+      if (mounted) {
+        setState(() {
+          _camOn = true;
+          _currentCameraId = pick.deviceId;
+        });
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // 외장(USB) 카메라를 우선 고른다. 라벨에 external/usb 가 있으면 그것,
+  // 없으면 첫 번째. (Camera2가 외장 카메라를 라벨로 구분해 준다)
+  MediaDevice _preferExternal(List<MediaDevice> cams) {
+    for (final c in cams) {
+      final l = c.label.toLowerCase();
+      if (l.contains('external') || l.contains('usb')) return c;
+    }
+    return cams.first;
+  }
+
+  // 선택한 카메라로 전환. 켜져 있으면 트랙 교체, 꺼져 있으면 그 기기로 켠다.
+  Future<void> _switchCamera(MediaDevice d) async {
+    final lp = _room.localParticipant;
+    if (lp == null) return;
+    LocalVideoTrack? camTrack;
+    for (final pub in lp.videoTrackPublications) {
+      if (pub.source == TrackSource.camera) {
+        final t = pub.track;
+        if (t is LocalVideoTrack) camTrack = t;
+        break;
+      }
+    }
+    try {
+      if (camTrack != null) {
+        await camTrack.switchCamera(d.deviceId);
+      } else {
+        await lp.setCameraEnabled(true,
+            cameraCaptureOptions: CameraCaptureOptions(deviceId: d.deviceId));
+      }
+      if (mounted) {
+        setState(() {
+          _camOn = true;
+          _currentCameraId = d.deviceId;
+        });
+      }
+    } catch (e) {
+      _snack('카메라 전환 실패: $e');
+    }
+  }
+
+  // 메뉴에 표시할 카메라 이름(외장/전후면 힌트, 라벨 없으면 번호).
+  String _cameraLabel(MediaDevice d, int index) {
+    final l = d.label.trim();
+    final lower = l.toLowerCase();
+    final isExternal = lower.contains('external') || lower.contains('usb');
+    if (l.isEmpty) return isExternal ? 'USB 카메라' : '카메라 ${index + 1}';
+    if (lower.contains('front') || lower.contains('user')) return '전면 카메라';
+    if (lower.contains('back') || lower.contains('environment')) return '후면 카메라';
+    if (isExternal) return 'USB 카메라';
+    return l;
   }
 
   // ---- 참가자 타일 목록 구성 (로컬을 맨 앞에) ----
@@ -835,6 +938,36 @@ class _RoomScreenState extends State<RoomScreen> {
       appBar: AppBar(
         title: Text('${widget.roomName}  ·  ${allTiles.length}명'),
         actions: [
+          // 카메라가 2개 이상(예: 전/후면, 또는 USB 외장 웹캠)일 때만 선택 메뉴 노출
+          if (_cameras.length >= 2)
+            PopupMenuButton<MediaDevice>(
+              tooltip: '카메라 선택',
+              icon: const Icon(Icons.cameraswitch),
+              onSelected: _switchCamera,
+              itemBuilder: (_) => [
+                for (int i = 0; i < _cameras.length; i++)
+                  PopupMenuItem<MediaDevice>(
+                    value: _cameras[i],
+                    child: Row(
+                      children: [
+                        Icon(
+                          _cameras[i].deviceId == _currentCameraId
+                              ? Icons.check
+                              : Icons.videocam_outlined,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            _cameraLabel(_cameras[i], i),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           IconButton(
             tooltip: 'QR 초대',
             onPressed: _showInviteQr,
