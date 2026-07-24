@@ -1,4 +1,4 @@
-package com.prism.prism_meeting
+package kr.co.mychannel.meeting.prism
 
 import io.flutter.embedding.android.FlutterActivity
 
