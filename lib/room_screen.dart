@@ -11,7 +11,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart' show Helper;
 // 안드로이드 화면공유 유지용 mediaProjection 포그라운드 서비스.
 import 'package:flutter_background/flutter_background.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:qr_flutter/qr_flutter.dart';
+import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'chat_panel.dart';
@@ -287,6 +287,29 @@ class _RoomScreenState extends State<RoomScreen> {
     }
     // 라벨이 채워진(권한 허용 후) 카메라 목록 로드
     await _loadCameras();
+    // 처음 켜진(기본) 카메라의 deviceId를 파악해 선택 메뉴 체크 표시에 반영
+    _syncCurrentCameraId();
+  }
+
+  // 현재 활성 카메라의 deviceId를 트랙 설정에서 읽어 _currentCameraId에 반영.
+  // (기본 카메라는 facingMode로 켜져 deviceId를 우리가 지정하지 않으므로 여기서 회수)
+  void _syncCurrentCameraId() {
+    if (_currentCameraId != null) return;
+    final lp = _room.localParticipant;
+    if (lp == null) return;
+    for (final pub in lp.videoTrackPublications) {
+      if (pub.source != TrackSource.camera) continue;
+      final t = pub.track;
+      if (t is LocalVideoTrack) {
+        try {
+          final dev = t.mediaStreamTrack.getSettings()['deviceId'];
+          if (dev != null && dev.toString().isNotEmpty) {
+            if (mounted) setState(() => _currentCameraId = dev.toString());
+          }
+        } catch (_) {}
+      }
+      break;
+    }
   }
 
   // 사용 가능한 카메라 목록을 불러온다(라벨은 권한 허용 후 채워짐).
@@ -664,17 +687,6 @@ class _RoomScreenState extends State<RoomScreen> {
     _exitToJoin();
   }
 
-  // 초대 링크를 클립보드에 복사
-  Future<void> _copyInviteLink() async {
-    final link = AppConfig.inviteLink(widget.roomName, pin: widget.pin);
-    await Clipboard.setData(ClipboardData(text: link));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('초대 링크 복사됨 (방: ${widget.roomName})')),
-      );
-    }
-  }
-
   // QR 초대: TV 등에서 QR을 띄우면 휴대폰으로 스캔해 바로 입장
   void _showInviteQr() {
     final link = AppConfig.inviteLink(widget.roomName, pin: widget.pin);
@@ -691,10 +703,21 @@ class _RoomScreenState extends State<RoomScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: QrImageView(
-                data: link,
-                size: 240,
-                backgroundColor: Colors.white,
+              child: SizedBox(
+                width: 240,
+                height: 240,
+                child: PrettyQrView.data(
+                  data: link,
+                  decoration: const PrettyQrDecoration(
+                    shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+                  ),
+                  // QR 생성 실패 시에도 다이얼로그가 쓸모있도록 안내 대체
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Text('QR 생성 실패\n아래 링크를 복사해 사용하세요',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54, fontSize: 13)),
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 16),
@@ -717,6 +740,11 @@ class _RoomScreenState extends State<RoomScreen> {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: link));
               Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('초대 링크 복사됨')),
+                );
+              }
             },
             child: const Text('링크 복사'),
           ),
@@ -936,10 +964,10 @@ class _RoomScreenState extends State<RoomScreen> {
       appBar: AppBar(
         title: Text('${widget.roomName}  ·  ${allTiles.length}명'),
         actions: [
-          // 카메라가 2개 이상(예: 전/후면, 또는 USB 외장 웹캠)일 때만 선택 메뉴 노출
+          // ① 카메라 전환 — 카메라가 2개 이상(전/후면, USB 외장 등)일 때만 노출
           if (_cameras.length >= 2)
             PopupMenuButton<MediaDevice>(
-              tooltip: '카메라 선택',
+              tooltip: '카메라 전환',
               icon: const Icon(Icons.cameraswitch),
               onSelected: _switchCamera,
               itemBuilder: (_) => [
@@ -966,26 +994,19 @@ class _RoomScreenState extends State<RoomScreen> {
                   ),
               ],
             ),
-          IconButton(
-            tooltip: 'QR 초대',
-            onPressed: _showInviteQr,
-            icon: const Icon(Icons.qr_code_2),
-          ),
-          IconButton(
-            tooltip: '초대 링크 복사',
-            onPressed: _copyInviteLink,
-            icon: const Icon(Icons.link),
-          ),
-          IconButton(
-            tooltip: _receiveVideo ? '영상 수신 끄기(저사양 기기용)' : '영상 수신 켜기',
-            onPressed: _toggleReceiveVideo,
-            icon: Icon(_receiveVideo ? Icons.visibility : Icons.visibility_off),
-          ),
+          // ② 화면 모드 변환 (갤러리 ↔ 발표자)
           IconButton(
             tooltip: _speakerView ? '갤러리 뷰' : '발표자 뷰',
             onPressed: () => setState(() => _speakerView = !_speakerView),
             icon: Icon(_speakerView ? Icons.grid_view : Icons.view_sidebar),
           ),
+          // ③ 초대 (QR + 링크 복사를 한 다이얼로그로 통합 → 아이콘 1개로 축소)
+          IconButton(
+            tooltip: '초대 (QR·링크)',
+            onPressed: _showInviteQr,
+            icon: const Icon(Icons.person_add_alt),
+          ),
+          // ④ 채팅
           IconButton(
             tooltip: '채팅',
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
@@ -994,6 +1015,28 @@ class _RoomScreenState extends State<RoomScreen> {
               isLabelVisible: _unread > 0,
               child: const Icon(Icons.chat_bubble_outline),
             ),
+          ),
+          // ⑤ 더보기(⋮) — 자주 안 쓰는 항목은 여기로: 화면 숨기기(저사양)
+          PopupMenuButton<String>(
+            tooltip: '더보기',
+            onSelected: (v) {
+              if (v == 'recv') _toggleReceiveVideo();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem<String>(
+                value: 'recv',
+                child: Row(
+                  children: [
+                    Icon(
+                      _receiveVideo ? Icons.visibility_off : Icons.visibility,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(_receiveVideo ? '화면 숨기기(저사양)' : '화면 다시 보기'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

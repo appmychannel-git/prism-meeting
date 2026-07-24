@@ -43,7 +43,9 @@ dependencies:
   http: ^1.6.0
   wakelock_plus: ^1.5.2
   app_links: ^7.0.0
-  qr_flutter: ^4.1.0
+  # QR 생성: qr_flutter(4.1.0, 2023년 이후 미유지보수)가 최신 Flutter에서
+  # QR이 안 그려지는 문제 → 유지보수되는 pretty_qr_code 로 교체.
+  pretty_qr_code: ^3.4.0
 
 dev_dependencies:
   flutter_test:
