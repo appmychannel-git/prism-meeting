@@ -962,7 +962,13 @@ class _RoomScreenState extends State<RoomScreen> {
         child: ChatPanel(messages: _messages, onSend: _sendChat),
       ),
       appBar: AppBar(
-        title: Text('${widget.roomName}  ·  ${allTiles.length}명'),
+        // 뒤로가기 ↔ 방이름 간격 최소화 + 방이름 글자 작게 → 긴 방이름도 더 보이게
+        titleSpacing: 0,
+        title: Text(
+          '${widget.roomName} · ${allTiles.length}명',
+          style: const TextStyle(fontSize: 15),
+          overflow: TextOverflow.ellipsis,
+        ),
         actions: [
           // ① 카메라 전환 — 카메라가 2개 이상(전/후면, USB 외장 등)일 때만 노출
           if (_cameras.length >= 2)
