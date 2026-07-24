@@ -3,7 +3,7 @@
 > 이 문서는 **Mac에서 Claude Code로 iOS 빌드를 이어서 진행**하기 위한 컨텍스트입니다.
 > Windows에서 안드로이드·웹은 이미 완성됐고, **iOS만 추가하면 됩니다.**
 >
-> **현재 앱 버전: v1.1.0 (pubspec `1.1.0+2`).** iOS도 이 버전으로 맞춘다
+> **현재 앱 버전: v1.0.2 (pubspec `1.0.2+3`).** iOS도 이 버전으로 맞춘다
 > (Flutter는 pubspec version 을 iOS CFBundleShortVersionString 로 사용 → 자동 반영).
 > v1.0.0 이후 추가된 `lib/` 공통 기능(= iOS도 자동 적용): **화면공유(표시+웹/폰 송출),
 > 화면공유 오디오, 오디오 음질 상향(Opus 96k+처리), 뒤로가기=나가기/방장종료.**
@@ -111,7 +111,7 @@ flutter run -d <ios-device-id> --dart-define=LK_TOKEN_URL=https://prism-token-se
 flutter build ipa --dart-define=LK_TOKEN_URL=https://prism-token-server.onrender.com/token
 ```
 
-### 5-7. 화면공유 (iOS 전용 주의) ★ v1.1.0
+### 5-7. 화면공유 (iOS 전용 주의) ★ v1.0.2
 - **수신/표시는 그대로 동작** — 다른 참가자가 공유한 화면은 iOS에서도 바로 보임(코드 공통).
 - **iOS에서 화면을 "송출"하려면 Broadcast Upload Extension(ReplayKit)이 필요**하다.
   안드로이드의 `flutter_background`(mediaProjection FGS)는 **iOS에선 무동작**이고, 우리 코드도
