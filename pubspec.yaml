@@ -46,6 +46,8 @@ dependencies:
   # QR 생성: qr_flutter(4.1.0, 2023년 이후 미유지보수)가 최신 Flutter에서
   # QR이 안 그려지는 문제 → 유지보수되는 pretty_qr_code 로 교체.
   pretty_qr_code: ^3.4.0
+  # 앱 패키지명(applicationId)을 런타임에 읽어 토큰 요청에 전송(옛 앱 차단용 표식).
+  package_info_plus: ^9.0.0
 
 dev_dependencies:
   flutter_test:

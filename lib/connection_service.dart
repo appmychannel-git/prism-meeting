@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// 방 접속에 필요한 서버 URL + 참가자 토큰.
 class ConnectionDetails {
@@ -17,6 +18,20 @@ class ConnectionDetails {
 /// 자체호스팅으로 전환해도 이 파일은 그대로. 토큰 서버의 LIVEKIT_URL 만
 /// 자체 서버 주소로 바꾸면 된다.
 class ConnectionService {
+  /// 앱 패키지명(applicationId) 캐시. 토큰 요청 시 표식으로 전송한다.
+  /// (서버는 나중에 이 값으로 옛/미승인 앱을 차단할 수 있다 — 차단 로직은 추후.)
+  static String? _cachedAppId;
+  static Future<String> _appId() async {
+    if (_cachedAppId != null) return _cachedAppId!;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _cachedAppId = info.packageName; // 예: kr.co.mychannel.meeting.prism
+    } catch (_) {
+      _cachedAppId = '';
+    }
+    return _cachedAppId!;
+  }
+
   /// 토큰 서버에서 접속 정보 발급.
   /// [tokenServerUrl] 예: http://192.168.10.20:3000/token
   static Future<ConnectionDetails> fetchFromServer({
@@ -34,6 +49,9 @@ class ConnectionService {
     };
     if (pin != null && pin.isNotEmpty) params['pin'] = pin;
     if (create) params['create'] = 'true';
+    // 앱 패키지명 전송(옛 앱 차단용 표식). 값이 없으면 생략.
+    final appId = await _appId();
+    if (appId.isNotEmpty) params['appId'] = appId;
     final uri = Uri.parse(tokenServerUrl).replace(queryParameters: params);
 
     final http.Response resp;
