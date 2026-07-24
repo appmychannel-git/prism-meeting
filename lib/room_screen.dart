@@ -964,6 +964,7 @@ class _RoomScreenState extends State<RoomScreen> {
       appBar: AppBar(
         // 뒤로가기 ↔ 방이름 간격 최소화 + 방이름 글자 작게 → 긴 방이름도 더 보이게
         titleSpacing: 0,
+        leadingWidth: 40, // 뒤로가기 영역 축소 → 방이름을 왼쪽으로 더 당김
         title: Text(
           '${widget.roomName} · ${allTiles.length}명',
           style: const TextStyle(fontSize: 15),
@@ -974,6 +975,7 @@ class _RoomScreenState extends State<RoomScreen> {
           if (_cameras.length >= 2)
             PopupMenuButton<MediaDevice>(
               tooltip: '카메라 전환',
+              padding: EdgeInsets.zero,
               icon: const Icon(Icons.cameraswitch),
               onSelected: _switchCamera,
               itemBuilder: (_) => [
@@ -1003,18 +1005,21 @@ class _RoomScreenState extends State<RoomScreen> {
           // ② 화면 모드 변환 (갤러리 ↔ 발표자)
           IconButton(
             tooltip: _speakerView ? '갤러리 뷰' : '발표자 뷰',
+            visualDensity: VisualDensity.compact,
             onPressed: () => setState(() => _speakerView = !_speakerView),
             icon: Icon(_speakerView ? Icons.grid_view : Icons.view_sidebar),
           ),
           // ③ 초대 (QR + 링크 복사를 한 다이얼로그로 통합 → 아이콘 1개로 축소)
           IconButton(
             tooltip: '초대 (QR·링크)',
+            visualDensity: VisualDensity.compact,
             onPressed: _showInviteQr,
             icon: const Icon(Icons.person_add_alt),
           ),
           // ④ 채팅
           IconButton(
             tooltip: '채팅',
+            visualDensity: VisualDensity.compact,
             onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
             icon: Badge.count(
               count: _unread,
@@ -1025,6 +1030,7 @@ class _RoomScreenState extends State<RoomScreen> {
           // ⑤ 더보기(⋮) — 자주 안 쓰는 항목은 여기로: 화면 숨기기(저사양)
           PopupMenuButton<String>(
             tooltip: '더보기',
+            padding: EdgeInsets.zero,
             onSelected: (v) {
               if (v == 'recv') _toggleReceiveVideo();
             },

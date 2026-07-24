@@ -51,14 +51,14 @@ class AppConfig {
     return '$inviteBaseUrl?${Uri(queryParameters: params).query}';
   }
 
-  /// 짧고 타이핑 가능한 랜덤 방 코드 생성 (예: abc-defg-hij).
+  /// 짧고 타이핑 가능한 랜덤 방 코드 생성 (예: abc-def-hij).
   /// 헷갈리는 문자(0 o 1 l i) 제외 → 추측 불가하면서도 입력하기 쉬움.
   static String generateRoomCode() {
     const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
     final r = Random();
     String grp(int n) =>
         List.generate(n, (_) => chars[r.nextInt(chars.length)]).join();
-    return '${grp(3)}-${grp(4)}-${grp(3)}';
+    return '${grp(3)}-${grp(3)}-${grp(3)}';
   }
 
   /// 이 기기의 고정 식별값(identity). 표시 이름과 분리한다.
