@@ -55,8 +55,9 @@ class _JoinScreenState extends State<JoinScreen> {
       final initial = await _appLinks.getInitialLink();
       if (initial != null) _applyLinkUri(initial, rebuild: true);
     } catch (_) {}
-    _linkSub =
-        _appLinks.uriLinkStream.listen((uri) => _applyLinkUri(uri, rebuild: true));
+    _linkSub = _appLinks.uriLinkStream.listen(
+      (uri) => _applyLinkUri(uri, rebuild: true),
+    );
   }
 
   // 초대 링크의 room/pin 을 참여 탭에 채운다.
@@ -69,6 +70,7 @@ class _JoinScreenState extends State<JoinScreen> {
       _codeCtrl.text = room.trim();
       if (pin != null) _pinCtrl.text = pin.trim();
     }
+
     if (rebuild && mounted) {
       setState(assign);
     } else {
@@ -204,213 +206,259 @@ class _JoinScreenState extends State<JoinScreen> {
         }
       },
       child: Scaffold(
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 460),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Icon(Icons.video_camera_front_rounded,
-                      size: landscape ? 40 : 60,
-                      color: const Color(0xFF5B8DEF)),
-                  SizedBox(height: landscape ? 6 : 10),
-                  Text('Prism Meeting',
-                      textAlign: TextAlign.center,
-                      style: (landscape
-                              ? Theme.of(context).textTheme.headlineSmall
-                              : Theme.of(context).textTheme.headlineMedium)
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  if (!landscape) ...[
-                    const SizedBox(height: 4),
-                    Text('소규모 화상회의 · 웹 / 모바일 / 디스플레이',
+        body: Stack(
+          children: [
+            Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 460),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Icon(
+                        Icons.video_camera_front_rounded,
+                        size: landscape ? 40 : 60,
+                        color: const Color(0xFF5B8DEF),
+                      ),
+                      SizedBox(height: landscape ? 6 : 10),
+                      Text(
+                        'Prism Meeting',
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                  SizedBox(height: landscape ? 16 : 24),
-
-                  // 참여 / 만들기 탭
-                  SegmentedButton<_Tab>(
-                    segments: const [
-                      ButtonSegment(
-                          value: _Tab.join,
-                          label: Text('참여하기'),
-                          icon: Icon(Icons.login)),
-                      ButtonSegment(
-                          value: _Tab.create,
-                          label: Text('방 만들기'),
-                          icon: Icon(Icons.add_circle_outline)),
-                    ],
-                    selected: {_tab},
-                    onSelectionChanged: (s) => setState(() {
-                      _tab = s.first;
-                      _pinCtrl.clear(); // 탭 바꾸면 입장코드 초기화(잔상 방지)
-                    }),
-                  ),
-                  SizedBox(height: gap),
-
-                  // 방 코드/이름 — 영문·숫자·하이픈만 (한글 불가)
-                  if (isJoin)
-                    TextField(
-                      controller: _codeCtrl,
-                      focusNode: _codeFocus,
-                      textInputAction: TextInputAction.next,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'[a-zA-Z0-9-]')),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: '방 코드',
-                        hintText: '예: abc-defg-hij',
-                        prefixIcon: Icon(Icons.meeting_room_outlined),
-                        border: OutlineInputBorder(),
+                        style:
+                            (landscape
+                                    ? Theme.of(context).textTheme.headlineSmall
+                                    : Theme.of(
+                                        context,
+                                      ).textTheme.headlineMedium)
+                                ?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                    )
-                  else
-                    TextField(
-                      controller: _customCtrl,
-                      focusNode: _customFocus,
-                      textInputAction: TextInputAction.next,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(
-                            RegExp(r'[a-zA-Z0-9-]')),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: '방 이름 (선택)',
-                        hintText: '영문·숫자·- 만 (비우면 자동)',
-                        prefixIcon: Icon(Icons.meeting_room_outlined),
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  SizedBox(height: gap),
-
-                  // 방 만들기: 비공개 체크 + (체크 시) 옆에 입장 코드
-                  if (!isJoin)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // 행 전체를 InkWell로 → 리모컨(D-pad) 포커스 이동 가능
-                        Expanded(
-                          child: InkWell(
-                            onTap: () =>
-                                setState(() => _private = !_private),
-                            borderRadius: BorderRadius.circular(8),
-                            focusColor: Colors.white24,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  // 체크박스는 포커스 대상에서 제외(InkWell이 담당)
-                                  ExcludeFocus(
-                                    child: Checkbox(
-                                      value: _private,
-                                      onChanged: (v) => setState(
-                                          () => _private = v ?? false),
-                                    ),
-                                  ),
-                                  const Flexible(
-                                    child: Text('비공개 방 (입장 코드)',
-                                        style: TextStyle(fontSize: 14)),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                      if (!landscape) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '소규모 화상회의 · 웹 / 모바일 / 디스플레이',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
-                        if (_private) ...[
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            width: 180,
-                            child: TextField(
-                              controller: _pinCtrl,
-                              focusNode: _pinFocus,
-                              textInputAction: TextInputAction.next,
-                              keyboardType: TextInputType.number,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(6),
-                              ],
-                              decoration: const InputDecoration(
-                                labelText: '입장 코드',
-                                hintText: '숫자 6자리',
-                                border: OutlineInputBorder(),
-                              ),
-                            ),
+                      ],
+                      SizedBox(height: landscape ? 16 : 24),
+
+                      // 참여 / 만들기 탭
+                      SegmentedButton<_Tab>(
+                        segments: const [
+                          ButtonSegment(
+                            value: _Tab.join,
+                            label: Text('참여하기'),
+                            icon: Icon(Icons.login),
+                          ),
+                          ButtonSegment(
+                            value: _Tab.create,
+                            label: Text('방 만들기'),
+                            icon: Icon(Icons.add_circle_outline),
                           ),
                         ],
-                      ],
-                    ),
-
-                  // 참여 탭: 입장 코드(선택) 전체폭
-                  if (isJoin) ...[
-                    TextField(
-                      controller: _pinCtrl,
-                      focusNode: _pinFocus,
-                      textInputAction: TextInputAction.next,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: '입장 코드 (비공개 방일 경우)',
-                        hintText: '공개 방이면 비워두세요',
-                        prefixIcon: Icon(Icons.password_outlined),
-                        border: OutlineInputBorder(),
+                        selected: {_tab},
+                        onSelectionChanged: (s) => setState(() {
+                          _tab = s.first;
+                          _pinCtrl.clear(); // 탭 바꾸면 입장코드 초기화(잔상 방지)
+                        }),
                       ),
-                    ),
-                  ],
-                  SizedBox(height: gap),
+                      SizedBox(height: gap),
 
-                  TextField(
-                    controller: _nameCtrl,
-                    focusNode: _nameFocus,
-                    textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      labelText: '내 이름 (선택)',
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
+                      // 방 코드/이름 — 영문·숫자·하이픈만 (한글 불가)
+                      if (isJoin)
+                        TextField(
+                          controller: _codeCtrl,
+                          focusNode: _codeFocus,
+                          textInputAction: TextInputAction.next,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9-]'),
+                            ),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: '방 코드',
+                            hintText: '예: abc-defg-hij',
+                            prefixIcon: Icon(Icons.meeting_room_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                        )
+                      else
+                        TextField(
+                          controller: _customCtrl,
+                          focusNode: _customFocus,
+                          textInputAction: TextInputAction.next,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9-]'),
+                            ),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: '방 이름 (선택)',
+                            hintText: '영문·숫자·- 만 (비우면 자동)',
+                            prefixIcon: Icon(Icons.meeting_room_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      SizedBox(height: gap),
 
-                  if (_error != null) ...[
-                    SizedBox(height: gap),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
+                      // 방 만들기: 비공개 체크 + (체크 시) 옆에 입장 코드
+                      if (!isJoin)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // 행 전체를 InkWell로 → 리모컨(D-pad) 포커스 이동 가능
+                            Expanded(
+                              child: InkWell(
+                                onTap: () =>
+                                    setState(() => _private = !_private),
+                                borderRadius: BorderRadius.circular(8),
+                                focusColor: Colors.white24,
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // 체크박스는 포커스 대상에서 제외(InkWell이 담당)
+                                      ExcludeFocus(
+                                        child: Checkbox(
+                                          value: _private,
+                                          onChanged: (v) => setState(
+                                            () => _private = v ?? false,
+                                          ),
+                                        ),
+                                      ),
+                                      const Flexible(
+                                        child: Text(
+                                          '비공개 방 (입장 코드)',
+                                          style: TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_private) ...[
+                              const SizedBox(width: 8),
+                              SizedBox(
+                                width: 180,
+                                child: TextField(
+                                  controller: _pinCtrl,
+                                  focusNode: _pinFocus,
+                                  textInputAction: TextInputAction.next,
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(6),
+                                  ],
+                                  decoration: const InputDecoration(
+                                    labelText: '입장 코드',
+                                    hintText: '숫자 6자리',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+
+                      // 참여 탭: 입장 코드(선택) 전체폭
+                      if (isJoin) ...[
+                        TextField(
+                          controller: _pinCtrl,
+                          focusNode: _pinFocus,
+                          textInputAction: TextInputAction.next,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
+                          ],
+                          decoration: const InputDecoration(
+                            labelText: '입장 코드 (비공개 방일 경우)',
+                            hintText: '공개 방이면 비워두세요',
+                            prefixIcon: Icon(Icons.password_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: gap),
+
+                      TextField(
+                        controller: _nameCtrl,
+                        focusNode: _nameFocus,
+                        textInputAction: TextInputAction.done,
+                        decoration: const InputDecoration(
+                          labelText: '내 이름 (선택)',
+                          prefixIcon: Icon(Icons.person_outline),
+                          border: OutlineInputBorder(),
+                        ),
                       ),
-                      child: Text(_error!,
-                          style: const TextStyle(color: Color(0xFFFF8A80))),
-                    ),
-                  ],
 
-                  SizedBox(height: landscape ? 14 : 24),
-                  FilledButton.icon(
-                    autofocus: true,
-                    onPressed: _connecting ? null : _join,
-                    style: FilledButton.styleFrom(
-                      padding: EdgeInsets.symmetric(
-                          vertical: landscape ? 14 : 18),
-                    ),
-                    icon: _connecting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(isJoin ? Icons.login : Icons.add),
-                    label: Text(_connecting
-                        ? '접속 중...'
-                        : (isJoin ? '회의 입장' : '방 만들기 & 입장')),
+                      if (_error != null) ...[
+                        SizedBox(height: gap),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: Color(0xFFFF8A80)),
+                          ),
+                        ),
+                      ],
+
+                      SizedBox(height: landscape ? 14 : 24),
+                      FilledButton.icon(
+                        autofocus: true,
+                        onPressed: _connecting ? null : _join,
+                        style: FilledButton.styleFrom(
+                          padding: EdgeInsets.symmetric(
+                            vertical: landscape ? 14 : 18,
+                          ),
+                        ),
+                        icon: _connecting
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Icon(isJoin ? Icons.login : Icons.add),
+                        label: Text(
+                          _connecting
+                              ? '접속 중...'
+                              : (isJoin ? '회의 입장' : '방 만들기 & 입장'),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
-          ),
+            // 앱 버전 표시 (우측 상단)
+            Positioned(
+              top: 0,
+              right: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, right: 14),
+                  child: Text(
+                    'v${AppConfig.appVersion}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

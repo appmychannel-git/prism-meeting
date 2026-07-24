@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.11.5
@@ -35,6 +35,10 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   livekit_client: ^2.8.1
+  # 화면공유: Helper.requestCapturePermission() 등 캡처 API 직접 사용(직접 의존으로 명시).
+  flutter_webrtc: ^1.4.0
+  # 안드로이드 화면공유용 mediaProjection 포그라운드 서비스(IsolateHolderService) 제공.
+  flutter_background: ^1.3.0
   permission_handler: ^12.0.3
   http: ^1.6.0
   wakelock_plus: ^1.5.2

@@ -15,6 +15,10 @@ import 'dart:math';
 ///   3. 아래 [tokenServerUrl] 을 토큰 서버 주소로 지정하거나 실행 시 주입:
 ///        --dart-define=LK_TOKEN_URL=http://[PC의 LAN IP]:3000/token
 class AppConfig {
+  /// 앱 표시 버전. 입장 화면 우측 상단에 노출한다.
+  /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
+  static const String appVersion = '1.1.0';
+
   /// 토큰 서버의 /token 엔드포인트 주소.
   ///   - 웹(같은 PC) 테스트:  http://localhost:3000/token
   ///   - 폰/TV 등 다른 기기:  http://[PC의 LAN IP]:3000/token  (예: http://192.168.10.20:3000/token)

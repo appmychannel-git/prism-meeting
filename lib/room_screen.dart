@@ -1,10 +1,16 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // ChatMessage 는 우리 chat_panel.dart 의 것을 사용 (LiveKit 동명 클래스는 숨김)
 import 'package:livekit_client/livekit_client.dart' hide ChatMessage;
+// 안드로이드 화면 캡처 권한 요청(Helper.requestCapturePermission)만 사용.
+import 'package:flutter_webrtc/flutter_webrtc.dart' show Helper;
+// 안드로이드 화면공유 유지용 mediaProjection 포그라운드 서비스.
+import 'package:flutter_background/flutter_background.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -13,13 +19,21 @@ import 'config.dart';
 import 'connection_service.dart';
 
 /// 참가자 + 그 사람의 비디오 트랙(없을 수 있음) + 마이크/발언 상태 묶음.
+/// 한 참가자가 카메라와 화면공유를 동시에 올리면 타일이 2개가 된다
+/// (카메라 타일 + [isScreenShare]=true 인 화면 타일).
 class _Tile {
   final Participant participant;
   final VideoTrack? video;
   final bool micOn;
   final bool speaking;
+  final bool isScreenShare;
   _Tile(this.participant, this.video,
-      {this.micOn = false, this.speaking = false});
+      {this.micOn = false, this.speaking = false, this.isScreenShare = false});
+
+  /// 핀/스포트라이트 매칭용 고유 id. 화면공유 타일은 카메라 타일과 identity가
+  /// 같으므로 접미사로 구분한다.
+  String get id =>
+      isScreenShare ? '${participant.identity}#screen' : participant.identity;
 }
 
 class RoomScreen extends StatefulWidget {
@@ -55,6 +69,23 @@ class _RoomScreenState extends State<RoomScreen> {
         // H.264는 하드웨어 디코더 지원이 가장 넓다.
         videoCodec: 'h264',
       ),
+      // ---- 오디오 음질 설정(회의 음질 우선) ----
+      // 코덱은 Opus 단일. 비트레이트를 기본 48k → 96k로 올려 음성/공유오디오(탭 소리)
+      // 모두 여유 있게. DTX(침묵 시 전송중단)·RED(패킷손실 대비 중복전송)는 유지.
+      defaultAudioPublishOptions: AudioPublishOptions(
+        encoding: AudioEncoding.presetMusicHighQuality, // 96kbps
+        dtx: true,
+        red: true,
+      ),
+      // 마이크 캡처 처리(기본값과 동일하나 의도를 명시): 노이즈억제·에코제거·자동게인·
+      // 음성분리 모두 ON. 회의에서 목소리를 또렷하게 유지한다.
+      defaultAudioCaptureOptions: AudioCaptureOptions(
+        noiseSuppression: true,
+        echoCancellation: true,
+        autoGainControl: true,
+        voiceIsolation: true,
+        typingNoiseDetection: true,
+      ),
     ),
   );
 
@@ -64,6 +95,9 @@ class _RoomScreenState extends State<RoomScreen> {
 
   bool _micOn = true;
   bool _camOn = true;
+  bool _screenSharing = false; // 내가 화면공유 송출 중인가
+  bool _shareBusy = false; // 화면공유 토글 진행 중(중복 탭 방지)
+  bool _bgServiceOn = false; // 안드로이드 mediaProjection FGS 활성화됨
   bool _connecting = true;
   bool _reconnecting = false; // 네트워크 재연결 중
   String? _error;
@@ -77,8 +111,8 @@ class _RoomScreenState extends State<RoomScreen> {
   // ---- 발표자 뷰 상태 ----
   bool _speakerView = false; // false=갤러리, true=발표자 뷰
   int _page = 0; // 갤러리 페이지(참가자 많을 때)
-  String? _pinnedIdentity; // 사용자가 고정한 참가자
-  String? _spotlightIdentity; // 최근 발언자(자동 스포트라이트)
+  String? _pinnedTileId; // 사용자가 고정한 타일(_Tile.id: 카메라 또는 화면)
+  String? _spotlightIdentity; // 최근 발언자(자동 스포트라이트, identity=카메라 타일 id)
 
   // 저사양/디코더 고장 기기(예: D23)용: 영상 수신을 꺼서 디코딩 부하를 없앤다.
   // false면 원격 영상을 구독 해제하고 아바타만 표시 → 프리즈 방지.
@@ -97,6 +131,7 @@ class _RoomScreenState extends State<RoomScreen> {
   @override
   void dispose() {
     WakelockPlus.disable(); // 회의 나가면 화면 유지 해제
+    _stopBackgroundService(); // 화면공유 포그라운드 서비스 정리
     _rebuildTimer?.cancel();
     _room.removeListener(_onRoomChange);
     _listener.dispose();
@@ -140,6 +175,11 @@ class _RoomScreenState extends State<RoomScreen> {
       })
       ..on<TrackMutedEvent>((_) => _onRoomChange())
       ..on<TrackUnmutedEvent>((_) => _onRoomChange())
+      ..on<LocalTrackPublishedEvent>((_) => _syncScreenShareState())
+      ..on<LocalTrackUnpublishedEvent>((_) {
+        // 브라우저 "공유 중지" 바나 안드로이드 알림에서 직접 끈 경우도 여기로 온다.
+        _syncScreenShareState();
+      })
       ..on<ActiveSpeakersChangedEvent>((_) {
         final speakers = _room.activeSpeakers;
         if (speakers.isNotEmpty) _spotlightIdentity = speakers.first.identity;
@@ -236,9 +276,11 @@ class _RoomScreenState extends State<RoomScreen> {
   List<_Tile> _buildTiles() {
     final tiles = <_Tile>[];
 
-    VideoTrack? firstVideo(Iterable<TrackPublication> pubs) {
+    // 카메라 영상(화면공유 제외)만 고른다.
+    VideoTrack? cameraVideo(Iterable<TrackPublication> pubs) {
       if (!_receiveVideo) return null; // 저사양 모드: 영상 대신 아바타
       for (final pub in pubs) {
+        if (pub.source == TrackSource.screenShareVideo) continue; // 화면은 별도 타일
         // 카메라가 꺼지면(음소거) 마지막 프레임이 멈추거나 검게 남는다.
         // 이 경우 영상 대신 아바타를 보이도록 여기서 제외한다.
         if (pub.muted) continue;
@@ -248,25 +290,47 @@ class _RoomScreenState extends State<RoomScreen> {
       return null;
     }
 
-    // 오디오 트랙이 하나라도 켜져(음소거 아님) 있으면 마이크 ON.
+    // 활성화된 화면공유 트랙(있으면).
+    VideoTrack? screenVideo(Iterable<TrackPublication> pubs) {
+      if (!_receiveVideo) return null; // 저사양 모드: 화면도 아바타로 대체
+      for (final pub in pubs) {
+        if (pub.source != TrackSource.screenShareVideo) continue;
+        if (pub.muted) continue;
+        final t = pub.track;
+        if (t is VideoTrack) return t;
+      }
+      return null;
+    }
+
+    // 마이크 트랙이 켜져(음소거 아님) 있으면 마이크 ON.
+    // 화면공유 오디오(screenShareAudio)는 마이크가 아니므로 제외한다.
     bool micOn(Participant p) {
       for (final pub in p.audioTrackPublications) {
+        if (pub.source == TrackSource.screenShareAudio) continue;
         if (!pub.muted) return true;
       }
       return false;
     }
 
-    _Tile toTile(Participant p) => _Tile(
-          p,
-          firstVideo(p.videoTrackPublications),
-          micOn: micOn(p),
-          speaking: p.isSpeaking,
-        );
+    void addFor(Participant p) {
+      // 카메라(또는 아바타) 타일
+      tiles.add(_Tile(
+        p,
+        cameraVideo(p.videoTrackPublications),
+        micOn: micOn(p),
+        speaking: p.isSpeaking,
+      ));
+      // 화면공유 타일(있을 때만) — 별도 타일로 크게 보여준다.
+      final screen = screenVideo(p.videoTrackPublications);
+      if (screen != null) {
+        tiles.add(_Tile(p, screen, isScreenShare: true));
+      }
+    }
 
     final lp = _room.localParticipant;
-    if (lp != null) tiles.add(toTile(lp));
+    if (lp != null) addFor(lp);
     for (final p in _room.remoteParticipants.values) {
-      tiles.add(toTile(p));
+      addFor(p);
     }
     return tiles;
   }
@@ -295,6 +359,136 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
+  // 실제 송출 상태를 화면 상태에 반영(publish/unpublish 이벤트, 시스템 중지 등).
+  void _syncScreenShareState() {
+    final on = _room.localParticipant?.isScreenShareEnabled() ?? false;
+    if (mounted && on != _screenSharing) {
+      setState(() => _screenSharing = on);
+    } else {
+      _screenSharing = on;
+    }
+    // 화면공유가 꺼졌으면 안드로이드 포그라운드 서비스도 정리.
+    if (!on && _bgServiceOn) {
+      _stopBackgroundService();
+    }
+  }
+
+  /// 화면공유 시작/중지 토글.
+  ///  - 웹/데스크탑: getDisplayMedia 로 창/화면 선택(추가 설정 불필요)
+  ///  - 안드로이드: 캡처 권한 + mediaProjection 포그라운드 서비스 필요
+  Future<void> _toggleScreenShare() async {
+    final lp = _room.localParticipant;
+    if (lp == null || _shareBusy) return;
+
+    // 이미 공유 중이면 중지
+    if (_screenSharing) {
+      setState(() => _shareBusy = true);
+      try {
+        await lp.setScreenShareEnabled(false);
+      } catch (_) {
+      } finally {
+        await _stopBackgroundService();
+        if (mounted) setState(() => _shareBusy = false);
+        _syncScreenShareState();
+      }
+      return;
+    }
+
+    // 모바일 웹은 getDisplayMedia 미지원 → 안내
+    if (kIsWeb && lkPlatformIsWebMobile()) {
+      _snack('모바일 브라우저에서는 화면공유를 지원하지 않습니다. PC 브라우저나 앱을 사용하세요.');
+      return;
+    }
+
+    setState(() => _shareBusy = true);
+    try {
+      // 안드로이드: 알림 권한 선확정 → 캡처 권한 → 포그라운드 서비스 준비.
+      // 알림 권한을 캡처 권한보다 먼저 받아, 첫 실행 시 여러 권한 다이얼로그가
+      // 캡처 시작 흐름과 겹쳐 첫 시도가 실패하던 것을 방지한다.
+      if (!kIsWeb && lkPlatformIs(PlatformType.android)) {
+        await _ensureNotificationPermission();
+        final granted = await Helper.requestCapturePermission();
+        if (!granted) {
+          _snack('화면 캡처 권한이 거부되었습니다.');
+          return;
+        }
+        final ok = await _ensureBackgroundService();
+        if (!ok) {
+          _snack('화면공유용 백그라운드 실행을 시작할 수 없습니다.');
+          return;
+        }
+      }
+
+      // 화면 소리도 함께 전송. 웹은 브라우저의 "탭 오디오 공유"로 안정적으로 동작.
+      // 안드로이드 내부오디오 캡처는 기기별로 실패해 공유 자체가 막힐 수 있어 실기기
+      // 검증 전까지는 웹에서만 켠다.
+      await lp.setScreenShareEnabled(true, captureScreenAudio: kIsWeb);
+      _syncScreenShareState();
+    } catch (e) {
+      await _stopBackgroundService();
+      _snack('화면공유를 시작할 수 없습니다: $e');
+    } finally {
+      if (mounted) setState(() => _shareBusy = false);
+    }
+  }
+
+  // Android 13+: 포그라운드 서비스 알림용 알림 권한(best-effort).
+  Future<void> _ensureNotificationPermission() async {
+    if (kIsWeb || !lkPlatformIs(PlatformType.android)) return;
+    try {
+      await Permission.notification.request();
+    } catch (_) {}
+  }
+
+  // 안드로이드 mediaProjection 유지용 포그라운드 서비스 시작(멱등).
+  // 첫 실행 시 권한이 막 확정된 직후 초기화가 실패할 수 있어 1회 자동 재시도한다
+  // (LiveKit 예제와 동일한 패턴). 재시도 때는 initialize 대신 hasPermissions 로 확인.
+  Future<bool> _ensureBackgroundService([bool isRetry = false]) async {
+    if (kIsWeb || !lkPlatformIs(PlatformType.android)) return true;
+    try {
+      const androidConfig = FlutterBackgroundAndroidConfig(
+        notificationTitle: '화면 공유 중',
+        notificationText: 'Prism Meeting 이 화면을 공유하고 있습니다.',
+        notificationImportance: AndroidNotificationImportance.normal,
+        notificationIcon:
+            AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+      );
+      var has = await FlutterBackground.hasPermissions;
+      if (!isRetry) {
+        has = await FlutterBackground.initialize(androidConfig: androidConfig);
+      }
+      if (!has) return false;
+      if (!FlutterBackground.isBackgroundExecutionEnabled) {
+        await FlutterBackground.enableBackgroundExecution();
+      }
+      _bgServiceOn = true;
+      return true;
+    } catch (_) {
+      if (!isRetry) {
+        // 1초 뒤 1회 재시도 (첫 실행 권한 확정 직후 레이스 완화)
+        await Future<void>.delayed(const Duration(seconds: 1));
+        return _ensureBackgroundService(true);
+      }
+      return false;
+    }
+  }
+
+  Future<void> _stopBackgroundService() async {
+    if (!_bgServiceOn) return;
+    _bgServiceOn = false;
+    try {
+      if (FlutterBackground.isBackgroundExecutionEnabled) {
+        await FlutterBackground.disableBackgroundExecution();
+      }
+    } catch (_) {}
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   bool _leaving = false;
 
   /// 회의 화면을 닫고 입장 화면으로 돌아간다.
@@ -318,12 +512,19 @@ class _RoomScreenState extends State<RoomScreen> {
                 child: const Text('확인')),
           ],
         ),
-      ).whenComplete(() {
-        if (mounted) Navigator.of(context).maybePop();
-      });
+      ).whenComplete(_popSelf);
     } else {
-      Navigator.of(context).maybePop();
+      _popSelf();
     }
+  }
+
+  // 회의 화면(라우트)만 실제로 닫는다.
+  // PopScope(canPop:false) 로 뒤로가기를 가로채므로, 여기서는 maybePop 이 아니라
+  // 무조건 pop 을 써야 한다(maybePop 은 다시 PopScope 에 걸려 무한 반복됨).
+  void _popSelf() {
+    if (!mounted) return;
+    final nav = Navigator.of(context);
+    if (nav.canPop()) nav.pop();
   }
 
   // 나가기 버튼: 방장이면 종료 확인, 아니면 바로 나감
@@ -447,7 +648,9 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  /// 발표자 뷰: 메인(고정한 사람 > 최근 발언자 > 첫 번째)을 크게 + 하단 썸네일.
+  /// 발표자 뷰: 메인을 크게 + 하단 썸네일.
+  /// 메인 우선순위: 사용자가 고정한 타일 > 화면공유 > 최근 발언자 > 첫 번째.
+  /// 누군가 화면을 공유하면 자동으로 그 화면이 메인에 크게 잡힌다.
   Widget _buildSpeakerView(List<_Tile> tiles) {
     if (tiles.isEmpty) {
       return const Center(child: Text('참가자를 기다리는 중...'));
@@ -455,16 +658,24 @@ class _RoomScreenState extends State<RoomScreen> {
     _Tile? byId(String? id) {
       if (id == null) return null;
       for (final t in tiles) {
-        if (t.participant.identity == id) return t;
+        if (t.id == id) return t;
       }
       return null;
     }
 
-    final main =
-        byId(_pinnedIdentity) ?? byId(_spotlightIdentity) ?? tiles.first;
-    final others = tiles
-        .where((t) => t.participant.identity != main.participant.identity)
-        .toList();
+    _Tile? firstShare;
+    for (final t in tiles) {
+      if (t.isScreenShare) {
+        firstShare = t;
+        break;
+      }
+    }
+
+    final main = byId(_pinnedTileId) ??
+        firstShare ??
+        byId(_spotlightIdentity) ??
+        tiles.first;
+    final others = tiles.where((t) => t.id != main.id).toList();
 
     return Column(
       children: [
@@ -472,15 +683,15 @@ class _RoomScreenState extends State<RoomScreen> {
           child: InkWell(
             // 리모컨/탭으로 고정 해제 (포커스 가능)
             onTap: () {
-              if (_pinnedIdentity != null) {
-                setState(() => _pinnedIdentity = null);
+              if (_pinnedTileId != null) {
+                setState(() => _pinnedTileId = null);
               }
             },
             borderRadius: BorderRadius.circular(12),
             child: Stack(
               children: [
                 Positioned.fill(child: _ParticipantTile(tile: main)),
-                if (_pinnedIdentity != null)
+                if (_pinnedTileId != null)
                   Positioned(
                     right: 8,
                     top: 8,
@@ -519,9 +730,8 @@ class _RoomScreenState extends State<RoomScreen> {
                 itemBuilder: (_, i) {
                   final t = others[i];
                   return InkWell(
-                    // 리모컨/탭으로 이 사람 크게 고정 (포커스 가능)
-                    onTap: () => setState(
-                        () => _pinnedIdentity = t.participant.identity),
+                    // 리모컨/탭으로 이 타일 크게 고정 (포커스 가능)
+                    onTap: () => setState(() => _pinnedTileId = t.id),
                     borderRadius: BorderRadius.circular(12),
                     focusColor: Colors.white24,
                     child: AspectRatio(
@@ -582,6 +792,13 @@ class _RoomScreenState extends State<RoomScreen> {
     }
 
     final allTiles = _buildTiles();
+    // 누군가 화면을 공유하면 자동으로 발표(프레젠테이션) 레이아웃으로 크게 보여준다.
+    final hasShare = allTiles.any((t) => t.isScreenShare);
+    final useSpeaker = _speakerView || hasShare;
+    // 화면공유 송출 버튼 노출 조건:
+    //  - 웹(노트북/PC): 항상 (핵심 사용처)
+    //  - 네이티브: TV처럼 넓은 화면은 제외(자기 화면 캡처는 무의미) → 폰만
+    final canPresent = kIsWeb || !isTv;
     // 갤러리 페이지네이션: 한 페이지에 maxVisibleTiles(6)명씩 → 저사양 기기 렌더 부하 고정.
     final perPage = AppConfig.maxVisibleTiles;
     final pageCount = (allTiles.length / perPage).ceil().clamp(1, 9999);
@@ -590,7 +807,20 @@ class _RoomScreenState extends State<RoomScreen> {
     final pageTiles =
         allTiles.skip(_page * perPage).take(perPage).toList();
 
-    return Scaffold(
+    return PopScope(
+      // 뒤로가기(앱바 화살표 · 안드로이드 시스템 백)를 가로채 나가기/회의종료와
+      // 동일하게 처리한다. 방장은 확인 후 방 종료(전원 퇴장).
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _leaving) return;
+        // 채팅 서랍이 열려 있으면 먼저 서랍만 닫는다.
+        if (_chatOpen) {
+          _scaffoldKey.currentState?.closeEndDrawer();
+          return;
+        }
+        _onLeavePressed();
+      },
+      child: Scaffold(
       key: _scaffoldKey,
       onEndDrawerChanged: (open) {
         setState(() {
@@ -662,13 +892,13 @@ class _RoomScreenState extends State<RoomScreen> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.all(8),
-              child: _speakerView
-                  ? _buildSpeakerView(allTiles) // 발표자 뷰: 전체 중 발언자를 메인에
+              child: useSpeaker
+                  ? _buildSpeakerView(allTiles) // 발표자 뷰: 화면공유/발언자를 메인에
                   : _VideoGrid(tiles: pageTiles, isTv: isTv),
             ),
           ),
           // 갤러리 페이지 이동 (참가자가 한 페이지보다 많을 때)
-          if (!_speakerView && pageCount > 1)
+          if (!useSpeaker && pageCount > 1)
             Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
@@ -696,11 +926,16 @@ class _RoomScreenState extends State<RoomScreen> {
             micOn: _micOn,
             camOn: _camOn,
             isHost: widget.isHost,
+            showShare: canPresent,
+            sharing: _screenSharing,
+            shareBusy: _shareBusy,
             onMic: _toggleMic,
             onCam: _toggleCam,
+            onShare: _toggleScreenShare,
             onLeave: _onLeavePressed,
           ),
         ],
+      ),
       ),
     );
   }
@@ -778,14 +1013,21 @@ class _ParticipantTile extends StatelessWidget {
     final name = p.name.isNotEmpty ? p.name : (p.identity);
     final isLocal = p is LocalParticipant;
     final hasVideo = tile.video != null;
+    final isScreen = tile.isScreenShare;
+    // 표시 라벨: 화면공유 타일은 "이름 님의 화면"으로 구분.
+    final label = isScreen
+        ? '${isLocal ? '내' : name} 화면'
+        : (isLocal ? '$name (나)' : name);
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        // 말하는 사람은 초록 테두리로 강조
-        border: tile.speaking
-            ? Border.all(color: const Color(0xFF4ADE80), width: 3)
-            : null,
+        // 화면공유는 파란 테두리, 말하는 사람은 초록 테두리로 강조
+        border: isScreen
+            ? Border.all(color: const Color(0xFF5B8DEF), width: 3)
+            : tile.speaking
+                ? Border.all(color: const Color(0xFF4ADE80), width: 3)
+                : null,
       ),
       child: ClipRRect(
       borderRadius: BorderRadius.circular(12),
@@ -797,8 +1039,9 @@ class _ParticipantTile extends StatelessWidget {
             if (hasVideo)
               VideoTrackRenderer(
                 tile.video!,
-                // 거울 반전 끔: 내 미리보기와 상대가 받는 영상을 동일한
-                // 실제 방향으로 통일 (기본값 auto는 내 화면만 좌우 반전됨)
+                // 화면공유는 전체가 보이도록 contain(레터박스). 카메라도 기본 contain.
+                fit: VideoViewFit.contain,
+                // 화면공유는 절대 좌우반전하면 안 됨(글자가 뒤집힘). 카메라도 off로 통일.
                 mirrorMode: VideoViewMirrorMode.off,
               )
             else
@@ -825,17 +1068,21 @@ class _ParticipantTile extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 마이크 on/off 아이콘 (꺼짐이면 빨간 mic_off)
+                    // 화면공유 타일은 화면 아이콘, 그 외엔 마이크 on/off 아이콘
                     Icon(
-                      tile.micOn ? Icons.mic : Icons.mic_off,
+                      isScreen
+                          ? Icons.screen_share
+                          : (tile.micOn ? Icons.mic : Icons.mic_off),
                       size: 14,
-                      color: tile.micOn
-                          ? Colors.white
-                          : const Color(0xFFFF6B6B),
+                      color: isScreen
+                          ? const Color(0xFF5B8DEF)
+                          : (tile.micOn
+                              ? Colors.white
+                              : const Color(0xFFFF6B6B)),
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isLocal ? '$name (나)' : name,
+                      label,
                       style:
                           const TextStyle(fontSize: 13, color: Colors.white),
                     ),
@@ -856,16 +1103,24 @@ class _ControlBar extends StatelessWidget {
   final bool micOn;
   final bool camOn;
   final bool isHost;
+  final bool showShare; // 화면공유 버튼 노출(웹/폰), TV는 표시 위주라 숨김
+  final bool sharing; // 내가 화면공유 중
+  final bool shareBusy; // 화면공유 토글 진행 중
   final VoidCallback onMic;
   final VoidCallback onCam;
+  final VoidCallback onShare;
   final VoidCallback onLeave;
 
   const _ControlBar({
     required this.micOn,
     required this.camOn,
     required this.isHost,
+    required this.showShare,
+    required this.sharing,
+    required this.shareBusy,
     required this.onMic,
     required this.onCam,
+    required this.onShare,
     required this.onLeave,
   });
 
@@ -892,6 +1147,17 @@ class _ControlBar extends StatelessWidget {
               active: camOn,
               onTap: onCam,
             ),
+            if (showShare) ...[
+              const SizedBox(width: 20),
+              _RoundButton(
+                icon: sharing ? Icons.stop_screen_share : Icons.screen_share,
+                label: sharing ? '공유 중지' : '화면 공유',
+                active: true, // 유휴 시에도 기본(어두운) 색 유지
+                accent: sharing, // 공유 중이면 파란색 강조
+                busy: shareBusy,
+                onTap: shareBusy ? null : onShare,
+              ),
+            ],
             const SizedBox(width: 20),
             _RoundButton(
               icon: Icons.call_end,
@@ -912,8 +1178,10 @@ class _RoundButton extends StatelessWidget {
   final String label;
   final bool active;
   final bool danger;
+  final bool accent; // 활성 강조(파란색) — 화면공유 중 표시용
   final bool autofocus;
-  final VoidCallback onTap;
+  final bool busy; // 진행 중이면 스피너 표시 + 비활성
+  final VoidCallback? onTap; // null 이면 비활성(회색 처리는 안 함, 탭만 막음)
 
   const _RoundButton({
     required this.icon,
@@ -921,14 +1189,18 @@ class _RoundButton extends StatelessWidget {
     required this.active,
     required this.onTap,
     this.danger = false,
+    this.accent = false,
     this.autofocus = false,
+    this.busy = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final bg = danger
         ? const Color(0xFFE5484D)
-        : (active ? const Color(0xFF2E3742) : const Color(0xFF3A2E2E));
+        : accent
+            ? const Color(0xFF2E5AC0)
+            : (active ? const Color(0xFF2E3742) : const Color(0xFF3A2E2E));
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -943,7 +1215,14 @@ class _RoundButton extends StatelessWidget {
             onTap: onTap,
             child: Padding(
               padding: const EdgeInsets.all(18),
-              child: Icon(icon, size: 28, color: Colors.white),
+              child: busy
+                  ? const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2.5, color: Colors.white),
+                    )
+                  : Icon(icon, size: 28, color: Colors.white),
             ),
           ),
         ),
