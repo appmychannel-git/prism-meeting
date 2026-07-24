@@ -363,16 +363,14 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  // 메뉴에 표시할 카메라 이름(외장/전후면 힌트, 라벨 없으면 번호).
+  // 메뉴에 표시할 카메라 이름.
+  // 주의: flutter_webrtc가 주는 라벨의 전/후면(facing) 값은 카메라가 여러 개인 폰
+  // (갤럭시 등)에서 실제와 어긋나는 경우가 있다. 그래서 전면/후면으로 단정하지 않고
+  // USB 외장만 키워드로 표시하고 나머지는 번호로 둔다(틀린 라벨 방지).
   String _cameraLabel(MediaDevice d, int index) {
-    final l = d.label.trim();
-    final lower = l.toLowerCase();
-    final isExternal = lower.contains('external') || lower.contains('usb');
-    if (l.isEmpty) return isExternal ? 'USB 카메라' : '카메라 ${index + 1}';
-    if (lower.contains('front') || lower.contains('user')) return '전면 카메라';
-    if (lower.contains('back') || lower.contains('environment')) return '후면 카메라';
-    if (isExternal) return 'USB 카메라';
-    return l;
+    final lower = d.label.toLowerCase();
+    if (lower.contains('external') || lower.contains('usb')) return 'USB 카메라';
+    return '카메라 ${index + 1}';
   }
 
   // ---- 참가자 타일 목록 구성 (로컬을 맨 앞에) ----
