@@ -30,8 +30,9 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.prism.prism_meeting"
+        // 앱 고유 패키지명(설치/Play Store 식별자). 내부 코드 namespace(com.prism...)와
+        // 달라도 무방하다. 딥링크(App Links)의 assetlinks.json·intent:// 도 이 값을 사용.
+        applicationId = "kr.co.mychannel.meeting.prism"
         // WebRTC(flutter_webrtc/livekit)는 minSdk 23 이상 필요
         minSdk = maxOf(23, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion

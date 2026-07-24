@@ -49,7 +49,7 @@
           + '?' + params.toString() + '&noapp=1';
         var intentUrl = 'intent://' + window.location.host
           + window.location.pathname + window.location.search
-          + '#Intent;scheme=https;package=com.prism.prism_meeting;'
+          + '#Intent;scheme=https;package=kr.co.mychannel.meeting.prism;'
           + 'S.browser_fallback_url=' + encodeURIComponent(fb) + ';end';
         window.location.href = intentUrl;
       } catch (e) {}

@@ -458,6 +458,25 @@ class _JoinScreenState extends State<JoinScreen> {
                 ),
               ),
             ),
+            // 하단 Powered by 표기
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    'Powered by 마이채널',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
