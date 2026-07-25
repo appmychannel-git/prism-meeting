@@ -543,10 +543,20 @@ class _RoomScreenState extends State<RoomScreen> {
         }
       }
 
+      // iOS는 다른 앱/전체 화면을 캡처하려면 ReplayKit Broadcast Extension을 통해야 한다
+      // (BroadcastExtension 타깃 + App Group 설정 필요). 이 옵션이 켜져야 시스템
+      // 방송 피커가 뜨고 확장을 거쳐 화면이 송출된다. 안드로이드/웹은 기존 경로 유지.
+      final iosBroadcast = !kIsWeb && lkPlatformIs(PlatformType.iOS);
       // 화면 소리도 함께 전송. 웹은 브라우저의 "탭 오디오 공유"로 안정적으로 동작.
       // 안드로이드 내부오디오 캡처는 기기별로 실패해 공유 자체가 막힐 수 있어 실기기
       // 검증 전까지는 웹에서만 켠다.
-      await lp.setScreenShareEnabled(true, captureScreenAudio: kIsWeb);
+      await lp.setScreenShareEnabled(
+        true,
+        captureScreenAudio: kIsWeb,
+        screenShareCaptureOptions: iosBroadcast
+            ? ScreenShareCaptureOptions(useiOSBroadcastExtension: true)
+            : null,
+      );
       _syncScreenShareState();
     } catch (e) {
       await _stopBackgroundService();

@@ -34,9 +34,11 @@
 
   <!--
     카카오톡 등 인앱 브라우저 대응:
-    초대 링크(?room=...)로 들어오면 안드로이드에서 intent:// 로 네이티브 앱을 바로 실행.
-    앱이 없으면 browser_fallback_url(웹, noapp=1)로 되돌아와 웹으로 진행.
-    인앱 브라우저는 App Links를 무시하므로 이 방식으로 앱을 연다.
+    초대 링크(?room=...)로 들어오면 네이티브 앱을 바로 실행한다.
+    - 안드로이드: intent:// (scheme=https, package 지정, 미설치 시 browser_fallback_url 로 웹 복귀)
+    - iOS:       커스텀 스킴 prismmeeting:// (Universal Link 는 카카오 인앱 웹뷰에서 동작하지
+                 않으므로 스킴으로 앱을 연다). 미설치 시 페이지가 남으므로 일정 시간 후 웹 폴백.
+    앱이 없으면 웹(noapp=1)으로 되돌아와 그대로 진행한다.
   -->
   <script>
     (function () {
@@ -44,14 +46,36 @@
         var params = new URLSearchParams(window.location.search);
         if (!params.get('room')) return;        // 초대 링크일 때만
         if (params.get('noapp') === '1') return; // 웹 폴백(재시도 방지)
-        if (!/Android/i.test(navigator.userAgent || '')) return; // 안드로이드만(iOS 추후)
+        var ua = navigator.userAgent || '';
         var fb = window.location.origin + window.location.pathname
           + '?' + params.toString() + '&noapp=1';
-        var intentUrl = 'intent://' + window.location.host
-          + window.location.pathname + window.location.search
-          + '#Intent;scheme=https;package=kr.co.mychannel.meeting.prism;'
-          + 'S.browser_fallback_url=' + encodeURIComponent(fb) + ';end';
-        window.location.href = intentUrl;
+
+        // ── 안드로이드: intent:// ──
+        if (/Android/i.test(ua)) {
+          var intentUrl = 'intent://' + window.location.host
+            + window.location.pathname + window.location.search
+            + '#Intent;scheme=https;package=kr.co.mychannel.meeting.prism;'
+            + 'S.browser_fallback_url=' + encodeURIComponent(fb) + ';end';
+          window.location.href = intentUrl;
+          return;
+        }
+
+        // ── iOS: 커스텀 스킴 + 타임아웃 폴백 ──
+        if (/iPhone|iPad|iPod/i.test(ua)) {
+          var scheme = 'prismmeeting://join?' + params.toString();
+          var left = false; // 앱으로 전환되면(페이지가 백그라운드로) 폴백 취소
+          var onLeave = function () { left = true; };
+          document.addEventListener('visibilitychange', function () {
+            if (document.hidden) left = true;
+          });
+          window.addEventListener('pagehide', onLeave);
+          window.addEventListener('blur', onLeave);
+          setTimeout(function () {
+            if (!left) window.location.href = fb; // 앱 미설치 → 웹으로 진행
+          }, 1600);
+          window.location.href = scheme;          // 앱 실행 시도
+          return;
+        }
       } catch (e) {}
     })();
   </script>
