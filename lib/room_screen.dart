@@ -27,8 +27,13 @@ class _Tile {
   final bool micOn;
   final bool speaking;
   final bool isScreenShare;
-  _Tile(this.participant, this.video,
-      {this.micOn = false, this.speaking = false, this.isScreenShare = false});
+  _Tile(
+    this.participant,
+    this.video, {
+    this.micOn = false,
+    this.speaking = false,
+    this.isScreenShare = false,
+  });
 
   /// 핀/스포트라이트 매칭용 고유 id. 화면공유 타일은 카메라 타일과 identity가
   /// 같으므로 접미사로 구분한다.
@@ -205,8 +210,8 @@ class _RoomScreenState extends State<RoomScreen> {
     if (e.topic != _chatTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
-      final sender =
-          (m['sender'] ?? e.participant?.identity ?? '상대').toString();
+      final sender = (m['sender'] ?? e.participant?.identity ?? '상대')
+          .toString();
       final text = (m['text'] ?? '').toString();
       if (text.isEmpty) return;
       _addMessage(ChatMessage(sender: sender, text: text, mine: false));
@@ -225,12 +230,13 @@ class _RoomScreenState extends State<RoomScreen> {
 
   // 채팅 전송 (같은 방 모든 참가자에게)
   Future<void> _sendChat(String text) async {
-    final payload = utf8.encode(jsonEncode({
-      'sender': widget.displayName,
-      'text': text,
-    }));
+    final payload = utf8.encode(
+      jsonEncode({'sender': widget.displayName, 'text': text}),
+    );
     // 내 화면에는 즉시 표시 (publishData는 발신자에게 되돌아오지 않음)
-    _addMessage(ChatMessage(sender: widget.displayName, text: text, mine: true));
+    _addMessage(
+      ChatMessage(sender: widget.displayName, text: text, mine: true),
+    );
     try {
       await _room.localParticipant?.publishData(
         payload,
@@ -330,9 +336,10 @@ class _RoomScreenState extends State<RoomScreen> {
       if (cams.isEmpty) return false;
       final pick = _preferExternal(cams);
       await lp
-          .setCameraEnabled(true,
-              cameraCaptureOptions:
-                  CameraCaptureOptions(deviceId: pick.deviceId))
+          .setCameraEnabled(
+            true,
+            cameraCaptureOptions: CameraCaptureOptions(deviceId: pick.deviceId),
+          )
           .timeout(const Duration(seconds: 8));
       if (mounted) {
         setState(() {
@@ -372,8 +379,10 @@ class _RoomScreenState extends State<RoomScreen> {
       if (camTrack != null) {
         await camTrack.switchCamera(d.deviceId);
       } else {
-        await lp.setCameraEnabled(true,
-            cameraCaptureOptions: CameraCaptureOptions(deviceId: d.deviceId));
+        await lp.setCameraEnabled(
+          true,
+          cameraCaptureOptions: CameraCaptureOptions(deviceId: d.deviceId),
+        );
       }
       if (mounted) {
         setState(() {
@@ -438,12 +447,14 @@ class _RoomScreenState extends State<RoomScreen> {
 
     void addFor(Participant p) {
       // 카메라(또는 아바타) 타일
-      tiles.add(_Tile(
-        p,
-        cameraVideo(p.videoTrackPublications),
-        micOn: micOn(p),
-        speaking: p.isSpeaking,
-      ));
+      tiles.add(
+        _Tile(
+          p,
+          cameraVideo(p.videoTrackPublications),
+          micOn: micOn(p),
+          speaking: p.isSpeaking,
+        ),
+      );
       // 화면공유 타일(있을 때만) — 별도 타일로 크게 보여준다.
       final screen = screenVideo(p.videoTrackPublications);
       if (screen != null) {
@@ -584,8 +595,10 @@ class _RoomScreenState extends State<RoomScreen> {
         notificationTitle: '화면 공유 중',
         notificationText: 'Prism Meeting 이 화면을 공유하고 있습니다.',
         notificationImportance: AndroidNotificationImportance.normal,
-        notificationIcon:
-            AndroidResource(name: 'ic_launcher', defType: 'mipmap'),
+        notificationIcon: AndroidResource(
+          name: 'ic_launcher',
+          defType: 'mipmap',
+        ),
       );
       var has = await FlutterBackground.hasPermissions;
       if (!isRetry) {
@@ -619,8 +632,7 @@ class _RoomScreenState extends State<RoomScreen> {
 
   void _snack(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
   bool _leaving = false;
@@ -642,8 +654,9 @@ class _RoomScreenState extends State<RoomScreen> {
           content: Text(notice),
           actions: [
             FilledButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('확인')),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('확인'),
+            ),
           ],
         ),
       ).whenComplete(_popSelf);
@@ -671,11 +684,13 @@ class _RoomScreenState extends State<RoomScreen> {
           content: const Text('회의를 종료하면 모든 참가자가 나가게 됩니다. 종료할까요?'),
           actions: [
             TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('취소')),
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소'),
+            ),
             FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('종료')),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('종료'),
+            ),
           ],
         ),
       );
@@ -723,26 +738,34 @@ class _RoomScreenState extends State<RoomScreen> {
                   ),
                   // QR 생성 실패 시에도 다이얼로그가 쓸모있도록 안내 대체
                   errorBuilder: (_, _, _) => const Center(
-                    child: Text('QR 생성 실패\n아래 링크를 복사해 사용하세요',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.black54, fontSize: 13)),
+                    child: Text(
+                      'QR 생성 실패\n아래 링크를 복사해 사용하세요',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.black54, fontSize: 13),
+                    ),
                   ),
                 ),
               ),
             ),
             const SizedBox(height: 16),
-            Text('방 코드: ${widget.roomName}',
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              '방 코드: ${widget.roomName}',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
             if (widget.pin != null && widget.pin!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text('입장 코드: ${widget.pin}',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(
+                  '입장 코드: ${widget.pin}',
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             const SizedBox(height: 8),
-            const Text('휴대폰으로 QR을 스캔하면 이 방으로 입장합니다.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.white70)),
+            const Text(
+              '휴대폰으로 QR을 스캔하면 이 방으로 입장합니다.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.white70),
+            ),
           ],
         ),
         actions: [
@@ -751,9 +774,9 @@ class _RoomScreenState extends State<RoomScreen> {
               Clipboard.setData(ClipboardData(text: link));
               Navigator.pop(ctx);
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('초대 링크 복사됨')),
-                );
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(const SnackBar(content: Text('초대 링크 복사됨')));
               }
             },
             child: const Text('링크 복사'),
@@ -810,7 +833,8 @@ class _RoomScreenState extends State<RoomScreen> {
       }
     }
 
-    final main = byId(_pinnedTileId) ??
+    final main =
+        byId(_pinnedTileId) ??
         firstShare ??
         byId(_spotlightIdentity) ??
         tiles.first;
@@ -836,7 +860,9 @@ class _RoomScreenState extends State<RoomScreen> {
                     top: 8,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(6),
@@ -846,9 +872,10 @@ class _RoomScreenState extends State<RoomScreen> {
                         children: [
                           Icon(Icons.push_pin, size: 14, color: Colors.white),
                           SizedBox(width: 4),
-                          Text('고정됨 · 탭하여 해제',
-                              style: TextStyle(
-                                  fontSize: 12, color: Colors.white)),
+                          Text(
+                            '고정됨 · 탭하여 해제',
+                            style: TextStyle(fontSize: 12, color: Colors.white),
+                          ),
                         ],
                       ),
                     ),
@@ -914,8 +941,11 @@ class _RoomScreenState extends State<RoomScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline,
-                    size: 48, color: Color(0xFFFF8A80)),
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                  color: Color(0xFFFF8A80),
+                ),
                 const SizedBox(height: 12),
                 Text(_error!, textAlign: TextAlign.center),
                 const SizedBox(height: 20),
@@ -943,8 +973,12 @@ class _RoomScreenState extends State<RoomScreen> {
     final pageCount = (allTiles.length / perPage).ceil().clamp(1, 9999);
     if (_page >= pageCount) _page = pageCount - 1; // 인원 줄면 페이지 보정
     if (_page < 0) _page = 0;
-    final pageTiles =
-        allTiles.skip(_page * perPage).take(perPage).toList();
+    final pageTiles = allTiles.skip(_page * perPage).take(perPage).toList();
+
+    // 넓은 화면(PC·안드로이드TV 가로)에서는 채팅을 영상 옆 인라인 패널로 → 영상이
+    // 왼쪽으로 줄고 가려지지 않는다. 좁은 화면(모바일)은 기존 드로어(오버레이) 유지.
+    final wideChat = size.width >= 900;
+    final inlineChatOpen = wideChat && _chatOpen;
 
     return PopScope(
       // 뒤로가기(앱바 화살표 · 안드로이드 시스템 백)를 가로채 나가기/회의종료와
@@ -952,186 +986,233 @@ class _RoomScreenState extends State<RoomScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || _leaving) return;
-        // 채팅 서랍이 열려 있으면 먼저 서랍만 닫는다.
+        // 채팅이 열려 있으면 먼저 채팅만 닫는다(인라인/드로어 각각 처리).
         if (_chatOpen) {
-          _scaffoldKey.currentState?.closeEndDrawer();
+          if (wideChat) {
+            setState(() => _chatOpen = false);
+          } else {
+            _scaffoldKey.currentState?.closeEndDrawer();
+          }
           return;
         }
         _onLeavePressed();
       },
       child: Scaffold(
-      key: _scaffoldKey,
-      onEndDrawerChanged: (open) {
-        setState(() {
-          _chatOpen = open;
-          if (open) _unread = 0;
-        });
-      },
-      endDrawer: Drawer(
-        width: isTv ? 420 : 320,
-        child: ChatPanel(messages: _messages, onSend: _sendChat),
-      ),
-      appBar: AppBar(
-        // 뒤로가기 ↔ 방이름 간격 최소화 + 방이름 글자 작게 → 긴 방이름도 더 보이게
-        titleSpacing: 0,
-        leadingWidth: 40, // 뒤로가기 영역 축소 → 방이름을 왼쪽으로 더 당김
-        title: Text(
-          '${widget.roomName} · ${allTiles.length}명',
-          style: const TextStyle(fontSize: 15),
-          overflow: TextOverflow.ellipsis,
-        ),
-        actions: [
-          // ① 카메라 전환 — 카메라가 2개 이상(전/후면, USB 외장 등)일 때만 노출
-          if (_cameras.length >= 2)
-            PopupMenuButton<MediaDevice>(
-              tooltip: '카메라 전환',
-              padding: EdgeInsets.zero,
-              icon: const Icon(Icons.cameraswitch),
-              onSelected: _switchCamera,
-              itemBuilder: (_) => [
-                for (int i = 0; i < _cameras.length; i++)
-                  PopupMenuItem<MediaDevice>(
-                    value: _cameras[i],
-                    child: Row(
-                      children: [
-                        Icon(
-                          _cameras[i].deviceId == _currentCameraId
-                              ? Icons.check
-                              : Icons.videocam_outlined,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            _cameraLabel(_cameras[i], i),
-                            overflow: TextOverflow.ellipsis,
+        key: _scaffoldKey,
+        onEndDrawerChanged: (open) {
+          setState(() {
+            _chatOpen = open;
+            if (open) _unread = 0;
+          });
+        },
+        // 좁은 화면(모바일)만 드로어. 넓은 화면은 body 안에 인라인 패널로 표시.
+        endDrawer: wideChat
+            ? null
+            : Drawer(
+                width: isTv ? 420 : 320,
+                child: ChatPanel(messages: _messages, onSend: _sendChat),
+              ),
+        appBar: AppBar(
+          // 뒤로가기 ↔ 방이름 간격 최소화 + 방이름 글자 작게 → 긴 방이름도 더 보이게
+          titleSpacing: 0,
+          leadingWidth: 40, // 뒤로가기 영역 축소 → 방이름을 왼쪽으로 더 당김
+          title: Text(
+            '${widget.roomName} · ${allTiles.length}명',
+            style: const TextStyle(fontSize: 15),
+            overflow: TextOverflow.ellipsis,
+          ),
+          actions: [
+            // ① 카메라 전환 — 카메라가 2개 이상(전/후면, USB 외장 등)일 때만 노출
+            if (_cameras.length >= 2)
+              PopupMenuButton<MediaDevice>(
+                tooltip: '카메라 전환',
+                padding: EdgeInsets.zero,
+                icon: const Icon(Icons.cameraswitch),
+                onSelected: _switchCamera,
+                itemBuilder: (_) => [
+                  for (int i = 0; i < _cameras.length; i++)
+                    PopupMenuItem<MediaDevice>(
+                      value: _cameras[i],
+                      child: Row(
+                        children: [
+                          Icon(
+                            _cameras[i].deviceId == _currentCameraId
+                                ? Icons.check
+                                : Icons.videocam_outlined,
+                            size: 18,
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              _cameraLabel(_cameras[i], i),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                ],
+              ),
+            // ② 화면 모드 변환 (갤러리 ↔ 발표자)
+            IconButton(
+              tooltip: _speakerView ? '갤러리 뷰' : '발표자 뷰',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(() => _speakerView = !_speakerView),
+              icon: Icon(_speakerView ? Icons.grid_view : Icons.view_sidebar),
+            ),
+            // ③ 초대 (QR + 링크 복사를 한 다이얼로그로 통합 → 아이콘 1개로 축소)
+            IconButton(
+              tooltip: '초대 (QR·링크)',
+              visualDensity: VisualDensity.compact,
+              onPressed: _showInviteQr,
+              icon: const Icon(Icons.person_add_alt),
+            ),
+            // ④ 채팅
+            IconButton(
+              tooltip: '채팅',
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                if (wideChat) {
+                  // 인라인 토글 (영상 옆으로 열림/닫힘)
+                  setState(() {
+                    _chatOpen = !_chatOpen;
+                    if (_chatOpen) _unread = 0;
+                  });
+                } else {
+                  _scaffoldKey.currentState?.openEndDrawer();
+                }
+              },
+              icon: Badge.count(
+                count: _unread,
+                isLabelVisible: _unread > 0,
+                child: const Icon(Icons.chat_bubble_outline),
+              ),
+            ),
+            // ⑤ 더보기(⋮) — 자주 안 쓰는 항목은 여기로: 화면 숨기기(저사양)
+            PopupMenuButton<String>(
+              tooltip: '더보기',
+              padding: EdgeInsets.zero,
+              onSelected: (v) {
+                if (v == 'recv') _toggleReceiveVideo();
+              },
+              itemBuilder: (_) => [
+                PopupMenuItem<String>(
+                  value: 'recv',
+                  child: Row(
+                    children: [
+                      Icon(
+                        _receiveVideo ? Icons.visibility_off : Icons.visibility,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_receiveVideo ? '화면 숨기기(저사양)' : '화면 다시 보기'),
+                    ],
                   ),
+                ),
               ],
             ),
-          // ② 화면 모드 변환 (갤러리 ↔ 발표자)
-          IconButton(
-            tooltip: _speakerView ? '갤러리 뷰' : '발표자 뷰',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => setState(() => _speakerView = !_speakerView),
-            icon: Icon(_speakerView ? Icons.grid_view : Icons.view_sidebar),
-          ),
-          // ③ 초대 (QR + 링크 복사를 한 다이얼로그로 통합 → 아이콘 1개로 축소)
-          IconButton(
-            tooltip: '초대 (QR·링크)',
-            visualDensity: VisualDensity.compact,
-            onPressed: _showInviteQr,
-            icon: const Icon(Icons.person_add_alt),
-          ),
-          // ④ 채팅
-          IconButton(
-            tooltip: '채팅',
-            visualDensity: VisualDensity.compact,
-            onPressed: () => _scaffoldKey.currentState?.openEndDrawer(),
-            icon: Badge.count(
-              count: _unread,
-              isLabelVisible: _unread > 0,
-              child: const Icon(Icons.chat_bubble_outline),
-            ),
-          ),
-          // ⑤ 더보기(⋮) — 자주 안 쓰는 항목은 여기로: 화면 숨기기(저사양)
-          PopupMenuButton<String>(
-            tooltip: '더보기',
-            padding: EdgeInsets.zero,
-            onSelected: (v) {
-              if (v == 'recv') _toggleReceiveVideo();
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem<String>(
-                value: 'recv',
-                child: Row(
-                  children: [
-                    Icon(
-                      _receiveVideo ? Icons.visibility_off : Icons.visibility,
-                      size: 18,
+          ],
+        ),
+        body: Row(
+          children: [
+            Expanded(
+              child: Column(
+                children: [
+                  // 네트워크 재연결 중 배너 (자동 복구 시도 중임을 표시)
+                  if (_reconnecting)
+                    Container(
+                      width: double.infinity,
+                      color: const Color(0xFFB45309),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 8,
+                        horizontal: 12,
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                          SizedBox(width: 10),
+                          Text(
+                            '네트워크 재연결 중...',
+                            style: TextStyle(color: Colors.white, fontSize: 13),
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(_receiveVideo ? '화면 숨기기(저사양)' : '화면 다시 보기'),
-                  ],
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: useSpeaker
+                          ? _buildSpeakerView(allTiles) // 발표자 뷰: 화면공유/발언자를 메인에
+                          : _VideoGrid(tiles: pageTiles, isTv: isTv),
+                    ),
+                  ),
+                  // 갤러리 페이지 이동 (참가자가 한 페이지보다 많을 때)
+                  if (!useSpeaker && pageCount > 1)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            tooltip: '이전',
+                            onPressed: _page > 0
+                                ? () => setState(() => _page--)
+                                : null,
+                            icon: const Icon(Icons.chevron_left),
+                          ),
+                          Text(
+                            '${_page + 1} / $pageCount',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                          IconButton(
+                            tooltip: '다음',
+                            onPressed: _page < pageCount - 1
+                                ? () => setState(() => _page++)
+                                : null,
+                            icon: const Icon(Icons.chevron_right),
+                          ),
+                        ],
+                      ),
+                    ),
+                  _ControlBar(
+                    micOn: _micOn,
+                    camOn: _camOn,
+                    isHost: widget.isHost,
+                    showShare: canPresent,
+                    sharing: _screenSharing,
+                    shareBusy: _shareBusy,
+                    onMic: _toggleMic,
+                    onCam: _toggleCam,
+                    onShare: _toggleScreenShare,
+                    onLeave: _onLeavePressed,
+                  ),
+                ],
+              ),
+            ),
+            // 넓은 화면: 채팅을 영상 오른쪽에 인라인으로 → 영상 영역이 왼쪽으로 줄어듦
+            if (inlineChatOpen)
+              Container(
+                width: isTv ? 380 : 340,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF141922),
+                  border: Border(left: BorderSide(color: Colors.white12)),
+                ),
+                child: ChatPanel(
+                  messages: _messages,
+                  onSend: _sendChat,
+                  onClose: () => setState(() => _chatOpen = false),
                 ),
               ),
-            ],
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 네트워크 재연결 중 배너 (자동 복구 시도 중임을 표시)
-          if (_reconnecting)
-            Container(
-              width: double.infinity,
-              color: const Color(0xFFB45309),
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  ),
-                  SizedBox(width: 10),
-                  Text('네트워크 재연결 중...',
-                      style: TextStyle(color: Colors.white, fontSize: 13)),
-                ],
-              ),
-            ),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: useSpeaker
-                  ? _buildSpeakerView(allTiles) // 발표자 뷰: 화면공유/발언자를 메인에
-                  : _VideoGrid(tiles: pageTiles, isTv: isTv),
-            ),
-          ),
-          // 갤러리 페이지 이동 (참가자가 한 페이지보다 많을 때)
-          if (!useSpeaker && pageCount > 1)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  IconButton(
-                    tooltip: '이전',
-                    onPressed:
-                        _page > 0 ? () => setState(() => _page--) : null,
-                    icon: const Icon(Icons.chevron_left),
-                  ),
-                  Text('${_page + 1} / $pageCount',
-                      style: const TextStyle(fontSize: 14)),
-                  IconButton(
-                    tooltip: '다음',
-                    onPressed: _page < pageCount - 1
-                        ? () => setState(() => _page++)
-                        : null,
-                    icon: const Icon(Icons.chevron_right),
-                  ),
-                ],
-              ),
-            ),
-          _ControlBar(
-            micOn: _micOn,
-            camOn: _camOn,
-            isHost: widget.isHost,
-            showShare: canPresent,
-            sharing: _screenSharing,
-            shareBusy: _shareBusy,
-            onMic: _toggleMic,
-            onCam: _toggleCam,
-            onShare: _toggleScreenShare,
-            onLeave: _onLeavePressed,
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
     );
   }
@@ -1222,73 +1303,79 @@ class _ParticipantTile extends StatelessWidget {
         border: isScreen
             ? Border.all(color: const Color(0xFF5B8DEF), width: 3)
             : tile.speaking
-                ? Border.all(color: const Color(0xFF4ADE80), width: 3)
-                : null,
+            ? Border.all(color: const Color(0xFF4ADE80), width: 3)
+            : null,
       ),
       child: ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        color: const Color(0xFF1A1F27),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasVideo)
-              VideoTrackRenderer(
-                tile.video!,
-                // 화면공유는 전체가 보이도록 contain(레터박스). 카메라도 기본 contain.
-                fit: VideoViewFit.contain,
-                // 화면공유는 절대 좌우반전하면 안 됨(글자가 뒤집힘). 카메라도 off로 통일.
-                mirrorMode: VideoViewMirrorMode.off,
-              )
-            else
-              Center(
-                child: CircleAvatar(
-                  radius: 32,
-                  backgroundColor: const Color(0xFF2E3742),
-                  child: Text(
-                    name.isNotEmpty ? name.characters.first.toUpperCase() : '?',
-                    style: const TextStyle(fontSize: 28),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          color: const Color(0xFF1A1F27),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (hasVideo)
+                VideoTrackRenderer(
+                  tile.video!,
+                  // 화면공유는 전체가 보이도록 contain(레터박스). 카메라도 기본 contain.
+                  fit: VideoViewFit.contain,
+                  // 화면공유는 절대 좌우반전하면 안 됨(글자가 뒤집힘). 카메라도 off로 통일.
+                  mirrorMode: VideoViewMirrorMode.off,
+                )
+              else
+                Center(
+                  child: CircleAvatar(
+                    radius: 32,
+                    backgroundColor: const Color(0xFF2E3742),
+                    child: Text(
+                      name.isNotEmpty
+                          ? name.characters.first.toUpperCase()
+                          : '?',
+                      style: const TextStyle(fontSize: 28),
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: 8,
+                bottom: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // 화면공유 타일은 화면 아이콘, 그 외엔 마이크 on/off 아이콘
+                      Icon(
+                        isScreen
+                            ? Icons.screen_share
+                            : (tile.micOn ? Icons.mic : Icons.mic_off),
+                        size: 14,
+                        color: isScreen
+                            ? const Color(0xFF5B8DEF)
+                            : (tile.micOn
+                                  ? Colors.white
+                                  : const Color(0xFFFF6B6B)),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            Positioned(
-              left: 8,
-              bottom: 8,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 화면공유 타일은 화면 아이콘, 그 외엔 마이크 on/off 아이콘
-                    Icon(
-                      isScreen
-                          ? Icons.screen_share
-                          : (tile.micOn ? Icons.mic : Icons.mic_off),
-                      size: 14,
-                      color: isScreen
-                          ? const Color(0xFF5B8DEF)
-                          : (tile.micOn
-                              ? Colors.white
-                              : const Color(0xFFFF6B6B)),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      label,
-                      style:
-                          const TextStyle(fontSize: 13, color: Colors.white),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -1395,8 +1482,8 @@ class _RoundButton extends StatelessWidget {
     final bg = danger
         ? const Color(0xFFE5484D)
         : accent
-            ? const Color(0xFF2E5AC0)
-            : (active ? const Color(0xFF2E3742) : const Color(0xFF3A2E2E));
+        ? const Color(0xFF2E5AC0)
+        : (active ? const Color(0xFF2E3742) : const Color(0xFF3A2E2E));
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -1416,7 +1503,9 @@ class _RoundButton extends StatelessWidget {
                       width: 28,
                       height: 28,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2.5, color: Colors.white),
+                        strokeWidth: 2.5,
+                        color: Colors.white,
+                      ),
                     )
                   : Icon(icon, size: 28, color: Colors.white),
             ),

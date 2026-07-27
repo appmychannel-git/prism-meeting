@@ -19,7 +19,15 @@ class ChatMessage {
 class ChatPanel extends StatefulWidget {
   final List<ChatMessage> messages;
   final void Function(String text) onSend;
-  const ChatPanel({super.key, required this.messages, required this.onSend});
+  // 닫기 동작. null이면 드로어처럼 Navigator.maybePop()(오버레이 닫기).
+  // 인라인(영상 옆) 모드에선 상위에서 setState로 패널을 접는 콜백을 넘긴다.
+  final VoidCallback? onClose;
+  const ChatPanel({
+    super.key,
+    required this.messages,
+    required this.onSend,
+    this.onClose,
+  });
 
   @override
   State<ChatPanel> createState() => _ChatPanelState();
@@ -72,16 +80,18 @@ class _ChatPanelState extends State<ChatPanel> {
               children: [
                 const Icon(Icons.chat_bubble_outline, size: 20),
                 const SizedBox(width: 8),
-                Text('채팅',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  '채팅',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: '닫기',
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed:
+                      widget.onClose ?? () => Navigator.of(context).maybePop(),
                 ),
               ],
             ),
@@ -92,8 +102,10 @@ class _ChatPanelState extends State<ChatPanel> {
           Expanded(
             child: widget.messages.isEmpty
                 ? const Center(
-                    child: Text('아직 메시지가 없습니다.',
-                        style: TextStyle(color: Colors.white38)),
+                    child: Text(
+                      '아직 메시지가 없습니다.',
+                      style: TextStyle(color: Colors.white38),
+                    ),
                   )
                 : ListView.builder(
                     controller: _scrollCtrl,
@@ -119,8 +131,10 @@ class _ChatPanelState extends State<ChatPanel> {
                     decoration: const InputDecoration(
                       hintText: '메시지 입력...',
                       border: OutlineInputBorder(),
-                      contentPadding:
-                          EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                     ),
                   ),
                 ),
@@ -149,14 +163,17 @@ class _Bubble extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
-        crossAxisAlignment:
-            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: mine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           if (!mine)
             Padding(
               padding: const EdgeInsets.only(left: 4, bottom: 2),
-              child: Text(msg.sender,
-                  style: const TextStyle(fontSize: 11, color: Colors.white54)),
+              child: Text(
+                msg.sender,
+                style: const TextStyle(fontSize: 11, color: Colors.white54),
+              ),
             ),
           Container(
             constraints: const BoxConstraints(maxWidth: 240),
