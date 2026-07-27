@@ -47,6 +47,8 @@ class RoomScreen extends StatefulWidget {
   final String displayName;
   final String? pin; // 비공개 방이면 초대 링크에 포함
   final bool isHost; // 방을 만든 사람(방장) → 나가면 방 종료
+  // 링크로 바로 입장한 경우 true → 입장 직후 이름 설정 팝업을 띄운다.
+  final bool promptNameOnEnter;
 
   const RoomScreen({
     super.key,
@@ -55,6 +57,7 @@ class RoomScreen extends StatefulWidget {
     required this.displayName,
     this.pin,
     this.isHost = false,
+    this.promptNameOnEnter = false,
   });
 
   @override
@@ -106,6 +109,9 @@ class _RoomScreenState extends State<RoomScreen> {
   bool _connecting = true;
   bool _reconnecting = false; // 네트워크 재연결 중
   String? _error;
+
+  // 표시 이름(입장 후 팝업으로 변경 가능). 채팅 발신자/타일 이름에 사용.
+  late String _displayName = widget.displayName;
 
   // ---- 채팅 상태 ----
   static const String _chatTopic = 'chat';
@@ -197,6 +203,7 @@ class _RoomScreenState extends State<RoomScreen> {
         // 브라우저 "공유 중지" 바나 안드로이드 알림에서 직접 끈 경우도 여기로 온다.
         _syncScreenShareState();
       })
+      ..on<ParticipantNameUpdatedEvent>((_) => _onRoomChange()) // 이름 변경 반영
       ..on<ActiveSpeakersChangedEvent>((_) {
         final speakers = _room.activeSpeakers;
         if (speakers.isNotEmpty) _spotlightIdentity = speakers.first.identity;
@@ -231,12 +238,10 @@ class _RoomScreenState extends State<RoomScreen> {
   // 채팅 전송 (같은 방 모든 참가자에게)
   Future<void> _sendChat(String text) async {
     final payload = utf8.encode(
-      jsonEncode({'sender': widget.displayName, 'text': text}),
+      jsonEncode({'sender': _displayName, 'text': text}),
     );
     // 내 화면에는 즉시 표시 (publishData는 발신자에게 되돌아오지 않음)
-    _addMessage(
-      ChatMessage(sender: widget.displayName, text: text, mine: true),
-    );
+    _addMessage(ChatMessage(sender: _displayName, text: text, mine: true));
     try {
       await _room.localParticipant?.publishData(
         payload,
@@ -270,9 +275,57 @@ class _RoomScreenState extends State<RoomScreen> {
     // 방 접속 성공 → 즉시 회의 화면 표시.
     if (mounted) setState(() => _connecting = false);
 
+    // 링크로 바로 입장한 경우: 입장 직후 이름 설정 팝업.
+    if (widget.promptNameOnEnter) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showNameDialog(initial: true);
+      });
+    }
+
     // 카메라/마이크는 실패하거나 오래 걸려도 회의 진입을 막지 않는다.
     // (카메라 없는/고장난 기기 = TV·미디어박스에서 흔함. 그 경우 아바타로 참여)
     _enableLocalDevices();
+  }
+
+  // 표시 이름 설정/변경 팝업. 확인 시 LiveKit 참가자 이름도 갱신(다른 참가자에게 반영).
+  Future<void> _showNameDialog({bool initial = false}) async {
+    final ctrl = TextEditingController(text: initial ? '' : _displayName);
+    final result = await showDialog<String>(
+      context: context,
+      barrierDismissible: !initial, // 최초 입장 팝업은 바깥 탭으로 안 닫히게
+      builder: (ctx) => AlertDialog(
+        title: Text(initial ? '이름 설정' : '이름 변경'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          maxLength: 20,
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+          decoration: InputDecoration(
+            labelText: '표시 이름',
+            hintText: initial ? '회의에서 보일 이름 (예: 홍길동)' : null,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(initial ? '건너뛰기' : '취소'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    final name = (result ?? '').trim();
+    if (name.isEmpty || name == _displayName) return;
+    setState(() => _displayName = name);
+    try {
+      await _room.localParticipant?.setName(name);
+    } catch (_) {}
   }
 
   Future<void> _enableLocalDevices() async {
@@ -1094,8 +1147,19 @@ class _RoomScreenState extends State<RoomScreen> {
               padding: EdgeInsets.zero,
               onSelected: (v) {
                 if (v == 'recv') _toggleReceiveVideo();
+                if (v == 'name') _showNameDialog();
               },
               itemBuilder: (_) => [
+                const PopupMenuItem<String>(
+                  value: 'name',
+                  child: Row(
+                    children: [
+                      Icon(Icons.badge_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('이름 변경'),
+                    ],
+                  ),
+                ),
                 PopupMenuItem<String>(
                   value: 'recv',
                   child: Row(

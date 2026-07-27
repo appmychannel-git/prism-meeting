@@ -34,6 +34,8 @@ class _JoinScreenState extends State<JoinScreen> {
   bool _private = false; // 방 만들기: 비공개 방 여부
   bool _connecting = false;
   String? _error;
+  bool _autoJoining = false; // 초대 링크로 자동 입장 중(폼 대신 로딩 표시)
+  bool _linkJoinTriggered = false; // 링크 자동입장 중복 트리거 방지
 
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSub;
@@ -60,15 +62,20 @@ class _JoinScreenState extends State<JoinScreen> {
     );
   }
 
-  // 초대 링크의 room/pin 을 참여 탭에 채운다.
+  // 초대 링크(room/pin)로 열리면 폼을 거치지 않고 바로 입장한다.
+  // 이름은 방 입장 후 팝업에서 설정(RoomScreen.promptNameOnEnter).
   void _applyLinkUri(Uri uri, {bool rebuild = false}) {
     final room = uri.queryParameters['room'];
     final pin = uri.queryParameters['pin'];
     if (room == null || room.trim().isEmpty) return;
+    if (_linkJoinTriggered) return; // 중복 트리거 방지(getInitialLink+stream 등)
+    _linkJoinTriggered = true;
+
     void assign() {
       _tab = _Tab.join;
       _codeCtrl.text = room.trim();
       if (pin != null) _pinCtrl.text = pin.trim();
+      _autoJoining = true; // 폼 대신 로딩 화면
     }
 
     if (rebuild && mounted) {
@@ -76,6 +83,10 @@ class _JoinScreenState extends State<JoinScreen> {
     } else {
       assign();
     }
+    // 첫 프레임 후 자동 입장(이름 없이 → 게스트로 입장, 방 안 팝업에서 이름 설정)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _join(fromLink: true);
+    });
   }
 
   FocusNode _fieldNode() {
@@ -124,7 +135,7 @@ class _JoinScreenState extends State<JoinScreen> {
     return statuses.values.every((s) => s.isGranted || s.isLimited);
   }
 
-  Future<void> _join() async {
+  Future<void> _join({bool fromLink = false}) async {
     setState(() {
       _error = null;
       _connecting = true;
@@ -179,11 +190,17 @@ class _JoinScreenState extends State<JoinScreen> {
             displayName: name,
             pin: pin,
             isHost: _tab == _Tab.create, // 방 만든 사람이 방장
+            promptNameOnEnter: fromLink, // 링크 자동입장 → 방 안에서 이름 설정
           ),
         ),
       );
+      // 회의에서 나오면 폼으로 복귀(자동입장 로딩 해제). 재자동입장은 막는다.
+      if (mounted) setState(() => _autoJoining = false);
     } catch (e) {
-      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _autoJoining = false; // 자동입장 실패 → 폼 노출해 사용자가 조치
+      });
     } finally {
       if (mounted) setState(() => _connecting = false);
     }
@@ -191,6 +208,22 @@ class _JoinScreenState extends State<JoinScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 초대 링크로 자동 입장 중이면 폼 대신 로딩 화면(바로 회의 시작 느낌)
+    if (_autoJoining && _error == null) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('회의에 입장하는 중...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     final isJoin = _tab == _Tab.join;
     final size = MediaQuery.of(context).size;
     final landscape = size.width > size.height; // 가로모드(TV 등)
