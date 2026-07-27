@@ -17,7 +17,7 @@ import 'dart:math';
 class AppConfig {
   /// 앱 표시 버전. 입장 화면 우측 상단에 노출한다.
   /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
-  static const String appVersion = '1.0.2';
+  static const String appVersion = '1.0.3';
 
   /// 토큰 서버의 /token 엔드포인트 주소.
   ///   - 웹(같은 PC) 테스트:  http://localhost:3000/token
