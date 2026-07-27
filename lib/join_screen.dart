@@ -36,7 +36,11 @@ class _JoinScreenState extends State<JoinScreen> {
   bool _connecting = false;
   String? _error;
   bool _autoJoining = false; // 초대 링크로 자동 입장 중(폼 대신 로딩 표시)
-  bool _linkJoinTriggered = false; // 링크 자동입장 중복 트리거 방지
+  bool _nameDialogOpen = false; // 이름 팝업 중복 표시 방지
+  // 같은 링크가 짧은 시간에 중복 도착(getInitialLink+stream)하는 것만 무시하기 위한 값.
+  // (영구 차단이 아니라 재스캔은 허용해야 백그라운드 재실행이 정상 동작한다)
+  String? _lastLinkKey;
+  DateTime? _lastLinkAt;
 
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSub;
@@ -59,23 +63,38 @@ class _JoinScreenState extends State<JoinScreen> {
       if (initial != null) _applyLinkUri(initial, rebuild: true);
     } catch (_) {}
     _linkSub = _appLinks.uriLinkStream.listen(
-      (uri) => _applyLinkUri(uri, rebuild: true),
+      (uri) => _applyLinkUri(uri, rebuild: true, fromStream: true),
     );
   }
 
   // 초대 링크(room/pin)로 열리면 폼을 거치지 않고 바로 입장한다.
   // 이름은 방 입장 후 팝업에서 설정(RoomScreen.promptNameOnEnter).
-  void _applyLinkUri(Uri uri, {bool rebuild = false}) {
+  void _applyLinkUri(Uri uri, {bool rebuild = false, bool fromStream = false}) {
     final room = uri.queryParameters['room'];
     final pin = uri.queryParameters['pin'];
     if (room == null || room.trim().isEmpty) return;
-    if (_linkJoinTriggered) return; // 중복 트리거 방지(getInitialLink+stream 등)
-    _linkJoinTriggered = true;
+
+    // 같은 링크가 2초 내 중복 도착(getInitialLink + stream)이면 무시.
+    // (영구 차단이 아니라, 재스캔·백그라운드 재실행 시엔 새로 반영해야 함)
+    final now = DateTime.now();
+    if (_lastLinkKey == uri.toString() &&
+        _lastLinkAt != null &&
+        now.difference(_lastLinkAt!).inSeconds < 2) {
+      return;
+    }
+    _lastLinkKey = uri.toString();
+    _lastLinkAt = now;
+
+    // 스트림으로 온 링크는 입장화면이 최상단일 때만 처리(회의 중·팝업 중이면 무시).
+    if (fromStream && mounted && ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
 
     void assign() {
       _tab = _Tab.join;
       _codeCtrl.text = room.trim();
-      if (pin != null) _pinCtrl.text = pin.trim();
+      _pinCtrl.text = (pin ?? '').trim(); // QR 값으로 항상 덮어씀(이전 값 잔상 제거)
+      _error = null;
     }
 
     if (rebuild && mounted) {
@@ -94,6 +113,8 @@ class _JoinScreenState extends State<JoinScreen> {
 
   // 입장 직전 이름 팝업. 확인/랜덤 → 그 이름으로 입장, 취소/닫기 → 참여하기 폼 유지.
   Future<void> _promptNameThenJoin() async {
+    if (_nameDialogOpen) return; // 중복 팝업 방지
+    _nameDialogOpen = true;
     final ctrl = TextEditingController();
     final result = await showDialog<String?>(
       context: context,
@@ -133,6 +154,7 @@ class _JoinScreenState extends State<JoinScreen> {
       ),
     );
     ctrl.dispose();
+    _nameDialogOpen = false;
     if (!mounted) return;
     if (result == null) {
       // 취소/닫기 → 참여하기 폼 유지(방 코드 채워진 상태). 자동 입장 안 함.

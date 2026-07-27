@@ -771,6 +771,8 @@ class _RoomScreenState extends State<RoomScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
+        // 화면(다이얼로그)이 작은 셋톱에서 내용이 넘쳐 오버플로우 줄무늬가 뜨는 것 방지.
+        scrollable: true,
         title: const Text('QR로 초대'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -782,8 +784,8 @@ class _RoomScreenState extends State<RoomScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: SizedBox(
-                width: 240,
-                height: 240,
+                width: 220,
+                height: 220,
                 child: PrettyQrView.data(
                   data: link,
                   decoration: const PrettyQrDecoration(
