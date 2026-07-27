@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -75,7 +76,6 @@ class _JoinScreenState extends State<JoinScreen> {
       _tab = _Tab.join;
       _codeCtrl.text = room.trim();
       if (pin != null) _pinCtrl.text = pin.trim();
-      _autoJoining = true; // 폼 대신 로딩 화면
     }
 
     if (rebuild && mounted) {
@@ -83,10 +83,65 @@ class _JoinScreenState extends State<JoinScreen> {
     } else {
       assign();
     }
-    // 첫 프레임 후 자동 입장(이름 없이 → 게스트로 입장, 방 안 팝업에서 이름 설정)
+    // 첫 프레임 후 이름 팝업 → 확인/랜덤=바로 입장, 취소/닫기=참여하기 폼 유지
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _join(fromLink: true);
+      if (mounted) _promptNameThenJoin();
     });
+  }
+
+  // 랜덤 게스트 이름 (예: 게스트-4823)
+  String _randomName() => '게스트-${1000 + Random().nextInt(9000)}';
+
+  // 입장 직전 이름 팝업. 확인/랜덤 → 그 이름으로 입장, 취소/닫기 → 참여하기 폼 유지.
+  Future<void> _promptNameThenJoin() async {
+    final ctrl = TextEditingController();
+    final result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: true, // 바깥 탭(닫기) → 취소로 처리
+      builder: (ctx) => AlertDialog(
+        title: const Text('이름 설정'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLength: 20,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (v) =>
+              Navigator.pop(ctx, v.trim().isEmpty ? _randomName() : v.trim()),
+          decoration: const InputDecoration(
+            labelText: '표시 이름',
+            hintText: '회의에서 보일 이름 (예: 홍길동)',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, null), // 취소
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, _randomName()), // 랜덤 이름으로 입장
+            child: const Text('랜덤'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              ctx,
+              ctrl.text.trim().isEmpty ? _randomName() : ctrl.text.trim(),
+            ),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    if (!mounted) return;
+    if (result == null) {
+      // 취소/닫기 → 참여하기 폼 유지(방 코드 채워진 상태). 자동 입장 안 함.
+      return;
+    }
+    // 확인/랜덤 → 그 이름으로 바로 입장
+    _nameCtrl.text = result;
+    setState(() => _autoJoining = true);
+    _join(fromLink: true);
   }
 
   FocusNode _fieldNode() {
@@ -190,7 +245,7 @@ class _JoinScreenState extends State<JoinScreen> {
             displayName: name,
             pin: pin,
             isHost: _tab == _Tab.create, // 방 만든 사람이 방장
-            promptNameOnEnter: fromLink, // 링크 자동입장 → 방 안에서 이름 설정
+            // 이름은 입장 전 팝업에서 이미 정하므로 방 안 자동팝업은 안 띄운다.
           ),
         ),
       );
