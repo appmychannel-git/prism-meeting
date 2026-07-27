@@ -20,7 +20,7 @@ class JoinScreen extends StatefulWidget {
 
 enum _Tab { join, create }
 
-class _JoinScreenState extends State<JoinScreen> {
+class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   final _nameCtrl = TextEditingController();
   final _codeCtrl = TextEditingController(); // 참여: 방 코드
   final _customCtrl = TextEditingController(); // 만들기: 지정 이름(선택)
@@ -37,10 +37,9 @@ class _JoinScreenState extends State<JoinScreen> {
   String? _error;
   bool _autoJoining = false; // 초대 링크로 자동 입장 중(폼 대신 로딩 표시)
   bool _nameDialogOpen = false; // 이름 팝업 중복 표시 방지
-  // 같은 링크가 짧은 시간에 중복 도착(getInitialLink+stream)하는 것만 무시하기 위한 값.
-  // (영구 차단이 아니라 재스캔은 허용해야 백그라운드 재실행이 정상 동작한다)
-  String? _lastLinkKey;
-  DateTime? _lastLinkAt;
+  // 이미 처리한 링크 키(URL 문자열). 같은 링크의 재처리(초기 이중 발생·매 resume의
+  // getLatestLink 재조회)를 막는다. 다른 링크가 오면 그때 처리한다.
+  String? _lastProcessedLinkKey;
 
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _linkSub;
@@ -48,6 +47,7 @@ class _JoinScreenState extends State<JoinScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (kIsWeb) {
       // 웹: 현재 URL(...?room=코드&pin=코드)에서 바로 읽음
       _applyLinkUri(Uri.base);
@@ -62,33 +62,34 @@ class _JoinScreenState extends State<JoinScreen> {
       final initial = await _appLinks.getInitialLink();
       if (initial != null) _applyLinkUri(initial, rebuild: true);
     } catch (_) {}
+    // 앱 실행 중 새 링크(백그라운드→포그라운드 포함) 스트림
     _linkSub = _appLinks.uriLinkStream.listen(
-      (uri) => _applyLinkUri(uri, rebuild: true, fromStream: true),
+      (uri) => _applyLinkUri(uri, rebuild: true),
     );
   }
 
-  // 초대 링크(room/pin)로 열리면 폼을 거치지 않고 바로 입장한다.
-  // 이름은 방 입장 후 팝업에서 설정(RoomScreen.promptNameOnEnter).
-  void _applyLinkUri(Uri uri, {bool rebuild = false, bool fromStream = false}) {
+  // 앱이 백그라운드에서 포그라운드로 돌아올 때, 일부 기기에서 uriLinkStream 이
+  // emit되지 않는 경우가 있어 최신 링크를 직접 재조회하는 폴백.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && !kIsWeb) {
+      _appLinks.getLatestLink().then((uri) {
+        if (uri != null && mounted) _applyLinkUri(uri, rebuild: true);
+      }).catchError((_) {});
+    }
+  }
+
+  // 초대 링크(room/pin)로 열리면 폼을 거치지 않고 이름 팝업 → 입장한다.
+  void _applyLinkUri(Uri uri, {bool rebuild = false}) {
     final room = uri.queryParameters['room'];
     final pin = uri.queryParameters['pin'];
     if (room == null || room.trim().isEmpty) return;
 
-    // 같은 링크가 2초 내 중복 도착(getInitialLink + stream)이면 무시.
-    // (영구 차단이 아니라, 재스캔·백그라운드 재실행 시엔 새로 반영해야 함)
-    final now = DateTime.now();
-    if (_lastLinkKey == uri.toString() &&
-        _lastLinkAt != null &&
-        now.difference(_lastLinkAt!).inSeconds < 2) {
-      return;
-    }
-    _lastLinkKey = uri.toString();
-    _lastLinkAt = now;
-
-    // 스트림으로 온 링크는 입장화면이 최상단일 때만 처리(회의 중·팝업 중이면 무시).
-    if (fromStream && mounted && ModalRoute.of(context)?.isCurrent != true) {
-      return;
-    }
+    // 이미 처리한 링크면 무시(초기 이중 발생·매 resume의 getLatestLink 재조회 방지).
+    // 다른 링크(재스캔·다른 방)가 오면 정상 처리한다.
+    final key = uri.toString();
+    if (key == _lastProcessedLinkKey) return;
+    _lastProcessedLinkKey = key;
 
     void assign() {
       _tab = _Tab.join;
@@ -114,6 +115,9 @@ class _JoinScreenState extends State<JoinScreen> {
   // 입장 직전 이름 팝업. 확인/랜덤 → 그 이름으로 입장, 취소/닫기 → 참여하기 폼 유지.
   Future<void> _promptNameThenJoin() async {
     if (_nameDialogOpen) return; // 중복 팝업 방지
+    // 회의 중/다른 다이얼로그 중(입장화면이 최상단이 아님)이면 팝업 안 띄움.
+    // (코드/PIN은 이미 갱신됨 → 회의 나오면 폼에 반영돼 있음)
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     _nameDialogOpen = true;
     final ctrl = TextEditingController();
     final result = await showDialog<String?>(
@@ -188,6 +192,7 @@ class _JoinScreenState extends State<JoinScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSub?.cancel();
     _nameCtrl.dispose();
     _codeCtrl.dispose();
