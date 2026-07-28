@@ -142,6 +142,7 @@ class L {
       'ko': '말하는 참가자도 자막을 켜야 자막이 표시됩니다.',
       'en': 'Captions appear only when the speaker also turns captions on.',
     },
+    'transcript': {'ko': '자막 기록', 'en': 'Transcript'},
 
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},

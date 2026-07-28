@@ -15,6 +15,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'caption_overlay.dart';
+import 'caption_panel.dart';
 import 'l10n.dart';
 import 'stt_platform.dart';
 import 'chat_panel.dart';
@@ -142,7 +143,9 @@ class _RoomScreenState extends State<RoomScreen> {
   DateTime? _lastInterimSentAt; // 중간 결과 송출 throttle
   CaptionMode _captionMode = CaptionMode.continuous; // 발언 방식
   bool _pttActive = false; // '눌러 말하기' 캡처 진행 중
-  static const int _maxCaptionLines = 8; // 화면에 표시할 자막 줄 수(최대)
+  bool _transcriptOpen = false; // 자막 기록 패널(왼쪽) 열림
+  static const int _maxCaptionLines = 8; // 하단 오버레이에 표시할 자막 줄 수(최대)
+  static const int _maxCaptionLog = 300; // 기록 패널용 확정 자막 보관 줄 수
 
   // 발화 언어(2-letter) → STT 로케일 ID.
   static const Map<String, String> _sttLocales = {
@@ -540,8 +543,8 @@ class _RoomScreenState extends State<RoomScreen> {
       mine: mine,
     );
     _captionLog.add(line);
-    if (_captionLog.length > 50) {
-      _captionLog.removeRange(0, _captionLog.length - 50);
+    if (_captionLog.length > _maxCaptionLog) {
+      _captionLog.removeRange(0, _captionLog.length - _maxCaptionLog);
     }
     setState(() {});
     // 남의 확정 자막을 내 언어로 자동 번역(발화 언어와 다를 때만).
@@ -576,6 +579,23 @@ class _RoomScreenState extends State<RoomScreen> {
         ? _captionLog.sublist(_captionLog.length - room)
         : _captionLog;
     return [...logPart, ...live];
+  }
+
+  // 자막 기록 패널용: 확정 로그 전체 + 말하는 중 라인.
+  List<LiveCaption> _transcriptLines() {
+    final live = _liveCaptions.values.toList()
+      ..sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
+    return [..._captionLog, ...live];
+  }
+
+  // 자막 기록 패널 열기/닫기. 넓은 화면=인라인(왼쪽), 좁은 화면=드로어(왼쪽).
+  void _toggleTranscript() {
+    final wide = MediaQuery.of(context).size.width >= 900;
+    if (wide) {
+      setState(() => _transcriptOpen = !_transcriptOpen);
+    } else {
+      _scaffoldKey.currentState?.openDrawer();
+    }
   }
 
   // 발언 방식 전환(연속 ↔ 눌러 말하기).
@@ -1429,6 +1449,7 @@ class _RoomScreenState extends State<RoomScreen> {
     // 왼쪽으로 줄고 가려지지 않는다. 좁은 화면(모바일)은 기존 드로어(오버레이) 유지.
     final wideChat = size.width >= 900;
     final inlineChatOpen = wideChat && _chatOpen;
+    final inlineTranscriptOpen = wideChat && _transcriptOpen;
 
     return PopScope(
       // 뒤로가기(앱바 화살표 · 안드로이드 시스템 백)를 가로채 나가기/회의종료와
@@ -1436,6 +1457,15 @@ class _RoomScreenState extends State<RoomScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop || _leaving) return;
+        // 자막 기록 패널이 열려 있으면 먼저 닫는다.
+        if (_transcriptOpen || (_scaffoldKey.currentState?.isDrawerOpen ?? false)) {
+          if (wideChat) {
+            setState(() => _transcriptOpen = false);
+          } else {
+            _scaffoldKey.currentState?.closeDrawer();
+          }
+          return;
+        }
         // 채팅이 열려 있으면 먼저 채팅만 닫는다(인라인/드로어 각각 처리).
         if (_chatOpen) {
           if (wideChat) {
@@ -1455,6 +1485,17 @@ class _RoomScreenState extends State<RoomScreen> {
             if (open) _unread = 0;
           });
         },
+        onDrawerChanged: (open) => setState(() => _transcriptOpen = open),
+        // 자막 기록 패널(왼쪽). 좁은 화면만 드로어, 넓은 화면은 body 인라인.
+        drawer: wideChat
+            ? null
+            : Drawer(
+                width: isTv ? 420 : 320,
+                child: CaptionPanel(
+                  lines: _transcriptLines(),
+                  myLang: _myLang,
+                ),
+              ),
         // 좁은 화면(모바일)만 드로어. 넓은 화면은 body 안에 인라인 패널로 표시.
         endDrawer: wideChat
             ? null
@@ -1554,6 +1595,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 if (v == 'recv') _toggleReceiveVideo();
                 if (v == 'name') _showNameDialog();
                 if (v == 'caption') _toggleCaptions();
+                if (v == 'transcript') _toggleTranscript();
                 if (v == 'caplang') _showCaptionLangDialog();
                 if (v == 'applang') showAppLanguagePicker(context);
                 if (v == 'capmode') {
@@ -1578,6 +1620,16 @@ class _RoomScreenState extends State<RoomScreen> {
                       ),
                       const SizedBox(width: 8),
                       Text(_captionsOn ? L.t('caption_off') : L.t('caption_on')),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'transcript',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.subject, size: 18),
+                      const SizedBox(width: 8),
+                      Text(L.t('transcript')),
                     ],
                   ),
                 ),
@@ -1655,6 +1707,20 @@ class _RoomScreenState extends State<RoomScreen> {
         ),
         body: Row(
           children: [
+            // 넓은 화면: 자막 기록을 영상 왼쪽에 인라인 패널로.
+            if (inlineTranscriptOpen)
+              Container(
+                width: isTv ? 380 : 340,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF141922),
+                  border: Border(right: BorderSide(color: Colors.white12)),
+                ),
+                child: CaptionPanel(
+                  lines: _transcriptLines(),
+                  myLang: _myLang,
+                  onClose: () => setState(() => _transcriptOpen = false),
+                ),
+              ),
             Expanded(
               child: Column(
                 children: [
