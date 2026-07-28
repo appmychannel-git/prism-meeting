@@ -1894,9 +1894,13 @@ class _ControlBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        // 버튼이 많아 좁은 폰에서 한 줄을 넘칠 수 있어 Wrap 으로 자동 줄바꿈.
+        child: Wrap(
+          alignment: WrapAlignment.center,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 16,
+          runSpacing: 10,
           children: [
             _RoundButton(
               icon: micOn ? Icons.mic : Icons.mic_off,
@@ -1905,15 +1909,13 @@ class _ControlBar extends StatelessWidget {
               autofocus: true, // 회의 진입 시 리모컨 시작 포커스
               onTap: onMic,
             ),
-            const SizedBox(width: 20),
             _RoundButton(
               icon: camOn ? Icons.videocam : Icons.videocam_off,
               label: camOn ? '카메라 끄기' : '카메라 켜기',
               active: camOn,
               onTap: onCam,
             ),
-            if (showShare) ...[
-              const SizedBox(width: 20),
+            if (showShare)
               _RoundButton(
                 icon: sharing ? Icons.stop_screen_share : Icons.screen_share,
                 label: sharing ? '공유 중지' : '화면 공유',
@@ -1922,8 +1924,6 @@ class _ControlBar extends StatelessWidget {
                 busy: shareBusy,
                 onTap: shareBusy ? null : onShare,
               ),
-            ],
-            const SizedBox(width: 20),
             _RoundButton(
               icon: captionsOn
                   ? Icons.closed_caption
@@ -1934,8 +1934,7 @@ class _ControlBar extends StatelessWidget {
               onTap: onCaption,
             ),
             // 눌러 말하기 모드 + 자막 켬일 때만: '말하기' 버튼
-            if (captionsOn && pushToTalkMode) ...[
-              const SizedBox(width: 20),
+            if (captionsOn && pushToTalkMode)
               _RoundButton(
                 icon: pttActive ? Icons.mic : Icons.mic_none,
                 label: pttActive ? '말하는 중' : '말하기',
@@ -1943,8 +1942,6 @@ class _ControlBar extends StatelessWidget {
                 accent: pttActive, // 캡처 중이면 파란색 강조
                 onTap: onPushToTalk,
               ),
-            ],
-            const SizedBox(width: 20),
             _RoundButton(
               icon: Icons.call_end,
               label: isHost ? '회의 종료' : '나가기',
