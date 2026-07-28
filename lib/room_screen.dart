@@ -15,6 +15,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'caption_overlay.dart';
+import 'l10n.dart';
 import 'stt_platform.dart';
 import 'chat_panel.dart';
 import 'config.dart';
@@ -218,7 +219,7 @@ class _RoomScreenState extends State<RoomScreen> {
         // 방장(host)이 회의를 종료해 튕긴 경우 안내 (본인이 나간 게 아닐 때만)
         final endedByHost =
             !widget.isHost && e.reason == DisconnectReason.roomDeleted;
-        _exitToJoin(notice: endedByHost ? '호스트가 회의를 종료했습니다.' : null);
+        _exitToJoin(notice: endedByHost ? L.t('host_ended') : null);
       })
       ..on<RoomReconnectingEvent>((_) {
         if (mounted) setState(() => _reconnecting = true);
@@ -260,7 +261,7 @@ class _RoomScreenState extends State<RoomScreen> {
     if (e.topic != _chatTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
-      final sender = (m['sender'] ?? e.participant?.identity ?? '상대')
+      final sender = (m['sender'] ?? e.participant?.identity ?? L.t('peer'))
           .toString();
       final text = (m['text'] ?? '').toString();
       if (text.isEmpty) return;
@@ -368,7 +369,7 @@ class _RoomScreenState extends State<RoomScreen> {
     if (_speechAvailable) return true;
     await _initSpeech();
     if (!_speechAvailable) {
-      _snack('이 기기/브라우저에서 음성 인식을 사용할 수 없습니다.');
+      _snack(L.t('stt_unavailable'));
       return false;
     }
     return true;
@@ -479,7 +480,8 @@ class _RoomScreenState extends State<RoomScreen> {
       if (text.isEmpty) return;
       _ingestCaption(
         identity: id,
-        sender: (m['sender'] ?? e.participant?.identity ?? '상대').toString(),
+        sender: (m['sender'] ?? e.participant?.identity ?? L.t('peer'))
+            .toString(),
         text: text,
         lang: (m['lang'] ?? '').toString(),
         isFinal: m['final'] == true,
@@ -586,7 +588,7 @@ class _RoomScreenState extends State<RoomScreen> {
     final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('자막 언어 (내 언어)'),
+        title: Text(L.t('caption_lang_title')),
         children: [
           for (final e in AppConfig.supportedLanguages.entries)
             SimpleDialogOption(
@@ -664,7 +666,7 @@ class _RoomScreenState extends State<RoomScreen> {
       context: context,
       barrierDismissible: !initial, // 최초 입장 팝업은 바깥 탭으로 안 닫히게
       builder: (ctx) => AlertDialog(
-        title: Text(initial ? '이름 설정' : '이름 변경'),
+        title: Text(initial ? L.t('name_set') : L.t('name_change')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -672,19 +674,19 @@ class _RoomScreenState extends State<RoomScreen> {
           maxLength: 20,
           onSubmitted: (v) => Navigator.pop(ctx, v),
           decoration: InputDecoration(
-            labelText: '표시 이름',
-            hintText: initial ? '회의에서 보일 이름 (예: 홍길동)' : null,
+            labelText: L.t('display_name'),
+            hintText: initial ? L.t('name_hint') : null,
             border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(initial ? '건너뛰기' : '취소'),
+            child: Text(initial ? L.t('skip') : L.t('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text),
-            child: const Text('확인'),
+            child: Text(L.t('ok')),
           ),
         ],
       ),
@@ -814,7 +816,7 @@ class _RoomScreenState extends State<RoomScreen> {
         });
       }
     } catch (e) {
-      _snack('카메라 전환 실패: $e');
+      _snack('${L.t('cam_switch_fail')}: $e');
     }
   }
 
@@ -824,8 +826,10 @@ class _RoomScreenState extends State<RoomScreen> {
   // USB 외장만 키워드로 표시하고 나머지는 번호로 둔다(틀린 라벨 방지).
   String _cameraLabel(MediaDevice d, int index) {
     final lower = d.label.toLowerCase();
-    if (lower.contains('external') || lower.contains('usb')) return 'USB 카메라';
-    return '카메라 ${index + 1}';
+    if (lower.contains('external') || lower.contains('usb')) {
+      return L.t('usb_camera');
+    }
+    return L.t('camera_n', {'n': '${index + 1}'});
   }
 
   // ---- 참가자 타일 목록 구성 (로컬을 맨 앞에) ----
@@ -954,7 +958,7 @@ class _RoomScreenState extends State<RoomScreen> {
 
     // 모바일 웹은 getDisplayMedia 미지원 → 안내
     if (kIsWeb && lkPlatformIsWebMobile()) {
-      _snack('모바일 브라우저에서는 화면공유를 지원하지 않습니다. PC 브라우저나 앱을 사용하세요.');
+      _snack(L.t('share_mobile_unsupported'));
       return;
     }
 
@@ -967,12 +971,12 @@ class _RoomScreenState extends State<RoomScreen> {
         await _ensureNotificationPermission();
         final granted = await Helper.requestCapturePermission();
         if (!granted) {
-          _snack('화면 캡처 권한이 거부되었습니다.');
+          _snack(L.t('capture_denied'));
           return;
         }
         final ok = await _ensureBackgroundService();
         if (!ok) {
-          _snack('화면공유용 백그라운드 실행을 시작할 수 없습니다.');
+          _snack(L.t('share_bg_fail'));
           return;
         }
       }
@@ -994,7 +998,7 @@ class _RoomScreenState extends State<RoomScreen> {
       _syncScreenShareState();
     } catch (e) {
       await _stopBackgroundService();
-      _snack('화면공유를 시작할 수 없습니다: $e');
+      _snack('${L.t('share_start_fail')}: $e');
     } finally {
       if (mounted) setState(() => _shareBusy = false);
     }
@@ -1014,9 +1018,9 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<bool> _ensureBackgroundService([bool isRetry = false]) async {
     if (kIsWeb || !lkPlatformIs(PlatformType.android)) return true;
     try {
-      const androidConfig = FlutterBackgroundAndroidConfig(
-        notificationTitle: '화면 공유 중',
-        notificationText: 'Prism Meeting 이 화면을 공유하고 있습니다.',
+      final androidConfig = FlutterBackgroundAndroidConfig(
+        notificationTitle: L.t('share_notif_title'),
+        notificationText: L.t('share_notif_text'),
         notificationImportance: AndroidNotificationImportance.normal,
         notificationIcon: AndroidResource(
           name: 'ic_launcher',
@@ -1073,12 +1077,12 @@ class _RoomScreenState extends State<RoomScreen> {
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
-          title: const Text('회의 종료'),
+          title: Text(L.t('meeting_end')),
           content: Text(notice),
           actions: [
             FilledButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('확인'),
+              child: Text(L.t('ok')),
             ),
           ],
         ),
@@ -1103,16 +1107,16 @@ class _RoomScreenState extends State<RoomScreen> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('회의 종료'),
-          content: const Text('회의를 종료하면 모든 참가자가 나가게 됩니다. 종료할까요?'),
+          title: Text(L.t('meeting_end')),
+          content: Text(L.t('meeting_end_confirm')),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('취소'),
+              child: Text(L.t('cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('종료'),
+              child: Text(L.t('end')),
             ),
           ],
         ),
@@ -1143,7 +1147,7 @@ class _RoomScreenState extends State<RoomScreen> {
       builder: (ctx) => AlertDialog(
         // 화면(다이얼로그)이 작은 셋톱에서 내용이 넘쳐 오버플로우 줄무늬가 뜨는 것 방지.
         scrollable: true,
-        title: const Text('QR로 초대'),
+        title: Text(L.t('invite_qr')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1162,11 +1166,14 @@ class _RoomScreenState extends State<RoomScreen> {
                     shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
                   ),
                   // QR 생성 실패 시에도 다이얼로그가 쓸모있도록 안내 대체
-                  errorBuilder: (_, _, _) => const Center(
+                  errorBuilder: (_, _, _) => Center(
                     child: Text(
-                      'QR 생성 실패\n아래 링크를 복사해 사용하세요',
+                      L.t('qr_fail'),
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.black54, fontSize: 13),
+                      style: const TextStyle(
+                        color: Colors.black54,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
                 ),
@@ -1174,22 +1181,22 @@ class _RoomScreenState extends State<RoomScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              '방 코드: ${widget.roomName}',
+              L.t('room_code_val', {'room': widget.roomName}),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             if (widget.pin != null && widget.pin!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  '입장 코드: ${widget.pin}',
+                  L.t('entry_code_val', {'pin': widget.pin!}),
                   style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
             const SizedBox(height: 8),
-            const Text(
-              '휴대폰으로 QR을 스캔하면 이 방으로 입장합니다.',
+            Text(
+              L.t('qr_scan_hint'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.white70),
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
             ),
           ],
         ),
@@ -1201,14 +1208,16 @@ class _RoomScreenState extends State<RoomScreen> {
               if (mounted) {
                 ScaffoldMessenger.of(
                   context,
-                ).showSnackBar(const SnackBar(content: Text('초대 링크 복사됨')));
+                ).showSnackBar(
+                  SnackBar(content: Text(L.t('link_copied'))),
+                );
               }
             },
-            child: const Text('링크 복사'),
+            child: Text(L.t('copy_link')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('닫기'),
+            child: Text(L.t('close')),
           ),
         ],
       ),
@@ -1240,7 +1249,7 @@ class _RoomScreenState extends State<RoomScreen> {
   /// 누군가 화면을 공유하면 자동으로 그 화면이 메인에 크게 잡힌다.
   Widget _buildSpeakerView(List<_Tile> tiles) {
     if (tiles.isEmpty) {
-      return const Center(child: Text('참가자를 기다리는 중...'));
+      return Center(child: Text(L.t('waiting')));
     }
     _Tile? byId(String? id) {
       if (id == null) return null;
@@ -1292,14 +1301,21 @@ class _RoomScreenState extends State<RoomScreen> {
                         color: Colors.black.withValues(alpha: 0.55),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.push_pin, size: 14, color: Colors.white),
-                          SizedBox(width: 4),
+                          const Icon(
+                            Icons.push_pin,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 4),
                           Text(
-                            '고정됨 · 탭하여 해제',
-                            style: TextStyle(fontSize: 12, color: Colors.white),
+                            L.t('pinned_hint'),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
+                            ),
                           ),
                         ],
                       ),
@@ -1344,14 +1360,14 @@ class _RoomScreenState extends State<RoomScreen> {
     final isTv = size.width >= AppConfig.tvBreakpointWidth;
 
     if (_connecting) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('회의에 접속하는 중...'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(L.t('connecting_meeting')),
             ],
           ),
         ),
@@ -1376,7 +1392,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 const SizedBox(height: 20),
                 FilledButton(
                   onPressed: () => Navigator.of(context).maybePop(),
-                  child: const Text('돌아가기'),
+                  child: Text(L.t('back')),
                 ),
               ],
             ),
@@ -1447,7 +1463,10 @@ class _RoomScreenState extends State<RoomScreen> {
           titleSpacing: 0,
           leadingWidth: 40, // 뒤로가기 영역 축소 → 방이름을 왼쪽으로 더 당김
           title: Text(
-            '${widget.roomName} · ${allTiles.length}명',
+            L.t('room_title', {
+              'room': widget.roomName,
+              'count': '${allTiles.length}',
+            }),
             style: const TextStyle(fontSize: 15),
             overflow: TextOverflow.ellipsis,
           ),
@@ -1455,7 +1474,7 @@ class _RoomScreenState extends State<RoomScreen> {
             // ① 카메라 전환 — 카메라가 2개 이상(전/후면, USB 외장 등)일 때만 노출
             if (_cameras.length >= 2)
               PopupMenuButton<MediaDevice>(
-                tooltip: '카메라 전환',
+                tooltip: L.t('tt_switch_cam'),
                 padding: EdgeInsets.zero,
                 icon: const Icon(Icons.cameraswitch),
                 onSelected: _switchCamera,
@@ -1485,21 +1504,21 @@ class _RoomScreenState extends State<RoomScreen> {
               ),
             // ② 화면 모드 변환 (갤러리 ↔ 발표자)
             IconButton(
-              tooltip: _speakerView ? '갤러리 뷰' : '발표자 뷰',
+              tooltip: _speakerView ? L.t('tt_gallery') : L.t('tt_speaker'),
               visualDensity: VisualDensity.compact,
               onPressed: () => setState(() => _speakerView = !_speakerView),
               icon: Icon(_speakerView ? Icons.grid_view : Icons.view_sidebar),
             ),
             // ③ 초대 (QR + 링크 복사를 한 다이얼로그로 통합 → 아이콘 1개로 축소)
             IconButton(
-              tooltip: '초대 (QR·링크)',
+              tooltip: L.t('tt_invite'),
               visualDensity: VisualDensity.compact,
               onPressed: _showInviteQr,
               icon: const Icon(Icons.person_add_alt),
             ),
             // ④ 채팅
             IconButton(
-              tooltip: '채팅',
+              tooltip: L.t('tt_chat'),
               visualDensity: VisualDensity.compact,
               onPressed: () {
                 if (wideChat) {
@@ -1520,13 +1539,14 @@ class _RoomScreenState extends State<RoomScreen> {
             ),
             // ⑤ 더보기(⋮) — 자주 안 쓰는 항목은 여기로: 화면 숨기기(저사양)
             PopupMenuButton<String>(
-              tooltip: '더보기',
+              tooltip: L.t('tt_more'),
               padding: EdgeInsets.zero,
               onSelected: (v) {
                 if (v == 'recv') _toggleReceiveVideo();
                 if (v == 'name') _showNameDialog();
                 if (v == 'caption') _toggleCaptions();
                 if (v == 'caplang') _showCaptionLangDialog();
+                if (v == 'applang') showAppLanguagePicker(context);
                 if (v == 'capmode') {
                   _setCaptionMode(
                     _captionMode == CaptionMode.continuous
@@ -1548,7 +1568,7 @@ class _RoomScreenState extends State<RoomScreen> {
                         size: 18,
                       ),
                       const SizedBox(width: 8),
-                      Text(_captionsOn ? '자막 끄기' : '자막 켜기'),
+                      Text(_captionsOn ? L.t('caption_off') : L.t('caption_on')),
                     ],
                   ),
                 ),
@@ -1559,7 +1579,10 @@ class _RoomScreenState extends State<RoomScreen> {
                       const Icon(Icons.subtitles_outlined, size: 18),
                       const SizedBox(width: 8),
                       Text(
-                        '자막 언어: ${AppConfig.supportedLanguages[_myLang] ?? _myLang}',
+                        L.t('caption_lang_menu', {
+                          'lang':
+                              AppConfig.supportedLanguages[_myLang] ?? _myLang,
+                        }),
                       ),
                     ],
                   ),
@@ -1577,20 +1600,30 @@ class _RoomScreenState extends State<RoomScreen> {
                       const SizedBox(width: 8),
                       Text(
                         _captionMode == CaptionMode.continuous
-                            ? '자막: 눌러 말하기로'
-                            : '자막: 연속으로',
+                            ? L.t('cap_to_ptt')
+                            : L.t('cap_to_cont'),
                       ),
                     ],
                   ),
                 ),
                 const PopupMenuDivider(),
-                const PopupMenuItem<String>(
+                PopupMenuItem<String>(
+                  value: 'applang',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.language, size: 18),
+                      const SizedBox(width: 8),
+                      Text('${L.t('app_language')}: ${L.uiLanguages[L.lang]}'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
                   value: 'name',
                   child: Row(
                     children: [
-                      Icon(Icons.badge_outlined, size: 18),
-                      SizedBox(width: 8),
-                      Text('이름 변경'),
+                      const Icon(Icons.badge_outlined, size: 18),
+                      const SizedBox(width: 8),
+                      Text(L.t('name_change')),
                     ],
                   ),
                 ),
@@ -1603,7 +1636,7 @@ class _RoomScreenState extends State<RoomScreen> {
                         size: 18,
                       ),
                       const SizedBox(width: 8),
-                      Text(_receiveVideo ? '화면 숨기기(저사양)' : '화면 다시 보기'),
+                      Text(_receiveVideo ? L.t('hide_video') : L.t('show_video')),
                     ],
                   ),
                 ),
@@ -1625,10 +1658,10 @@ class _RoomScreenState extends State<RoomScreen> {
                         vertical: 8,
                         horizontal: 12,
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          SizedBox(
+                          const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(
@@ -1636,10 +1669,13 @@ class _RoomScreenState extends State<RoomScreen> {
                               color: Colors.white,
                             ),
                           ),
-                          SizedBox(width: 10),
+                          const SizedBox(width: 10),
                           Text(
-                            '네트워크 재연결 중...',
-                            style: TextStyle(color: Colors.white, fontSize: 13),
+                            L.t('reconnecting'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -1660,7 +1696,7 @@ class _RoomScreenState extends State<RoomScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           IconButton(
-                            tooltip: '이전',
+                            tooltip: L.t('prev'),
                             onPressed: _page > 0
                                 ? () => setState(() => _page--)
                                 : null,
@@ -1671,7 +1707,7 @@ class _RoomScreenState extends State<RoomScreen> {
                             style: const TextStyle(fontSize: 14),
                           ),
                           IconButton(
-                            tooltip: '다음',
+                            tooltip: L.t('next'),
                             onPressed: _page < pageCount - 1
                                 ? () => setState(() => _page++)
                                 : null,
@@ -1757,7 +1793,7 @@ class _VideoGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (tiles.isEmpty) {
-      return const Center(child: Text('참가자를 기다리는 중...'));
+      return Center(child: Text(L.t('waiting')));
     }
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -1804,8 +1840,8 @@ class _ParticipantTile extends StatelessWidget {
     final isScreen = tile.isScreenShare;
     // 표시 라벨: 화면공유 타일은 "이름 님의 화면"으로 구분.
     final label = isScreen
-        ? '${isLocal ? '내' : name} 화면'
-        : (isLocal ? '$name (나)' : name);
+        ? (isLocal ? L.t('my_screen') : L.t('screen_of', {'name': name}))
+        : (isLocal ? L.t('me_suffix', {'name': name}) : name);
 
     return Container(
       decoration: BoxDecoration(
@@ -1941,21 +1977,21 @@ class _ControlBar extends StatelessWidget {
           children: [
             _RoundButton(
               icon: micOn ? Icons.mic : Icons.mic_off,
-              label: micOn ? '음소거' : '해제',
+              label: micOn ? L.t('mic_mute') : L.t('mic_unmute'),
               active: micOn,
               autofocus: true, // 회의 진입 시 리모컨 시작 포커스
               onTap: onMic,
             ),
             _RoundButton(
               icon: camOn ? Icons.videocam : Icons.videocam_off,
-              label: camOn ? '카메라 끄기' : '카메라 켜기',
+              label: camOn ? L.t('cam_off') : L.t('cam_on'),
               active: camOn,
               onTap: onCam,
             ),
             if (showShare)
               _RoundButton(
                 icon: sharing ? Icons.stop_screen_share : Icons.screen_share,
-                label: sharing ? '공유 중지' : '화면 공유',
+                label: sharing ? L.t('share_stop') : L.t('share'),
                 active: true, // 유휴 시에도 기본(어두운) 색 유지
                 accent: sharing, // 공유 중이면 파란색 강조
                 busy: shareBusy,
@@ -1966,14 +2002,14 @@ class _ControlBar extends StatelessWidget {
             if (captionsOn && pushToTalkMode)
               _RoundButton(
                 icon: pttActive ? Icons.mic : Icons.mic_none,
-                label: pttActive ? '말하는 중' : '말하기',
+                label: pttActive ? L.t('ptt_speaking') : L.t('ptt_talk'),
                 active: true,
                 accent: pttActive, // 캡처 중이면 파란색 강조
                 onTap: onPushToTalk,
               ),
             _RoundButton(
               icon: Icons.call_end,
-              label: isHost ? '회의 종료' : '나가기',
+              label: isHost ? L.t('meeting_end') : L.t('leave'),
               active: true,
               danger: true,
               onTap: onLeave,

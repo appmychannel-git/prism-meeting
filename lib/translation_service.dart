@@ -33,7 +33,7 @@ class TranslationService {
 
     final bodyText = utf8.decode(res.bodyBytes);
     if (res.statusCode != 200) {
-      String msg = '번역 실패 (${res.statusCode})';
+      String msg = '(HTTP ${res.statusCode})';
       try {
         final m = jsonDecode(bodyText) as Map<String, dynamic>;
         if (m['error'] != null) msg = m['error'].toString();

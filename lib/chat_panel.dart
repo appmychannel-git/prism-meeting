@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'config.dart';
+import 'l10n.dart';
 
 /// 채팅 메시지 한 건.
 ///
@@ -100,7 +101,7 @@ class _ChatPanelState extends State<ChatPanel> {
                 const Icon(Icons.chat_bubble_outline, size: 20),
                 const SizedBox(width: 8),
                 Text(
-                  '채팅',
+                  L.t('chat'),
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -113,7 +114,7 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  tooltip: '닫기',
+                  tooltip: L.t('close'),
                   onPressed:
                       widget.onClose ?? () => Navigator.of(context).maybePop(),
                 ),
@@ -125,10 +126,10 @@ class _ChatPanelState extends State<ChatPanel> {
           // 메시지 목록
           Expanded(
             child: widget.messages.isEmpty
-                ? const Center(
+                ? Center(
                     child: Text(
-                      '아직 메시지가 없습니다.',
-                      style: TextStyle(color: Colors.white38),
+                      L.t('no_messages'),
+                      style: const TextStyle(color: Colors.white38),
                     ),
                   )
                 : ListView.builder(
@@ -155,10 +156,10 @@ class _ChatPanelState extends State<ChatPanel> {
                     onSubmitted: (_) => _send(),
                     minLines: 1,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      hintText: '메시지 입력...',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
+                    decoration: InputDecoration(
+                      hintText: L.t('message_hint'),
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12,
                         vertical: 10,
                       ),
@@ -169,7 +170,7 @@ class _ChatPanelState extends State<ChatPanel> {
                 IconButton.filled(
                   onPressed: _send,
                   icon: const Icon(Icons.send),
-                  tooltip: '보내기',
+                  tooltip: L.t('send'),
                 ),
               ],
             ),
@@ -186,18 +187,19 @@ class _LanguageSelector extends StatelessWidget {
   final ValueChanged<String> onChanged;
   const _LanguageSelector({required this.value, required this.onChanged});
 
-  String _label(String code) =>
-      code.isEmpty ? '사용 안 함' : (AppConfig.supportedLanguages[code] ?? code);
+  String _label(String code) => code.isEmpty
+      ? L.t('translate_off')
+      : (AppConfig.supportedLanguages[code] ?? code);
 
   @override
   Widget build(BuildContext context) {
     final off = value.isEmpty;
     return PopupMenuButton<String>(
-      tooltip: '번역 언어',
+      tooltip: L.t('translate_lang'),
       initialValue: value,
       onSelected: onChanged,
       itemBuilder: (_) => [
-        const PopupMenuItem(value: '', child: Text('사용 안 함')),
+        PopupMenuItem(value: '', child: Text(L.t('translate_off'))),
         const PopupMenuDivider(),
         for (final e in AppConfig.supportedLanguages.entries)
           PopupMenuItem(value: e.key, child: Text(e.value)),
@@ -276,18 +278,18 @@ class _Bubble extends StatelessWidget {
   Widget _translationArea() {
     // 번역 진행 중
     if (msg.translating) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 6),
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
         child: Row(
           children: [
-            SizedBox(
+            const SizedBox(
               width: 12,
               height: 12,
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
-            SizedBox(width: 6),
-            Text('번역 중...',
-                style: TextStyle(fontSize: 11, color: Colors.white54)),
+            const SizedBox(width: 6),
+            Text(L.t('translating'),
+                style: const TextStyle(fontSize: 11, color: Colors.white54)),
           ],
         ),
       );
@@ -302,12 +304,12 @@ class _Bubble extends StatelessWidget {
             const Divider(height: 1, color: Colors.white24),
             const SizedBox(height: 6),
             Row(
-              children: const [
-                Icon(Icons.translate, size: 12, color: Colors.white38),
-                SizedBox(width: 4),
+              children: [
+                const Icon(Icons.translate, size: 12, color: Colors.white38),
+                const SizedBox(width: 4),
                 Text(
-                  '번역',
-                  style: TextStyle(fontSize: 10, color: Colors.white38),
+                  L.t('translation'),
+                  style: const TextStyle(fontSize: 10, color: Colors.white38),
                 ),
               ],
             ),
@@ -325,7 +327,7 @@ class _Bubble extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.only(top: 6),
         child: Text(
-          '번역 실패: ${msg.translateError!}',
+          '${L.t('translate_fail')}: ${msg.translateError!}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(fontSize: 10, color: Colors.white38),

@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'l10n.dart';
+
 /// 방 접속에 필요한 서버 URL + 참가자 토큰.
 class ConnectionDetails {
   final String serverUrl;
@@ -58,12 +60,12 @@ class ConnectionService {
     try {
       resp = await http.get(uri);
     } catch (e) {
-      throw Exception('토큰 서버에 연결할 수 없습니다: $tokenServerUrl\n서버 실행/주소를 확인하세요.\n$e');
+      throw Exception('${L.t('conn_fail')}: $tokenServerUrl\n$e');
     }
 
     if (resp.statusCode != 200) {
       // 서버가 준 error 메시지를 깔끔히 표시
-      String msg = '접속 실패 (HTTP ${resp.statusCode})';
+      String msg = '${L.t('http_fail')} (HTTP ${resp.statusCode})';
       try {
         final j = jsonDecode(resp.body);
         if (j is Map && j['error'] != null) msg = j['error'].toString();
@@ -75,7 +77,7 @@ class ConnectionService {
     final url = data['serverUrl'] as String?;
     final token = (data['participantToken'] ?? data['token']) as String?;
     if (url == null || token == null) {
-      throw Exception('응답에 serverUrl/participantToken 이 없습니다: ${resp.body}');
+      throw Exception('${L.t('resp_invalid')}: ${resp.body}');
     }
     return ConnectionDetails(serverUrl: url, token: token);
   }

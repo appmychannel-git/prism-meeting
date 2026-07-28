@@ -9,6 +9,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'config.dart';
 import 'connection_service.dart';
+import 'l10n.dart';
 import 'room_screen.dart';
 
 class JoinScreen extends StatefulWidget {
@@ -110,7 +111,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   }
 
   // 랜덤 게스트 이름 (예: 게스트-4823)
-  String _randomName() => '게스트-${1000 + Random().nextInt(9000)}';
+  String _randomName() => '${L.t('guest')}-${1000 + Random().nextInt(9000)}';
 
   // 입장 직전 이름 팝업. 확인/랜덤 → 그 이름으로 입장, 취소/닫기 → 참여하기 폼 유지.
   Future<void> _promptNameThenJoin() async {
@@ -124,7 +125,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: true, // 바깥 탭(닫기) → 취소로 처리
       builder: (ctx) => AlertDialog(
-        title: const Text('이름 설정'),
+        title: Text(L.t('name_set')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -132,27 +133,27 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
           textInputAction: TextInputAction.done,
           onSubmitted: (v) =>
               Navigator.pop(ctx, v.trim().isEmpty ? _randomName() : v.trim()),
-          decoration: const InputDecoration(
-            labelText: '표시 이름',
-            hintText: '회의에서 보일 이름 (예: 홍길동)',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: L.t('display_name'),
+            hintText: L.t('name_hint'),
+            border: const OutlineInputBorder(),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, null), // 취소
-            child: const Text('취소'),
+            child: Text(L.t('cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, _randomName()), // 랜덤 이름으로 입장
-            child: const Text('랜덤'),
+            child: Text(L.t('random')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(
               ctx,
               ctrl.text.trim().isEmpty ? _randomName() : ctrl.text.trim(),
             ),
-            child: const Text('확인'),
+            child: Text(L.t('ok')),
           ),
         ],
       ),
@@ -228,30 +229,30 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       final String pin;
       if (_tab == _Tab.join) {
         room = _codeCtrl.text.trim();
-        if (room.isEmpty) throw Exception('방 코드를 입력하세요.');
+        if (room.isEmpty) throw Exception(L.t('err_room_required'));
         pin = _pinCtrl.text.trim(); // 공개방이면 서버가 무시
       } else {
         final custom = _customCtrl.text.trim();
         room = custom.isEmpty ? AppConfig.generateRoomCode() : custom;
         if (_private) {
           pin = _pinCtrl.text.trim();
-          if (pin.isEmpty) throw Exception('비공개 방은 입장 코드를 입력하세요.');
+          if (pin.isEmpty) throw Exception(L.t('err_private_pin'));
         } else {
           pin = '';
         }
       }
 
       final name = _nameCtrl.text.trim().isEmpty
-          ? '게스트-${DateTime.now().millisecondsSinceEpoch % 1000}'
+          ? '${L.t('guest')}-${DateTime.now().millisecondsSinceEpoch % 1000}'
           : _nameCtrl.text.trim();
 
       if (AppConfig.tokenServerUrl.isEmpty) {
-        throw Exception('토큰 서버 주소가 설정되지 않았습니다. (LK_TOKEN_URL)');
+        throw Exception(L.t('err_no_token'));
       }
 
       final granted = await _ensurePermissions();
       if (!granted) {
-        throw Exception('카메라/마이크 권한이 필요합니다. 설정에서 허용해주세요.');
+        throw Exception(L.t('err_permission'));
       }
 
       final details = await ConnectionService.fetchFromServer(
@@ -292,14 +293,14 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     // 초대 링크로 자동 입장 중이면 폼 대신 로딩 화면(바로 회의 시작 느낌)
     if (_autoJoining && _error == null) {
-      return const Scaffold(
+      return Scaffold(
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('회의에 입장하는 중...'),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(L.t('joining')),
             ],
           ),
         ),
@@ -352,7 +353,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                       if (!landscape) ...[
                         const SizedBox(height: 4),
                         Text(
-                          '소규모 화상회의 · 웹 / 모바일 / 디스플레이',
+                          L.t('tagline'),
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -361,16 +362,16 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
                       // 참여 / 만들기 탭
                       SegmentedButton<_Tab>(
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: _Tab.join,
-                            label: Text('참여하기'),
-                            icon: Icon(Icons.login),
+                            label: Text(L.t('tab_join')),
+                            icon: const Icon(Icons.login),
                           ),
                           ButtonSegment(
                             value: _Tab.create,
-                            label: Text('방 만들기'),
-                            icon: Icon(Icons.add_circle_outline),
+                            label: Text(L.t('tab_create')),
+                            icon: const Icon(Icons.add_circle_outline),
                           ),
                         ],
                         selected: {_tab},
@@ -392,11 +393,11 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                               RegExp(r'[a-zA-Z0-9-]'),
                             ),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: '방 코드',
-                            hintText: '예: abc-defg-hij',
-                            prefixIcon: Icon(Icons.meeting_room_outlined),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: L.t('room_code'),
+                            hintText: L.t('room_code_hint'),
+                            prefixIcon: const Icon(Icons.meeting_room_outlined),
+                            border: const OutlineInputBorder(),
                           ),
                         )
                       else
@@ -409,11 +410,11 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                               RegExp(r'[a-zA-Z0-9-]'),
                             ),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: '방 이름 (선택)',
-                            hintText: '영문·숫자·- 만 (비우면 자동)',
-                            prefixIcon: Icon(Icons.meeting_room_outlined),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: L.t('room_name_opt'),
+                            hintText: L.t('room_name_hint'),
+                            prefixIcon: const Icon(Icons.meeting_room_outlined),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                       SizedBox(height: gap),
@@ -445,10 +446,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                                           ),
                                         ),
                                       ),
-                                      const Flexible(
+                                      Flexible(
                                         child: Text(
-                                          '비공개 방 (입장 코드)',
-                                          style: TextStyle(fontSize: 14),
+                                          L.t('private_room'),
+                                          style: const TextStyle(fontSize: 14),
                                         ),
                                       ),
                                     ],
@@ -469,10 +470,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                                     FilteringTextInputFormatter.digitsOnly,
                                     LengthLimitingTextInputFormatter(6),
                                   ],
-                                  decoration: const InputDecoration(
-                                    labelText: '입장 코드',
-                                    hintText: '숫자 6자리',
-                                    border: OutlineInputBorder(),
+                                  decoration: InputDecoration(
+                                    labelText: L.t('entry_code'),
+                                    hintText: L.t('entry_code_hint6'),
+                                    border: const OutlineInputBorder(),
                                   ),
                                 ),
                               ),
@@ -491,11 +492,11 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(6),
                           ],
-                          decoration: const InputDecoration(
-                            labelText: '입장 코드 (비공개 방일 경우)',
-                            hintText: '공개 방이면 비워두세요',
-                            prefixIcon: Icon(Icons.password_outlined),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: L.t('entry_code_join'),
+                            hintText: L.t('entry_code_join_hint'),
+                            prefixIcon: const Icon(Icons.password_outlined),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                       ],
@@ -505,10 +506,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                         controller: _nameCtrl,
                         focusNode: _nameFocus,
                         textInputAction: TextInputAction.done,
-                        decoration: const InputDecoration(
-                          labelText: '내 이름 (선택)',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: L.t('my_name_opt'),
+                          prefixIcon: const Icon(Icons.person_outline),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
 
@@ -547,8 +548,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                             : Icon(isJoin ? Icons.login : Icons.add),
                         label: Text(
                           _connecting
-                              ? '접속 중...'
-                              : (isJoin ? '회의 입장' : '방 만들기 & 입장'),
+                              ? L.t('connecting')
+                              : (isJoin
+                                    ? L.t('enter_meeting')
+                                    : L.t('create_enter')),
                         ),
                       ),
                     ],
@@ -582,13 +585,24 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: Text(
-                    'Powered by 마이채널',
+                    L.t('powered_by'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.white.withValues(alpha: 0.45),
                     ),
                   ),
+                ),
+              ),
+            ),
+            // 앱 언어 선택 (좌측 상단)
+            Positioned(
+              top: 0,
+              left: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4, left: 6),
+                  child: const AppLanguageButton(),
                 ),
               ),
             ),
