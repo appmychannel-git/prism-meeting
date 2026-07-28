@@ -13,10 +13,9 @@ import 'package:flutter_background/flutter_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
-import 'package:speech_to_text/speech_recognition_result.dart';
 
 import 'caption_overlay.dart';
+import 'stt_platform.dart';
 import 'chat_panel.dart';
 import 'config.dart';
 import 'connection_service.dart';
@@ -127,7 +126,7 @@ class _RoomScreenState extends State<RoomScreen> {
 
   // ---- 음성 자막 상태 ----
   static const String _captionTopic = 'caption';
-  final stt.SpeechToText _speech = stt.SpeechToText();
+  final PlatformStt _speech = PlatformStt(); // 웹=브라우저 STT, 모바일=speech_to_text
   bool _speechAvailable = false; // STT 초기화 성공(기기/브라우저 지원) 여부
   bool _captionsOn = false; // 자막 켬(내 발화 송출 + 오버레이 표시)
   // 내 언어: STT 인식 언어(내 발화) + 자막 번역 대상(내가 읽을 언어)로 동시 사용.
@@ -186,7 +185,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _stopBackgroundService(); // 화면공유 포그라운드 서비스 정리
     _deviceSub?.cancel();
     _rebuildTimer?.cancel();
-    if (_speechAvailable) _speech.cancel();
+    if (_speechAvailable) _speech.stop();
     _room.removeListener(_onRoomChange);
     _listener.dispose();
     _room.dispose();
@@ -338,9 +337,11 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<void> _initSpeech() async {
     try {
       _speechAvailable = await _speech.initialize(
-        onStatus: _onSpeechStatus,
-        onError: (e) {
-          // 인식 실패(무음/네트워크 등)는 조용히 무시하고 계속 시도.
+        // 한 발화가 끝나면(무음/네트워크 종료) 자막이 켜져 있는 동안 계속 다시 듣는다.
+        onEnd: () {
+          if (_captionsOn) _restartListening();
+        },
+        onError: (_) {
           if (_captionsOn) _restartListening();
         },
       );
@@ -348,13 +349,6 @@ class _RoomScreenState extends State<RoomScreen> {
       _speechAvailable = false;
     }
     if (mounted) setState(() {});
-  }
-
-  void _onSpeechStatus(String status) {
-    // 한 발화가 끝나면(done/notListening) 자막이 켜져 있는 동안 계속 다시 듣는다.
-    if ((status == 'done' || status == 'notListening') && _captionsOn) {
-      _restartListening();
-    }
   }
 
   Future<void> _toggleCaptions() async {
@@ -377,17 +371,7 @@ class _RoomScreenState extends State<RoomScreen> {
   void _startListening() {
     if (!_captionsOn || !_speechAvailable || _speech.isListening) return;
     final locale = _sttLocales[_myLang] ?? 'en_US';
-    _speech.listen(
-      onResult: _onSpeechResult,
-      listenOptions: stt.SpeechListenOptions(
-        partialResults: true,
-        listenMode: stt.ListenMode.dictation,
-        cancelOnError: false,
-        localeId: locale,
-        listenFor: const Duration(minutes: 5),
-        pauseFor: const Duration(seconds: 3),
-      ),
-    );
+    _speech.listen(localeId: locale, onResult: _onSpeechResult);
   }
 
   void _restartListening() {
@@ -397,10 +381,9 @@ class _RoomScreenState extends State<RoomScreen> {
     });
   }
 
-  void _onSpeechResult(SpeechRecognitionResult result) {
-    final text = result.recognizedWords.trim();
+  void _onSpeechResult(String words, bool isFinal) {
+    final text = words.trim();
     if (text.isEmpty) return;
-    final isFinal = result.finalResult;
     // 중간 결과는 ~400ms 간격으로만 송출(대역폭/비용 절약). 확정 결과는 항상 송출.
     final now = DateTime.now();
     if (!isFinal) {
