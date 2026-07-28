@@ -422,6 +422,8 @@ class _RoomScreenState extends State<RoomScreen> {
   }
 
   void _onCaptionReceived(DataReceivedEvent e) {
+    // 자막을 끈 사람은 받은 자막을 처리/번역하지 않는다(불필요한 번역 과금 방지).
+    if (!_captionsOn) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
       final id = e.participant?.identity ?? (m['sender'] ?? '').toString();
