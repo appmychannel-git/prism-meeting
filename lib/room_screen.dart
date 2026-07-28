@@ -581,6 +581,36 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
+  // 자막 언어(내 언어) 선택 다이얼로그 — 더보기 메뉴에서 호출.
+  Future<void> _showCaptionLangDialog() async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('자막 언어 (내 언어)'),
+        children: [
+          for (final e in AppConfig.supportedLanguages.entries)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, e.key),
+              child: Row(
+                children: [
+                  Icon(
+                    e.key == _myLang
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    size: 18,
+                    color: e.key == _myLang ? const Color(0xFF4ADE80) : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(e.value),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked != null) _changeMyLang(picked);
+  }
+
   // 내 언어 변경(자막 언어 = STT 인식 언어 + 번역 대상).
   void _changeMyLang(String code) {
     if (!AppConfig.supportedLanguages.containsKey(code)) return;
@@ -1467,28 +1497,7 @@ class _RoomScreenState extends State<RoomScreen> {
               onPressed: _showInviteQr,
               icon: const Icon(Icons.person_add_alt),
             ),
-            // ④ 내 언어(자막 인식/번역) 선택
-            PopupMenuButton<String>(
-              tooltip: '내 언어(자막)',
-              padding: EdgeInsets.zero,
-              onSelected: _changeMyLang,
-              icon: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.subtitles_outlined, size: 20),
-                  const SizedBox(width: 2),
-                  Text(
-                    _myLang.toUpperCase(),
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                ],
-              ),
-              itemBuilder: (_) => [
-                for (final e in AppConfig.supportedLanguages.entries)
-                  PopupMenuItem<String>(value: e.key, child: Text(e.value)),
-              ],
-            ),
-            // ⑤ 채팅
+            // ④ 채팅
             IconButton(
               tooltip: '채팅',
               visualDensity: VisualDensity.compact,
@@ -1516,6 +1525,8 @@ class _RoomScreenState extends State<RoomScreen> {
               onSelected: (v) {
                 if (v == 'recv') _toggleReceiveVideo();
                 if (v == 'name') _showNameDialog();
+                if (v == 'caption') _toggleCaptions();
+                if (v == 'caplang') _showCaptionLangDialog();
                 if (v == 'capmode') {
                   _setCaptionMode(
                     _captionMode == CaptionMode.continuous
@@ -1525,13 +1536,31 @@ class _RoomScreenState extends State<RoomScreen> {
                 }
               },
               itemBuilder: (_) => [
-                const PopupMenuItem<String>(
-                  value: 'name',
+                // ── 자막 ──
+                PopupMenuItem<String>(
+                  value: 'caption',
                   child: Row(
                     children: [
-                      Icon(Icons.badge_outlined, size: 18),
-                      SizedBox(width: 8),
-                      Text('이름 변경'),
+                      Icon(
+                        _captionsOn
+                            ? Icons.closed_caption
+                            : Icons.closed_caption_off,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(_captionsOn ? '자막 끄기' : '자막 켜기'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'caplang',
+                  child: Row(
+                    children: [
+                      const Icon(Icons.subtitles_outlined, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        '자막 언어: ${AppConfig.supportedLanguages[_myLang] ?? _myLang}',
+                      ),
                     ],
                   ),
                 ),
@@ -1551,6 +1580,17 @@ class _RoomScreenState extends State<RoomScreen> {
                             ? '자막: 눌러 말하기로'
                             : '자막: 연속으로',
                       ),
+                    ],
+                  ),
+                ),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'name',
+                  child: Row(
+                    children: [
+                      Icon(Icons.badge_outlined, size: 18),
+                      SizedBox(width: 8),
+                      Text('이름 변경'),
                     ],
                   ),
                 ),
@@ -1660,7 +1700,6 @@ class _RoomScreenState extends State<RoomScreen> {
                     onMic: _toggleMic,
                     onCam: _toggleCam,
                     onShare: _toggleScreenShare,
-                    onCaption: _toggleCaptions,
                     onPushToTalk: _pushToTalk,
                     onLeave: _onLeavePressed,
                   ),
@@ -1867,7 +1906,6 @@ class _ControlBar extends StatelessWidget {
   final VoidCallback onMic;
   final VoidCallback onCam;
   final VoidCallback onShare;
-  final VoidCallback onCaption;
   final VoidCallback onPushToTalk;
   final VoidCallback onLeave;
 
@@ -1884,7 +1922,6 @@ class _ControlBar extends StatelessWidget {
     required this.onMic,
     required this.onCam,
     required this.onShare,
-    required this.onCaption,
     required this.onPushToTalk,
     required this.onLeave,
   });
@@ -1924,16 +1961,8 @@ class _ControlBar extends StatelessWidget {
                 busy: shareBusy,
                 onTap: shareBusy ? null : onShare,
               ),
-            _RoundButton(
-              icon: captionsOn
-                  ? Icons.closed_caption
-                  : Icons.closed_caption_off,
-              label: captionsOn ? '자막 끄기' : '자막',
-              active: true,
-              accent: captionsOn, // 켬이면 파란색 강조
-              onTap: onCaption,
-            ),
             // 눌러 말하기 모드 + 자막 켬일 때만: '말하기' 버튼
+            // (자막 켜기/끄기·언어 선택은 앱바 더보기(⋮) 메뉴로 이동)
             if (captionsOn && pushToTalkMode)
               _RoundButton(
                 icon: pttActive ? Icons.mic : Icons.mic_none,
