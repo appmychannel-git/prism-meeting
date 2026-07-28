@@ -38,6 +38,8 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        // 앱 표시 이름(매니페스트 android:label). 빌드 타입별로 덮어씀.
+        manifestPlaceholders["appLabel"] = "Prism Meeting"
     }
 
     signingConfigs {
@@ -60,6 +62,15 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+        }
+        // [feature/translation] debug 빌드는 별개 앱으로 설치되게 접미사를 붙인다.
+        // → applicationId = ...prism.dev 라 릴리즈 앱과 한 기기에 공존(아이콘 2개).
+        // release 빌드는 손대지 않으므로 main에 병합해도 프로덕션은 영향 없음.
+        // 주의: .dev 는 별개 패키지라 딥링크(App Links/assetlinks)는 동작 안 함(번역 테스트엔 무관).
+        debug {
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            manifestPlaceholders["appLabel"] = "Prism 번역(dev)"
         }
     }
 }
