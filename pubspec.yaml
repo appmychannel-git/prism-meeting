@@ -48,6 +48,7 @@ dependencies:
   pretty_qr_code: ^3.4.0
   # 앱 패키지명(applicationId)을 런타임에 읽어 토큰 요청에 전송(옛 앱 차단용 표식).
   package_info_plus: ^9.0.0
+  speech_to_text: ^7.4.0
 
 dev_dependencies:
   flutter_test:

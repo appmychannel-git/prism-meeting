@@ -83,5 +83,9 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- 음성 인식(speech_to_text): Android 11+ 에서 이 queries 없으면 STT 초기화 실패 -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
     </queries>
 </manifest>

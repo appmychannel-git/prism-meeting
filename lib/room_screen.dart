@@ -13,7 +13,10 @@ import 'package:flutter_background/flutter_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:speech_to_text/speech_recognition_result.dart';
 
+import 'caption_overlay.dart';
 import 'chat_panel.dart';
 import 'config.dart';
 import 'connection_service.dart';
@@ -122,6 +125,29 @@ class _RoomScreenState extends State<RoomScreen> {
   // 받은 메시지를 번역할 대상(선호) 언어. ''=사용 안 함(기본). 언어 선택 시 자동 번역.
   String _targetLang = AppConfig.targetLanguage;
 
+  // ---- 음성 자막 상태 ----
+  static const String _captionTopic = 'caption';
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _speechAvailable = false; // STT 초기화 성공(기기/브라우저 지원) 여부
+  bool _captionsOn = false; // 자막 켬(내 발화 송출 + 오버레이 표시)
+  // 내 언어: STT 인식 언어(내 발화) + 자막 번역 대상(내가 읽을 언어)로 동시 사용.
+  late String _myLang = _defaultMyLang();
+  final Map<String, LiveCaption> _captions = {}; // identity -> 현재 자막
+  DateTime? _lastInterimSentAt; // 중간 결과 송출 throttle
+
+  // 발화 언어(2-letter) → STT 로케일 ID.
+  static const Map<String, String> _sttLocales = {
+    'ko': 'ko_KR', 'en': 'en_US', 'ru': 'ru_RU', 'kk': 'kk_KZ',
+    'fr': 'fr_FR', 'ja': 'ja_JP', 'zh': 'zh_CN', 'es': 'es_ES',
+    'de': 'de_DE', 'ar': 'ar_SA', 'rw': 'rw_RW',
+  };
+
+  String _defaultMyLang() {
+    final code = WidgetsBinding.instance.platformDispatcher.locale.languageCode
+        .toLowerCase();
+    return AppConfig.supportedLanguages.containsKey(code) ? code : 'ko';
+  }
+
   // ---- 발표자 뷰 상태 ----
   bool _speakerView = false; // false=갤러리, true=발표자 뷰
   int _page = 0; // 갤러리 페이지(참가자 많을 때)
@@ -150,6 +176,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
       _loadCameras();
     });
+    _initSpeech();
     _connect();
   }
 
@@ -159,6 +186,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _stopBackgroundService(); // 화면공유 포그라운드 서비스 정리
     _deviceSub?.cancel();
     _rebuildTimer?.cancel();
+    if (_speechAvailable) _speech.cancel();
     _room.removeListener(_onRoomChange);
     _listener.dispose();
     _room.dispose();
@@ -217,6 +245,10 @@ class _RoomScreenState extends State<RoomScreen> {
 
   // 다른 참가자가 보낸 채팅 수신 (LiveKit 데이터 채널)
   void _onDataReceived(DataReceivedEvent e) {
+    if (e.topic == _captionTopic) {
+      _onCaptionReceived(e);
+      return;
+    }
     if (e.topic != _chatTopic) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
@@ -298,6 +330,208 @@ class _RoomScreenState extends State<RoomScreen> {
         m.translating = false;
         m.translateError = e.toString().replaceFirst('Exception: ', '');
       });
+    }
+  }
+
+  // ---- 음성 자막 ----
+
+  Future<void> _initSpeech() async {
+    try {
+      _speechAvailable = await _speech.initialize(
+        onStatus: _onSpeechStatus,
+        onError: (e) {
+          // 인식 실패(무음/네트워크 등)는 조용히 무시하고 계속 시도.
+          if (_captionsOn) _restartListening();
+        },
+      );
+    } catch (_) {
+      _speechAvailable = false;
+    }
+    if (mounted) setState(() {});
+  }
+
+  void _onSpeechStatus(String status) {
+    // 한 발화가 끝나면(done/notListening) 자막이 켜져 있는 동안 계속 다시 듣는다.
+    if ((status == 'done' || status == 'notListening') && _captionsOn) {
+      _restartListening();
+    }
+  }
+
+  Future<void> _toggleCaptions() async {
+    if (!_captionsOn) {
+      if (!_speechAvailable) {
+        await _initSpeech();
+        if (!_speechAvailable) {
+          _snack('이 기기/브라우저에서 음성 인식을 사용할 수 없습니다.');
+          return;
+        }
+      }
+      setState(() => _captionsOn = true);
+      _startListening();
+    } else {
+      setState(() => _captionsOn = false);
+      await _speech.stop();
+    }
+  }
+
+  void _startListening() {
+    if (!_captionsOn || !_speechAvailable || _speech.isListening) return;
+    final locale = _sttLocales[_myLang] ?? 'en_US';
+    _speech.listen(
+      onResult: _onSpeechResult,
+      listenOptions: stt.SpeechListenOptions(
+        partialResults: true,
+        listenMode: stt.ListenMode.dictation,
+        cancelOnError: false,
+        localeId: locale,
+        listenFor: const Duration(minutes: 5),
+        pauseFor: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _restartListening() {
+    // 다음 프레임에 재시작(콜백 중 재진입 방지) + 상태 확인.
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted && _captionsOn && !_speech.isListening) _startListening();
+    });
+  }
+
+  void _onSpeechResult(SpeechRecognitionResult result) {
+    final text = result.recognizedWords.trim();
+    if (text.isEmpty) return;
+    final isFinal = result.finalResult;
+    // 중간 결과는 ~400ms 간격으로만 송출(대역폭/비용 절약). 확정 결과는 항상 송출.
+    final now = DateTime.now();
+    if (!isFinal) {
+      if (_lastInterimSentAt != null &&
+          now.difference(_lastInterimSentAt!).inMilliseconds < 400) {
+        return;
+      }
+      _lastInterimSentAt = now;
+    }
+    _broadcastCaption(text, isFinal);
+  }
+
+  Future<void> _broadcastCaption(String text, bool isFinal) async {
+    final myId = _room.localParticipant?.identity ?? AppConfig.deviceIdentity;
+    // 내 자막도 화면에 표시(원문만).
+    _updateCaption(
+      identity: myId,
+      sender: _displayName,
+      text: text,
+      lang: _myLang,
+      isFinal: isFinal,
+      mine: true,
+    );
+    try {
+      await _room.localParticipant?.publishData(
+        utf8.encode(jsonEncode({
+          'sender': _displayName,
+          'text': text,
+          'lang': _myLang,
+          'final': isFinal,
+        })),
+        reliable: isFinal, // 확정 결과만 신뢰성 전송, 중간 결과는 유실 허용
+        topic: _captionTopic,
+      );
+    } catch (_) {}
+  }
+
+  void _onCaptionReceived(DataReceivedEvent e) {
+    try {
+      final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
+      final id = e.participant?.identity ?? (m['sender'] ?? '').toString();
+      final text = (m['text'] ?? '').toString();
+      if (text.isEmpty) return;
+      _updateCaption(
+        identity: id,
+        sender: (m['sender'] ?? e.participant?.identity ?? '상대').toString(),
+        text: text,
+        lang: (m['lang'] ?? '').toString(),
+        isFinal: m['final'] == true,
+        mine: false,
+      );
+    } catch (_) {}
+  }
+
+  void _updateCaption({
+    required String identity,
+    required String sender,
+    required String text,
+    required String lang,
+    required bool isFinal,
+    required bool mine,
+  }) {
+    if (!mounted) return;
+    final existing = _captions[identity];
+    final c = existing ?? LiveCaption(
+      identity: identity,
+      sender: sender,
+      text: text,
+      lang: lang,
+      isFinal: isFinal,
+      updatedAt: DateTime.now(),
+      mine: mine,
+    );
+    // 문장이 바뀌면 이전 번역은 무효화.
+    if (c.text != text) {
+      c.translated = null;
+      c.translatedLang = null;
+    }
+    c.text = text;
+    c.lang = lang;
+    c.isFinal = isFinal;
+    c.updatedAt = DateTime.now();
+    _captions[identity] = c;
+    setState(() {});
+    // 남의 확정 자막을 내 언어로 자동 번역(발화 언어와 다를 때만).
+    if (!mine && isFinal && lang != _myLang) {
+      _translateCaption(c);
+    }
+  }
+
+  Future<void> _translateCaption(LiveCaption c) async {
+    final target = _myLang;
+    final src = c.text;
+    if (c.translated != null && c.translatedLang == target) return;
+    try {
+      final r = await TranslationService.translate(src, target);
+      if (!mounted) return;
+      // 번역 도중 문장이 바뀌지 않았을 때만 반영.
+      if (c.text == src) {
+        setState(() {
+          c.translated = r.translatedText;
+          c.translatedLang = target;
+        });
+      }
+    } catch (_) {
+      // 자막 번역 실패는 조용히 무시(원문은 계속 표시).
+    }
+  }
+
+  // 최근 ~6초 내 갱신된 자막만, 최신순 최대 2줄.
+  List<LiveCaption> _activeCaptions() {
+    final now = DateTime.now();
+    final list = _captions.values
+        .where((c) => now.difference(c.updatedAt).inSeconds < 6)
+        .toList()
+      ..sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
+    if (list.length > 2) return list.sublist(list.length - 2);
+    return list;
+  }
+
+  // 내 언어 변경(자막 언어 = STT 인식 언어 + 번역 대상).
+  void _changeMyLang(String code) {
+    if (!AppConfig.supportedLanguages.containsKey(code)) return;
+    setState(() => _myLang = code);
+    // 듣는 중이면 새 언어로 재시작.
+    if (_captionsOn && _speech.isListening) {
+      _speech.stop();
+    }
+    // 표시 중인 남의 자막을 새 언어로 다시 번역.
+    for (final c in _captions.values) {
+      if (!c.mine && c.isFinal) _translateCaption(c);
     }
   }
 
@@ -1175,7 +1409,28 @@ class _RoomScreenState extends State<RoomScreen> {
               onPressed: _showInviteQr,
               icon: const Icon(Icons.person_add_alt),
             ),
-            // ④ 채팅
+            // ④ 내 언어(자막 인식/번역) 선택
+            PopupMenuButton<String>(
+              tooltip: '내 언어(자막)',
+              padding: EdgeInsets.zero,
+              onSelected: _changeMyLang,
+              icon: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.subtitles_outlined, size: 20),
+                  const SizedBox(width: 2),
+                  Text(
+                    _myLang.toUpperCase(),
+                    style: const TextStyle(fontSize: 11),
+                  ),
+                ],
+              ),
+              itemBuilder: (_) => [
+                for (final e in AppConfig.supportedLanguages.entries)
+                  PopupMenuItem<String>(value: e.key, child: Text(e.value)),
+              ],
+            ),
+            // ⑤ 채팅
             IconButton(
               tooltip: '채팅',
               visualDensity: VisualDensity.compact,
@@ -1301,6 +1556,12 @@ class _RoomScreenState extends State<RoomScreen> {
                         ],
                       ),
                     ),
+                  // 실시간 자막 오버레이(줌 스타일, 자막 켬일 때만)
+                  if (_captionsOn)
+                    CaptionOverlay(
+                      captions: _activeCaptions(),
+                      myLang: _myLang,
+                    ),
                   _ControlBar(
                     micOn: _micOn,
                     camOn: _camOn,
@@ -1308,9 +1569,11 @@ class _RoomScreenState extends State<RoomScreen> {
                     showShare: canPresent,
                     sharing: _screenSharing,
                     shareBusy: _shareBusy,
+                    captionsOn: _captionsOn,
                     onMic: _toggleMic,
                     onCam: _toggleCam,
                     onShare: _toggleScreenShare,
+                    onCaption: _toggleCaptions,
                     onLeave: _onLeavePressed,
                   ),
                 ],
@@ -1510,9 +1773,11 @@ class _ControlBar extends StatelessWidget {
   final bool showShare; // 화면공유 버튼 노출(웹/폰), TV는 표시 위주라 숨김
   final bool sharing; // 내가 화면공유 중
   final bool shareBusy; // 화면공유 토글 진행 중
+  final bool captionsOn; // 자막 켬
   final VoidCallback onMic;
   final VoidCallback onCam;
   final VoidCallback onShare;
+  final VoidCallback onCaption;
   final VoidCallback onLeave;
 
   const _ControlBar({
@@ -1522,9 +1787,11 @@ class _ControlBar extends StatelessWidget {
     required this.showShare,
     required this.sharing,
     required this.shareBusy,
+    required this.captionsOn,
     required this.onMic,
     required this.onCam,
     required this.onShare,
+    required this.onCaption,
     required this.onLeave,
   });
 
@@ -1562,6 +1829,16 @@ class _ControlBar extends StatelessWidget {
                 onTap: shareBusy ? null : onShare,
               ),
             ],
+            const SizedBox(width: 20),
+            _RoundButton(
+              icon: captionsOn
+                  ? Icons.closed_caption
+                  : Icons.closed_caption_off,
+              label: captionsOn ? '자막 끄기' : '자막',
+              active: true,
+              accent: captionsOn, // 켬이면 파란색 강조
+              onTap: onCaption,
+            ),
             const SizedBox(width: 20),
             _RoundButton(
               icon: Icons.call_end,
