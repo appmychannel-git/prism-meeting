@@ -11,6 +11,7 @@ class ChatMessage {
   final String text; // 원문
   final bool mine; // 내가 보낸 메시지인지
   String? translated; // 번역문(있으면 원문과 함께 표시)
+  String? translatedLang; // translated 가 어떤 언어로 된 것인지(대상 언어 코드)
   bool translating; // 번역 요청 중
   String? translateError; // 번역 실패 메시지
   ChatMessage({
@@ -18,6 +19,7 @@ class ChatMessage {
     required this.text,
     required this.mine,
     this.translated,
+    this.translatedLang,
     this.translating = false,
     this.translateError,
   });
@@ -26,25 +28,23 @@ class ChatMessage {
 /// 회의 화면 우측에 열리는 채팅 패널.
 ///
 /// 메시지 송수신 로직은 RoomScreen(LiveKit 연결부)에 있고,
-/// 이 위젯은 표시 + 입력 + 번역 트리거만 담당한다.
+/// 이 위젯은 표시 + 입력 + 번역 언어 선택만 담당한다.
+/// 번역은 언어를 고르면 RoomScreen 이 자동으로 수행한다(버튼 없음).
 class ChatPanel extends StatefulWidget {
   final List<ChatMessage> messages;
   final void Function(String text) onSend;
   // 닫기 동작. null이면 드로어처럼 Navigator.maybePop()(오버레이 닫기).
   // 인라인(영상 옆) 모드에선 상위에서 setState로 패널을 접는 콜백을 넘긴다.
   final VoidCallback? onClose;
-  // 번역 대상(선호) 언어 코드 + 변경 콜백.
+  // 번역 대상(선호) 언어 코드. ''(빈 문자열)이면 "사용 안 함"(번역 표시 안 함).
   final String targetLanguage;
   final ValueChanged<String> onLanguageChange;
-  // 특정 메시지를 현재 대상 언어로 번역 요청.
-  final void Function(ChatMessage msg) onTranslate;
   const ChatPanel({
     super.key,
     required this.messages,
     required this.onSend,
     required this.targetLanguage,
     required this.onLanguageChange,
-    required this.onTranslate,
     this.onClose,
   });
 
@@ -106,7 +106,7 @@ class _ChatPanelState extends State<ChatPanel> {
                   ),
                 ),
                 const Spacer(),
-                // 번역 대상(선호) 언어 선택
+                // 번역 대상(선호) 언어 선택. '사용 안 함' 선택 시 번역 표시 안 함.
                 _LanguageSelector(
                   value: widget.targetLanguage,
                   onChanged: widget.onLanguageChange,
@@ -137,8 +137,7 @@ class _ChatPanelState extends State<ChatPanel> {
                     itemCount: widget.messages.length,
                     itemBuilder: (_, i) => _Bubble(
                       msg: widget.messages[i],
-                      onTranslate: () =>
-                          widget.onTranslate(widget.messages[i]),
+                      targetLang: widget.targetLanguage,
                     ),
                   ),
           ),
@@ -181,19 +180,25 @@ class _ChatPanelState extends State<ChatPanel> {
   }
 }
 
-/// 번역 대상 언어 드롭다운(🌐 + 언어명).
+/// 번역 대상 언어 드롭다운. 맨 위 "사용 안 함"(값 '') + 지원 언어들.
 class _LanguageSelector extends StatelessWidget {
-  final String value;
+  final String value; // '' = 사용 안 함
   final ValueChanged<String> onChanged;
   const _LanguageSelector({required this.value, required this.onChanged});
 
+  String _label(String code) =>
+      code.isEmpty ? '사용 안 함' : (AppConfig.supportedLanguages[code] ?? code);
+
   @override
   Widget build(BuildContext context) {
+    final off = value.isEmpty;
     return PopupMenuButton<String>(
       tooltip: '번역 언어',
       initialValue: value,
       onSelected: onChanged,
       itemBuilder: (_) => [
+        const PopupMenuItem(value: '', child: Text('사용 안 함')),
+        const PopupMenuDivider(),
         for (final e in AppConfig.supportedLanguages.entries)
           PopupMenuItem(value: e.key, child: Text(e.value)),
       ],
@@ -202,11 +207,18 @@ class _LanguageSelector extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.translate, size: 18),
+            Icon(
+              Icons.translate,
+              size: 18,
+              color: off ? Colors.white38 : const Color(0xFF9FC0FF),
+            ),
             const SizedBox(width: 4),
             Text(
-              AppConfig.supportedLanguages[value] ?? value,
-              style: const TextStyle(fontSize: 13),
+              _label(value),
+              style: TextStyle(
+                fontSize: 13,
+                color: off ? Colors.white54 : null,
+              ),
             ),
             const Icon(Icons.arrow_drop_down, size: 18),
           ],
@@ -218,8 +230,8 @@ class _LanguageSelector extends StatelessWidget {
 
 class _Bubble extends StatelessWidget {
   final ChatMessage msg;
-  final VoidCallback onTranslate;
-  const _Bubble({required this.msg, required this.onTranslate});
+  final String targetLang; // '' = 사용 안 함
+  const _Bubble({required this.msg, required this.targetLang});
 
   @override
   Widget build(BuildContext context) {
@@ -251,8 +263,8 @@ class _Bubble extends StatelessWidget {
               children: [
                 // 원문
                 Text(msg.text, style: const TextStyle(fontSize: 14)),
-                // 번역 영역(내가 받은 메시지에만): 번역문 or 번역 버튼 or 상태
-                if (!mine) _translationArea(),
+                // 번역 영역(받은 메시지 + 언어 선택됨일 때만 자동 표시)
+                if (!mine && targetLang.isNotEmpty) _translationArea(),
               ],
             ),
           ),
@@ -262,8 +274,26 @@ class _Bubble extends StatelessWidget {
   }
 
   Widget _translationArea() {
-    // 번역문이 있으면 원문 아래에 함께 표시(원문 + 번역 동시)
-    if (msg.translated != null) {
+    // 번역 진행 중
+    if (msg.translating) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 6),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 12,
+              height: 12,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 6),
+            Text('번역 중...',
+                style: TextStyle(fontSize: 11, color: Colors.white54)),
+          ],
+        ),
+      );
+    }
+    // 현재 대상 언어로 번역 완료 → 원문 아래에 함께 표시
+    if (msg.translated != null && msg.translatedLang == targetLang) {
       return Padding(
         padding: const EdgeInsets.only(top: 6),
         child: Column(
@@ -290,55 +320,19 @@ class _Bubble extends StatelessWidget {
         ),
       );
     }
-    if (msg.translating) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 6),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 6),
-            Text('번역 중...',
-                style: TextStyle(fontSize: 11, color: Colors.white54)),
-          ],
+    // 실패
+    if (msg.translateError != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Text(
+          '번역 실패: ${msg.translateError!}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 10, color: Colors.white38),
         ),
       );
     }
-    // 아직 번역 안 함 → 번역 버튼(실패 시 재시도 문구)
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: InkWell(
-        onTap: onTranslate,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.translate, size: 13, color: Color(0xFF9FC0FF)),
-            const SizedBox(width: 4),
-            Text(
-              msg.translateError == null ? '번역' : '다시 시도',
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF9FC0FF),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            if (msg.translateError != null) ...[
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  msg.translateError!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 10, color: Colors.white38),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
+    // 아직 시작 전(곧 자동 번역됨) → 아무것도 표시 안 함
+    return const SizedBox.shrink();
   }
 }

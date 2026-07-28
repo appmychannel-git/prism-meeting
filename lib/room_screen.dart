@@ -119,7 +119,7 @@ class _RoomScreenState extends State<RoomScreen> {
   final List<ChatMessage> _messages = [];
   int _unread = 0;
   bool _chatOpen = false;
-  // 받은 메시지를 번역할 대상(선호) 언어. 기본=기기 언어(AppConfig).
+  // 받은 메시지를 번역할 대상(선호) 언어. ''=사용 안 함(기본). 언어 선택 시 자동 번역.
   String _targetLang = AppConfig.targetLanguage;
 
   // ---- 발표자 뷰 상태 ----
@@ -224,7 +224,10 @@ class _RoomScreenState extends State<RoomScreen> {
           .toString();
       final text = (m['text'] ?? '').toString();
       if (text.isEmpty) return;
-      _addMessage(ChatMessage(sender: sender, text: text, mine: false));
+      final msg = ChatMessage(sender: sender, text: text, mine: false);
+      _addMessage(msg);
+      // 언어가 선택돼 있으면 받은 즉시 자동 번역(탭 불필요).
+      if (_targetLang.isNotEmpty) _translateMessage(msg);
     } catch (_) {
       // 형식이 안 맞는 데이터는 무시
     }
@@ -257,26 +260,37 @@ class _RoomScreenState extends State<RoomScreen> {
   }
 
   // 번역 대상 언어 변경(채팅 패널 드롭다운). AppConfig에도 반영.
+  // 언어를 고르면 기존에 받은 메시지들도 그 언어로 자동 번역한다.
   void _changeTargetLang(String code) {
     setState(() {
       _targetLang = code;
       AppConfig.targetLanguage = code;
     });
+    if (code.isEmpty) return; // '사용 안 함' → 표시만 숨김(재번역 안 함)
+    for (final m in _messages) {
+      if (!m.mine && m.translatedLang != code) _translateMessage(m);
+    }
   }
 
-  // 받은 메시지 한 건을 현재 대상 언어로 번역(탭 번역).
+  // 받은 메시지 한 건을 현재 대상 언어로 자동 번역.
   Future<void> _translateMessage(ChatMessage m) async {
-    if (m.translating) return;
+    final target = _targetLang;
+    if (target.isEmpty) return;
+    if (m.translated != null && m.translatedLang == target) return; // 이미 됨
     setState(() {
       m.translating = true;
       m.translateError = null;
     });
     try {
-      final r = await TranslationService.translate(m.text, _targetLang);
+      final r = await TranslationService.translate(m.text, target);
       if (!mounted) return;
       setState(() {
-        m.translated = r.translatedText;
         m.translating = false;
+        // 번역 도중 대상 언어가 또 바뀌었으면 최신 선택만 반영.
+        if (_targetLang == target) {
+          m.translated = r.translatedText;
+          m.translatedLang = target;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -1104,7 +1118,6 @@ class _RoomScreenState extends State<RoomScreen> {
                   onSend: _sendChat,
                   targetLanguage: _targetLang,
                   onLanguageChange: _changeTargetLang,
-                  onTranslate: _translateMessage,
                 ),
               ),
         appBar: AppBar(
@@ -1316,7 +1329,6 @@ class _RoomScreenState extends State<RoomScreen> {
                   onSend: _sendChat,
                   targetLanguage: _targetLang,
                   onLanguageChange: _changeTargetLang,
-                  onTranslate: _translateMessage,
                   onClose: () => setState(() => _chatOpen = false),
                 ),
               ),

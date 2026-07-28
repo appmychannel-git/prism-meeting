@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:ui' as ui;
 
 /// Prism Meeting - 앱 전역 설정
 ///
@@ -63,18 +62,14 @@ class AppConfig {
     'ar': 'العربية',
   };
 
-  /// 내가 받은 메시지를 번역할 대상(선호) 언어. 기본값은 기기 언어.
-  /// (앱 실행 중 유지. 채팅 패널에서 변경 가능. 재시작 시 기기 언어로 초기화.)
-  static String? _targetLang;
-  static String get targetLanguage => _targetLang ??= _defaultLanguage();
+  /// 받은 메시지를 번역할 대상(선호) 언어.
+  /// 빈 문자열('')이면 "사용 안 함"(번역 끔) — 기본값.
+  /// 언어를 선택하면 그때부터 받은 메시지를 자동 번역한다.
+  /// (앱 실행 중 유지. 채팅 패널 드롭다운에서 변경. 재시작 시 '사용 안 함'으로 초기화.)
+  static String _targetLang = '';
+  static String get targetLanguage => _targetLang;
   static set targetLanguage(String code) {
-    if (supportedLanguages.containsKey(code)) _targetLang = code;
-  }
-
-  static String _defaultLanguage() {
-    final code = ui.PlatformDispatcher.instance.locale.languageCode
-        .toLowerCase();
-    return supportedLanguages.containsKey(code) ? code : 'en';
+    if (code.isEmpty || supportedLanguages.containsKey(code)) _targetLang = code;
   }
 
   /// 기본 방 이름 (입장 화면 기본값)
