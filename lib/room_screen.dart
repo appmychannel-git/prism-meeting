@@ -17,6 +17,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'chat_panel.dart';
 import 'config.dart';
 import 'connection_service.dart';
+import 'translation_service.dart';
 
 /// 참가자 + 그 사람의 비디오 트랙(없을 수 있음) + 마이크/발언 상태 묶음.
 /// 한 참가자가 카메라와 화면공유를 동시에 올리면 타일이 2개가 된다
@@ -118,6 +119,8 @@ class _RoomScreenState extends State<RoomScreen> {
   final List<ChatMessage> _messages = [];
   int _unread = 0;
   bool _chatOpen = false;
+  // 받은 메시지를 번역할 대상(선호) 언어. 기본=기기 언어(AppConfig).
+  String _targetLang = AppConfig.targetLanguage;
 
   // ---- 발표자 뷰 상태 ----
   bool _speakerView = false; // false=갤러리, true=발표자 뷰
@@ -250,6 +253,37 @@ class _RoomScreenState extends State<RoomScreen> {
       );
     } catch (_) {
       // 전송 실패는 조용히 무시 (프로토타입)
+    }
+  }
+
+  // 번역 대상 언어 변경(채팅 패널 드롭다운). AppConfig에도 반영.
+  void _changeTargetLang(String code) {
+    setState(() {
+      _targetLang = code;
+      AppConfig.targetLanguage = code;
+    });
+  }
+
+  // 받은 메시지 한 건을 현재 대상 언어로 번역(탭 번역).
+  Future<void> _translateMessage(ChatMessage m) async {
+    if (m.translating) return;
+    setState(() {
+      m.translating = true;
+      m.translateError = null;
+    });
+    try {
+      final r = await TranslationService.translate(m.text, _targetLang);
+      if (!mounted) return;
+      setState(() {
+        m.translated = r.translatedText;
+        m.translating = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        m.translating = false;
+        m.translateError = e.toString().replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -1065,7 +1099,13 @@ class _RoomScreenState extends State<RoomScreen> {
             ? null
             : Drawer(
                 width: isTv ? 420 : 320,
-                child: ChatPanel(messages: _messages, onSend: _sendChat),
+                child: ChatPanel(
+                  messages: _messages,
+                  onSend: _sendChat,
+                  targetLanguage: _targetLang,
+                  onLanguageChange: _changeTargetLang,
+                  onTranslate: _translateMessage,
+                ),
               ),
         appBar: AppBar(
           // 뒤로가기 ↔ 방이름 간격 최소화 + 방이름 글자 작게 → 긴 방이름도 더 보이게
@@ -1274,6 +1314,9 @@ class _RoomScreenState extends State<RoomScreen> {
                 child: ChatPanel(
                   messages: _messages,
                   onSend: _sendChat,
+                  targetLanguage: _targetLang,
+                  onLanguageChange: _changeTargetLang,
+                  onTranslate: _translateMessage,
                   onClose: () => setState(() => _chatOpen = false),
                 ),
               ),

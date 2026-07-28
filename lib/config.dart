@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 /// Prism Meeting - 앱 전역 설정
 ///
@@ -29,6 +30,52 @@ class AppConfig {
     // 필요 시 --dart-define=LK_TOKEN_URL=... 로 덮어쓸 수 있음.
     defaultValue: 'https://prism-token-server.onrender.com/token',
   );
+
+  /// 채팅 번역 엔드포인트 주소(POST /translate).
+  /// 기본은 토큰 서버 주소의 끝 `/token` 을 `/translate` 로 바꾼 값.
+  /// 필요 시 --dart-define=LK_TRANSLATE_URL=... 로 덮어쓸 수 있음.
+  static const String _translateUrlOverride = String.fromEnvironment(
+    'LK_TRANSLATE_URL',
+    defaultValue: '',
+  );
+  static String get translateServerUrl {
+    if (_translateUrlOverride.isNotEmpty) return _translateUrlOverride;
+    const suffix = '/token';
+    if (tokenServerUrl.endsWith(suffix)) {
+      return '${tokenServerUrl.substring(0, tokenServerUrl.length - suffix.length)}/translate';
+    }
+    return tokenServerUrl;
+  }
+
+  /// 채팅 번역 지원 언어: 코드 -> 표시 이름(각 언어 고유 표기).
+  /// Google Cloud Translation 은 언어당 추가 비용이 없어 폭넓게 지원.
+  static const Map<String, String> supportedLanguages = {
+    'ko': '한국어',
+    'en': 'English',
+    'kk': 'Қазақ',
+    'ru': 'Русский',
+    'rw': 'Ikinyarwanda',
+    'fr': 'Français',
+    'ja': '日本語',
+    'zh': '中文',
+    'es': 'Español',
+    'de': 'Deutsch',
+    'ar': 'العربية',
+  };
+
+  /// 내가 받은 메시지를 번역할 대상(선호) 언어. 기본값은 기기 언어.
+  /// (앱 실행 중 유지. 채팅 패널에서 변경 가능. 재시작 시 기기 언어로 초기화.)
+  static String? _targetLang;
+  static String get targetLanguage => _targetLang ??= _defaultLanguage();
+  static set targetLanguage(String code) {
+    if (supportedLanguages.containsKey(code)) _targetLang = code;
+  }
+
+  static String _defaultLanguage() {
+    final code = ui.PlatformDispatcher.instance.locale.languageCode
+        .toLowerCase();
+    return supportedLanguages.containsKey(code) ? code : 'en';
+  }
 
   /// 기본 방 이름 (입장 화면 기본값)
   static const String defaultRoomName = 'prism-demo';
