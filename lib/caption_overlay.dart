@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// 실시간 자막 한 줄(발화자별 현재 문장).
+/// 실시간 자막 한 줄(확정 문장 또는 말하는 중인 문장).
 class LiveCaption {
   final String identity; // 발화자 고정 식별값
   final String sender; // 발화자 표시 이름
@@ -9,7 +9,7 @@ class LiveCaption {
   bool isFinal; // 확정된 문장인지(중간 결과=false)
   String? translated; // 내 언어로 번역
   String? translatedLang; // translated 의 언어 코드
-  DateTime updatedAt; // 마지막 갱신 시각(오래되면 자동 숨김)
+  DateTime updatedAt; // 마지막 갱신 시각
   bool mine; // 내가 말한 자막인지(번역 안 함)
   LiveCaption({
     required this.identity,
@@ -24,34 +24,64 @@ class LiveCaption {
   });
 }
 
-/// 화면 하단 자막 오버레이(줌 스타일). 활성 자막 몇 줄을 원문+번역으로 표시.
-class CaptionOverlay extends StatelessWidget {
-  final List<LiveCaption> captions;
+/// 화면 하단 자막 오버레이(줌 스타일). 최근 여러 줄을 원문+번역으로 표시하고,
+/// 새 줄이 오면 자동으로 맨 아래로 스크롤한다. 높이는 화면 일부로 제한.
+class CaptionOverlay extends StatefulWidget {
+  final List<LiveCaption> lines;
   final String myLang; // 내가 읽을 언어(번역 대상)
+  final int maxLines; // 표시 줄 수 참고값(높이 계산용)
   const CaptionOverlay({
     super.key,
-    required this.captions,
+    required this.lines,
     required this.myLang,
+    this.maxLines = 8,
   });
 
   @override
+  State<CaptionOverlay> createState() => _CaptionOverlayState();
+}
+
+class _CaptionOverlayState extends State<CaptionOverlay> {
+  final _scrollCtrl = ScrollController();
+
+  @override
+  void didUpdateWidget(covariant CaptionOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 새 줄/갱신 시 맨 아래로.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollCtrl.hasClients) {
+        _scrollCtrl.jumpTo(_scrollCtrl.position.maxScrollExtent);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (captions.isEmpty) return const SizedBox.shrink();
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(10),
-        ),
+    if (widget.lines.isEmpty) return const SizedBox.shrink();
+    // 최대 높이: 화면의 약 38% 로 제한(그 이상은 내부 스크롤).
+    final maxH = MediaQuery.of(context).size.height * 0.38;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      constraints: BoxConstraints(maxHeight: maxH),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: SingleChildScrollView(
+        controller: _scrollCtrl,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final c in captions) _line(c),
+            for (final c in widget.lines) _line(c),
           ],
         ),
       ),
@@ -62,7 +92,7 @@ class CaptionOverlay extends StatelessWidget {
     final showTr = !c.mine &&
         c.translated != null &&
         c.translated!.isNotEmpty &&
-        c.translatedLang == myLang;
+        c.translatedLang == widget.myLang;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Column(
@@ -77,6 +107,7 @@ class CaptionOverlay extends StatelessWidget {
             style: TextStyle(
               fontSize: 15,
               height: 1.25,
+              // 말하는 중(미확정)은 약간 흐리게.
               color: c.isFinal ? Colors.white : Colors.white70,
             ),
           ),

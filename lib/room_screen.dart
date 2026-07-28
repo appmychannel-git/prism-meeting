@@ -21,6 +21,11 @@ import 'config.dart';
 import 'connection_service.dart';
 import 'translation_service.dart';
 
+/// 음성 자막 발언 방식.
+/// - continuous: 자막 켜면 계속 인식·송출(발표/회의)
+/// - pushToTalk: '말하기' 버튼을 탭할 때만 한 문장 인식·송출(상담/통역)
+enum CaptionMode { continuous, pushToTalk }
+
 /// 참가자 + 그 사람의 비디오 트랙(없을 수 있음) + 마이크/발언 상태 묶음.
 /// 한 참가자가 카메라와 화면공유를 동시에 올리면 타일이 2개가 된다
 /// (카메라 타일 + [isScreenShare]=true 인 화면 타일).
@@ -131,8 +136,12 @@ class _RoomScreenState extends State<RoomScreen> {
   bool _captionsOn = false; // 자막 켬(내 발화 송출 + 오버레이 표시)
   // 내 언어: STT 인식 언어(내 발화) + 자막 번역 대상(내가 읽을 언어)로 동시 사용.
   late String _myLang = _defaultMyLang();
-  final Map<String, LiveCaption> _captions = {}; // identity -> 현재 자막
+  final List<LiveCaption> _captionLog = []; // 확정된 자막 줄 누적(최근 N줄 표시)
+  final Map<String, LiveCaption> _liveCaptions = {}; // identity -> 말하는 중(중간)
   DateTime? _lastInterimSentAt; // 중간 결과 송출 throttle
+  CaptionMode _captionMode = CaptionMode.continuous; // 발언 방식
+  bool _pttActive = false; // '눌러 말하기' 캡처 진행 중
+  static const int _maxCaptionLines = 8; // 화면에 표시할 자막 줄 수(최대)
 
   // 발화 언어(2-letter) → STT 로케일 ID.
   static const Map<String, String> _sttLocales = {
@@ -337,13 +346,8 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<void> _initSpeech() async {
     try {
       _speechAvailable = await _speech.initialize(
-        // 한 발화가 끝나면(무음/네트워크 종료) 자막이 켜져 있는 동안 계속 다시 듣는다.
-        onEnd: () {
-          if (_captionsOn) _restartListening();
-        },
-        onError: (_) {
-          if (_captionsOn) _restartListening();
-        },
+        onEnd: _onListenEnd,
+        onError: (_) => _onListenEnd(),
       );
     } catch (_) {
       _speechAvailable = false;
@@ -351,34 +355,73 @@ class _RoomScreenState extends State<RoomScreen> {
     if (mounted) setState(() {});
   }
 
+  // 인식 종료 시: 연속 모드면 자막 켜진 동안 계속 재시작, 눌러 말하기면 1회로 끝.
+  void _onListenEnd() {
+    if (_captionMode == CaptionMode.continuous) {
+      if (_captionsOn) _restartListening();
+    } else if (mounted) {
+      setState(() => _pttActive = false);
+    }
+  }
+
+  Future<bool> _ensureSpeech() async {
+    if (_speechAvailable) return true;
+    await _initSpeech();
+    if (!_speechAvailable) {
+      _snack('이 기기/브라우저에서 음성 인식을 사용할 수 없습니다.');
+      return false;
+    }
+    return true;
+  }
+
+  // 자막 보기 on/off. 연속 모드면 내 발화도 계속 송출 시작/중지.
   Future<void> _toggleCaptions() async {
     if (!_captionsOn) {
-      if (!_speechAvailable) {
-        await _initSpeech();
-        if (!_speechAvailable) {
-          _snack('이 기기/브라우저에서 음성 인식을 사용할 수 없습니다.');
-          return;
-        }
-      }
+      if (!await _ensureSpeech()) return;
       setState(() => _captionsOn = true);
-      _startListening();
+      if (_captionMode == CaptionMode.continuous) _startContinuous();
     } else {
-      setState(() => _captionsOn = false);
+      setState(() {
+        _captionsOn = false;
+        _pttActive = false;
+      });
       await _speech.stop();
     }
   }
 
-  void _startListening() {
-    if (!_captionsOn || !_speechAvailable || _speech.isListening) return;
-    final locale = _sttLocales[_myLang] ?? 'en_US';
-    _speech.listen(localeId: locale, onResult: _onSpeechResult);
+  void _startContinuous() {
+    if (!_speechAvailable || _speech.isListening) return;
+    _speech.listen(
+      localeId: _sttLocales[_myLang] ?? 'en_US',
+      onResult: _onSpeechResult,
+    );
   }
 
   void _restartListening() {
-    // 다음 프레임에 재시작(콜백 중 재진입 방지) + 상태 확인.
+    // 다음 틱에 재시작(콜백 중 재진입 방지) + 상태 재확인.
     Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted && _captionsOn && !_speech.isListening) _startListening();
+      if (mounted &&
+          _captionsOn &&
+          _captionMode == CaptionMode.continuous &&
+          !_speech.isListening) {
+        _startContinuous();
+      }
     });
+  }
+
+  // 눌러 말하기: 탭하면 한 문장 캡처 시작(확정되면 자동 종료). 다시 탭하면 중지.
+  Future<void> _pushToTalk() async {
+    if (_pttActive) {
+      await _speech.stop();
+      if (mounted) setState(() => _pttActive = false);
+      return;
+    }
+    if (!await _ensureSpeech()) return;
+    setState(() => _pttActive = true);
+    _speech.listen(
+      localeId: _sttLocales[_myLang] ?? 'en_US',
+      onResult: _onSpeechResult,
+    );
   }
 
   void _onSpeechResult(String words, bool isFinal) {
@@ -394,12 +437,17 @@ class _RoomScreenState extends State<RoomScreen> {
       _lastInterimSentAt = now;
     }
     _broadcastCaption(text, isFinal);
+    // 눌러 말하기: 한 문장 확정되면 캡처 종료.
+    if (isFinal && _captionMode == CaptionMode.pushToTalk) {
+      _speech.stop();
+      if (mounted) setState(() => _pttActive = false);
+    }
   }
 
   Future<void> _broadcastCaption(String text, bool isFinal) async {
     final myId = _room.localParticipant?.identity ?? AppConfig.deviceIdentity;
     // 내 자막도 화면에 표시(원문만).
-    _updateCaption(
+    _ingestCaption(
       identity: myId,
       sender: _displayName,
       text: text,
@@ -429,7 +477,7 @@ class _RoomScreenState extends State<RoomScreen> {
       final id = e.participant?.identity ?? (m['sender'] ?? '').toString();
       final text = (m['text'] ?? '').toString();
       if (text.isEmpty) return;
-      _updateCaption(
+      _ingestCaption(
         identity: id,
         sender: (m['sender'] ?? e.participant?.identity ?? '상대').toString(),
         text: text,
@@ -440,7 +488,8 @@ class _RoomScreenState extends State<RoomScreen> {
     } catch (_) {}
   }
 
-  void _updateCaption({
+  // 자막 한 조각 반영: 중간결과=발화자별 '말하는 중' 라인, 확정결과=로그에 한 줄 추가.
+  void _ingestCaption({
     required String identity,
     required String sender,
     required String text,
@@ -449,31 +498,43 @@ class _RoomScreenState extends State<RoomScreen> {
     required bool mine,
   }) {
     if (!mounted) return;
-    final existing = _captions[identity];
-    final c = existing ?? LiveCaption(
+    if (!isFinal) {
+      final live = _liveCaptions[identity];
+      if (live == null) {
+        _liveCaptions[identity] = LiveCaption(
+          identity: identity,
+          sender: sender,
+          text: text,
+          lang: lang,
+          isFinal: false,
+          updatedAt: DateTime.now(),
+          mine: mine,
+        );
+      } else {
+        live.text = text;
+        live.updatedAt = DateTime.now();
+      }
+      setState(() {});
+      return;
+    }
+    // 확정: '말하는 중' 라인 제거하고 로그에 한 줄 추가.
+    _liveCaptions.remove(identity);
+    final line = LiveCaption(
       identity: identity,
       sender: sender,
       text: text,
       lang: lang,
-      isFinal: isFinal,
+      isFinal: true,
       updatedAt: DateTime.now(),
       mine: mine,
     );
-    // 문장이 바뀌면 이전 번역은 무효화.
-    if (c.text != text) {
-      c.translated = null;
-      c.translatedLang = null;
+    _captionLog.add(line);
+    if (_captionLog.length > 50) {
+      _captionLog.removeRange(0, _captionLog.length - 50);
     }
-    c.text = text;
-    c.lang = lang;
-    c.isFinal = isFinal;
-    c.updatedAt = DateTime.now();
-    _captions[identity] = c;
     setState(() {});
     // 남의 확정 자막을 내 언어로 자동 번역(발화 언어와 다를 때만).
-    if (!mine && isFinal && lang != _myLang) {
-      _translateCaption(c);
-    }
+    if (!mine && lang != _myLang) _translateCaption(line);
   }
 
   Future<void> _translateCaption(LiveCaption c) async {
@@ -495,27 +556,39 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
-  // 최근 ~6초 내 갱신된 자막만, 최신순 최대 2줄.
-  List<LiveCaption> _activeCaptions() {
-    final now = DateTime.now();
-    final list = _captions.values
-        .where((c) => now.difference(c.updatedAt).inSeconds < 6)
-        .toList()
+  // 화면에 표시할 자막: 확정 로그 최근 줄 + '말하는 중' 라인, 합쳐서 최대 _maxCaptionLines.
+  List<LiveCaption> _displayCaptions() {
+    final live = _liveCaptions.values.toList()
       ..sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
-    if (list.length > 2) return list.sublist(list.length - 2);
-    return list;
+    final room = (_maxCaptionLines - live.length).clamp(0, _maxCaptionLines);
+    final logPart = _captionLog.length > room
+        ? _captionLog.sublist(_captionLog.length - room)
+        : _captionLog;
+    return [...logPart, ...live];
+  }
+
+  // 발언 방식 전환(연속 ↔ 눌러 말하기).
+  void _setCaptionMode(CaptionMode mode) {
+    if (_captionMode == mode) return;
+    setState(() {
+      _captionMode = mode;
+      _pttActive = false;
+    });
+    if (mode == CaptionMode.pushToTalk) {
+      _speech.stop(); // 연속 듣기 중지(이후엔 '말하기' 버튼으로)
+    } else if (_captionsOn) {
+      _startContinuous(); // 연속으로 전환 + 자막 켜져 있으면 바로 듣기
+    }
   }
 
   // 내 언어 변경(자막 언어 = STT 인식 언어 + 번역 대상).
   void _changeMyLang(String code) {
     if (!AppConfig.supportedLanguages.containsKey(code)) return;
     setState(() => _myLang = code);
-    // 듣는 중이면 새 언어로 재시작.
-    if (_captionsOn && _speech.isListening) {
-      _speech.stop();
-    }
-    // 표시 중인 남의 자막을 새 언어로 다시 번역.
-    for (final c in _captions.values) {
+    // 듣는 중이면 새 언어로 재시작(연속이면 onEnd에서 자동 재시작).
+    if (_speech.isListening) _speech.stop();
+    // 표시 중인 남의 확정 자막을 새 언어로 다시 번역.
+    for (final c in _captionLog) {
       if (!c.mine && c.isFinal) _translateCaption(c);
     }
   }
@@ -1443,6 +1516,13 @@ class _RoomScreenState extends State<RoomScreen> {
               onSelected: (v) {
                 if (v == 'recv') _toggleReceiveVideo();
                 if (v == 'name') _showNameDialog();
+                if (v == 'capmode') {
+                  _setCaptionMode(
+                    _captionMode == CaptionMode.continuous
+                        ? CaptionMode.pushToTalk
+                        : CaptionMode.continuous,
+                  );
+                }
               },
               itemBuilder: (_) => [
                 const PopupMenuItem<String>(
@@ -1452,6 +1532,25 @@ class _RoomScreenState extends State<RoomScreen> {
                       Icon(Icons.badge_outlined, size: 18),
                       SizedBox(width: 8),
                       Text('이름 변경'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem<String>(
+                  value: 'capmode',
+                  child: Row(
+                    children: [
+                      Icon(
+                        _captionMode == CaptionMode.continuous
+                            ? Icons.mic_none
+                            : Icons.autorenew,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _captionMode == CaptionMode.continuous
+                            ? '자막: 눌러 말하기로'
+                            : '자막: 연속으로',
+                      ),
                     ],
                   ),
                 ),
@@ -1544,8 +1643,9 @@ class _RoomScreenState extends State<RoomScreen> {
                   // 실시간 자막 오버레이(줌 스타일, 자막 켬일 때만)
                   if (_captionsOn)
                     CaptionOverlay(
-                      captions: _activeCaptions(),
+                      lines: _displayCaptions(),
                       myLang: _myLang,
+                      maxLines: _maxCaptionLines,
                     ),
                   _ControlBar(
                     micOn: _micOn,
@@ -1555,10 +1655,13 @@ class _RoomScreenState extends State<RoomScreen> {
                     sharing: _screenSharing,
                     shareBusy: _shareBusy,
                     captionsOn: _captionsOn,
+                    pushToTalkMode: _captionMode == CaptionMode.pushToTalk,
+                    pttActive: _pttActive,
                     onMic: _toggleMic,
                     onCam: _toggleCam,
                     onShare: _toggleScreenShare,
                     onCaption: _toggleCaptions,
+                    onPushToTalk: _pushToTalk,
                     onLeave: _onLeavePressed,
                   ),
                 ],
@@ -1759,10 +1862,13 @@ class _ControlBar extends StatelessWidget {
   final bool sharing; // 내가 화면공유 중
   final bool shareBusy; // 화면공유 토글 진행 중
   final bool captionsOn; // 자막 켬
+  final bool pushToTalkMode; // 눌러 말하기 모드
+  final bool pttActive; // 눌러 말하기 캡처 중
   final VoidCallback onMic;
   final VoidCallback onCam;
   final VoidCallback onShare;
   final VoidCallback onCaption;
+  final VoidCallback onPushToTalk;
   final VoidCallback onLeave;
 
   const _ControlBar({
@@ -1773,10 +1879,13 @@ class _ControlBar extends StatelessWidget {
     required this.sharing,
     required this.shareBusy,
     required this.captionsOn,
+    required this.pushToTalkMode,
+    required this.pttActive,
     required this.onMic,
     required this.onCam,
     required this.onShare,
     required this.onCaption,
+    required this.onPushToTalk,
     required this.onLeave,
   });
 
@@ -1824,6 +1933,17 @@ class _ControlBar extends StatelessWidget {
               accent: captionsOn, // 켬이면 파란색 강조
               onTap: onCaption,
             ),
+            // 눌러 말하기 모드 + 자막 켬일 때만: '말하기' 버튼
+            if (captionsOn && pushToTalkMode) ...[
+              const SizedBox(width: 20),
+              _RoundButton(
+                icon: pttActive ? Icons.mic : Icons.mic_none,
+                label: pttActive ? '말하는 중' : '말하기',
+                active: true,
+                accent: pttActive, // 캡처 중이면 파란색 강조
+                onTap: onPushToTalk,
+              ),
+            ],
             const SizedBox(width: 20),
             _RoundButton(
               icon: Icons.call_end,
