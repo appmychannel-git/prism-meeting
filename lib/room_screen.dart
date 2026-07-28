@@ -381,6 +381,15 @@ class _RoomScreenState extends State<RoomScreen> {
       if (!await _ensureSpeech()) return;
       setState(() => _captionsOn = true);
       if (_captionMode == CaptionMode.continuous) _startContinuous();
+      // 자막의 동작 방식 안내(상대도 켜야 함 + 언어 설정).
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(L.t('caption_hint_on')),
+            duration: const Duration(seconds: 6),
+          ),
+        );
+      }
     } else {
       setState(() {
         _captionsOn = false;
@@ -1716,13 +1725,46 @@ class _RoomScreenState extends State<RoomScreen> {
                         ],
                       ),
                     ),
-                  // 실시간 자막 오버레이(줌 스타일, 자막 켬일 때만)
+                  // 실시간 자막 오버레이(줌 스타일, 자막 켬일 때만).
+                  // 아직 아무 자막도 없으면 "상대도 켜야 함" 안내를 대신 표시.
                   if (_captionsOn)
-                    CaptionOverlay(
-                      lines: _displayCaptions(),
-                      myLang: _myLang,
-                      maxLines: _maxCaptionLines,
-                    ),
+                    _displayCaptions().isEmpty
+                        ? Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.55),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.info_outline,
+                                  size: 16,
+                                  color: Colors.white54,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    L.t('caption_empty_hint'),
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : CaptionOverlay(
+                            lines: _displayCaptions(),
+                            myLang: _myLang,
+                            maxLines: _maxCaptionLines,
+                          ),
                   _ControlBar(
                     micOn: _micOn,
                     camOn: _camOn,

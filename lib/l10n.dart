@@ -134,6 +134,14 @@ class L {
     'caption_lang_menu': {'ko': '자막 언어: {lang}', 'en': 'Caption language: {lang}'},
     'cap_to_ptt': {'ko': '자막: 눌러 말하기로', 'en': 'Captions: push-to-talk'},
     'cap_to_cont': {'ko': '자막: 연속으로', 'en': 'Captions: continuous'},
+    'caption_hint_on': {
+      'ko': '자막 켜짐 — 내 음성이 자막으로 전송됩니다. 상대방도 자막을 켜야 서로 보이고, "자막 언어"는 내가 말하는 언어로 설정하세요.',
+      'en': 'Captions on — your speech is sent as captions. Others must also turn on captions, and set "Caption language" to the language you speak.',
+    },
+    'caption_empty_hint': {
+      'ko': '말하는 참가자도 자막을 켜야 자막이 표시됩니다.',
+      'en': 'Captions appear only when the speaker also turns captions on.',
+    },
 
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},
