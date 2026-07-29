@@ -340,7 +340,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                       ),
                       SizedBox(height: landscape ? 6 : 10),
                       Text(
-                        'Prism Meeting',
+                        AppConfig.appBrand,
                         textAlign: TextAlign.center,
                         style:
                             (landscape

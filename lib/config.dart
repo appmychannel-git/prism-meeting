@@ -19,6 +19,21 @@ class AppConfig {
   /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
   static const String appVersion = '1.0.3';
 
+  /// 앱 표시 브랜드명(브라우저 타이틀 + 입장화면 제목).
+  /// 기본 'Prism Meeting'. 거래처 시연 등 브랜드를 숨길 땐
+  /// --dart-define=APP_BRAND=Meeting 로 덮어쓴다.
+  static const String appBrand = String.fromEnvironment(
+    'APP_BRAND',
+    defaultValue: 'Prism Meeting',
+  );
+
+  /// 번역 엔진을 빌드별로 강제 지정. ''(기본)=서버 기본 엔진.
+  /// 카자흐스탄 빌드는 --dart-define=LK_TRANSLATE_PROVIDER=azure 로 Azure 사용.
+  static const String translateProvider = String.fromEnvironment(
+    'LK_TRANSLATE_PROVIDER',
+    defaultValue: '',
+  );
+
   /// 토큰 서버의 /token 엔드포인트 주소.
   ///   - 웹(같은 PC) 테스트:  http://localhost:3000/token
   ///   - 폰/TV 등 다른 기기:  http://[PC의 LAN IP]:3000/token  (예: http://192.168.10.20:3000/token)

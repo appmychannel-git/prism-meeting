@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'config.dart';
 import 'join_screen.dart';
 import 'l10n.dart';
 
@@ -20,7 +21,7 @@ class PrismMeetingApp extends StatelessWidget {
       valueListenable: L.localeNotifier,
       builder: (context, _, _) {
         return MaterialApp(
-          title: 'Prism Meeting',
+          title: AppConfig.appBrand,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
             colorScheme: scheme,

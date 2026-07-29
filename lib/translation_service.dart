@@ -19,7 +19,8 @@ class TranslationService {
   static final Map<String, TranslationResult> _cache = {};
 
   static Future<TranslationResult> translate(String text, String target) async {
-    final key = '$target|$text';
+    final provider = AppConfig.translateProvider;
+    final key = '$provider|$target|$text';
     final cached = _cache[key];
     if (cached != null) return cached;
 
@@ -27,7 +28,12 @@ class TranslationService {
         .post(
           Uri.parse(AppConfig.translateServerUrl),
           headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'text': text, 'target': target}),
+          body: jsonEncode({
+            'text': text,
+            'target': target,
+            // 빌드별 엔진 지정(''이면 필드 생략 → 서버 기본 엔진)
+            if (provider.isNotEmpty) 'provider': provider,
+          }),
         )
         .timeout(const Duration(seconds: 15));
 
