@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 /// Prism Meeting - 앱 전역 설정
 ///
 /// [거래처 전달 / 테스트 준비]
@@ -98,14 +100,29 @@ class AppConfig {
   /// 안드로이드TV/디스플레이 등 큰 화면 판별 기준(픽셀 폭).
   static const double tvBreakpointWidth = 1100;
 
-  /// 초대 링크 기본 주소 (웹 배포 위치). 링크 형식: [base]?room=[코드]
-  static const String inviteBaseUrl =
-      'https://androidtv.mychannel.co.kr/meeting/';
+  /// 초대 링크 기본 주소. 링크 형식: [base]?room=[코드]
+  /// - 웹: 현재 접속 중인 실제 경로에서 자동 유도 → 어느 경로에 올려도
+  ///   (/meeting/, /meeting-kz/ 등) 그 경로로 초대 링크가 생성된다.
+  /// - 네이티브(앱): 고정값(초대는 웹 링크로 연다). 빌드별로
+  ///   --dart-define=INVITE_BASE_URL=... 로 덮어쓸 수 있음.
+  static const String _inviteBaseNative = String.fromEnvironment(
+    'INVITE_BASE_URL',
+    defaultValue: 'https://androidtv.mychannel.co.kr/meeting/',
+  );
+  static String get inviteBaseUrl {
+    if (kIsWeb) {
+      final b = Uri.base; // 예: https://.../meeting-kz/?room=... (쿼리 제거)
+      return '${b.origin}${b.path}';
+    }
+    return _inviteBaseNative;
+  }
 
   static String inviteLink(String room, {String? pin}) {
     final params = <String, String>{'room': room};
     if (pin != null && pin.isNotEmpty) params['pin'] = pin;
-    return '$inviteBaseUrl?${Uri(queryParameters: params).query}';
+    final base = inviteBaseUrl;
+    final sep = base.contains('?') ? '&' : '?';
+    return '$base$sep${Uri(queryParameters: params).query}';
   }
 
   /// 짧고 타이핑 가능한 랜덤 방 코드 생성 (예: abc-def-hij).
