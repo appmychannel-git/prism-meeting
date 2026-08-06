@@ -61,6 +61,11 @@ android {
             applicationId = "kr.co.mychannel.meeting.viewplus"
             manifestPlaceholders["appLabel"] = "뷰플러스"
         }
+        create("mychannel") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.meeting"
+            manifestPlaceholders["appLabel"] = "Mychannel Meeting"
+        }
     }
 
     signingConfigs {
