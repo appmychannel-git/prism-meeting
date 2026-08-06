@@ -108,10 +108,12 @@ class _ChatPanelState extends State<ChatPanel> {
                 ),
                 const Spacer(),
                 // 번역 대상(선호) 언어 선택. '사용 안 함' 선택 시 번역 표시 안 함.
-                _LanguageSelector(
-                  value: widget.targetLanguage,
-                  onChanged: widget.onLanguageChange,
-                ),
+                // SHOW_TRANSLATION=false 빌드에선 숨김(번역 기능 비노출).
+                if (AppConfig.showTranslation)
+                  _LanguageSelector(
+                    value: widget.targetLanguage,
+                    onChanged: widget.onLanguageChange,
+                  ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: L.t('close'),

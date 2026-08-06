@@ -188,7 +188,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
       _loadCameras();
     });
-    _initSpeech();
+    if (AppConfig.showTranslation) _initSpeech();
     _connect();
   }
 
@@ -732,22 +732,38 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<void> _enableLocalDevices() async {
     final lp = _room.localParticipant;
     if (lp == null) return;
-    try {
-      await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
-    } catch (_) {
-      // 기본(내장) 카메라 실패 → 외장/사용 가능한 카메라로 재시도.
-      // 내장 카메라 없는 TV에 USB 웹캠을 꽂은 경우 여기서 자동으로 잡힌다.
-      final ok = await _tryEnableAnyCamera();
-      if (!ok && mounted) setState(() => _camOn = false);
-    }
+
+    // 마이크 먼저 켠다(회의 핵심). 카메라 문제로 오디오가 막히지 않게.
     try {
       await lp.setMicrophoneEnabled(true).timeout(const Duration(seconds: 8));
     } catch (_) {
       if (mounted) setState(() => _micOn = false);
     }
-    // 라벨이 채워진(권한 허용 후) 카메라 목록 로드
-    await _loadCameras();
-    // 처음 켜진(기본) 카메라의 deviceId를 파악해 선택 메뉴 체크 표시에 반영
+
+    // 카메라: 기기에 카메라가 "있는지 먼저 확인" 후에만 켠다.
+    // 카메라 없는 태블릿/TV박스에서 setCameraEnabled 가 네이티브(Camera2)에서
+    // 멈춰 UI 전체가 굳던 문제 방지(카메라 연결 시에만 버튼이 눌리던 증상).
+    List<MediaDevice> cams = const [];
+    try {
+      cams = await Hardware.instance
+          .videoInputs()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    if (mounted) setState(() => _cameras = cams);
+
+    if (cams.isEmpty) {
+      // 카메라 없음 → 아바타로 참여(시도 안 함).
+      if (mounted) setState(() => _camOn = false);
+    } else {
+      try {
+        await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
+      } catch (_) {
+        // 기본(내장) 실패 → 외장/사용 가능한 카메라로 재시도(USB 웹캠 등).
+        final ok = await _tryEnableAnyCamera();
+        if (!ok && mounted) setState(() => _camOn = false);
+      }
+    }
+    // 처음 켜진 카메라의 deviceId를 선택 메뉴 체크 표시에 반영
     _syncCurrentCameraId();
   }
 
@@ -1607,7 +1623,8 @@ class _RoomScreenState extends State<RoomScreen> {
                 }
               },
               itemBuilder: (_) => [
-                // ── 자막 ──
+                // ── 자막·번역 (SHOW_TRANSLATION=false 빌드에선 숨김) ──
+                if (AppConfig.showTranslation) ...[
                 PopupMenuItem<String>(
                   value: 'caption',
                   child: Row(
@@ -1667,6 +1684,7 @@ class _RoomScreenState extends State<RoomScreen> {
                     ],
                   ),
                 ),
+                ],
                 const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'applang',

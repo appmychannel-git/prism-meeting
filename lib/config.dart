@@ -36,6 +36,14 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// 채팅 번역·음성 자막 기능 노출 여부(기본 노출).
+  /// 국내 브랜드 등 번역이 필요 없는 빌드는 --dart-define=SHOW_TRANSLATION=false
+  /// 로 번역/자막 UI를 숨긴다.
+  static const bool showTranslation = bool.fromEnvironment(
+    'SHOW_TRANSLATION',
+    defaultValue: true,
+  );
+
   /// 토큰 서버의 /token 엔드포인트 주소.
   ///   - 웹(같은 PC) 테스트:  http://localhost:3000/token
   ///   - 폰/TV 등 다른 기기:  http://[PC의 LAN IP]:3000/token  (예: http://192.168.10.20:3000/token)
