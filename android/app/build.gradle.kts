@@ -30,16 +30,37 @@ android {
     }
 
     defaultConfig {
-        // 앱 고유 패키지명(설치/Play Store 식별자) = namespace 와 동일.
-        // 딥링크(App Links)의 assetlinks.json·intent:// 도 이 값을 사용.
+        // 기본 applicationId(=namespace). 실제 값은 아래 브랜드 flavor에서 덮어씀.
         applicationId = "kr.co.mychannel.meeting.prism"
         // WebRTC(flutter_webrtc/livekit)는 minSdk 23 이상 필요
         minSdk = maxOf(23, flutter.minSdkVersion)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // 앱 표시 이름(매니페스트 android:label). 빌드 타입별로 덮어씀.
+        // 앱 표시 이름(매니페스트 android:label). flavor에서 브랜드별로 덮어씀.
         manifestPlaceholders["appLabel"] = "Prism Meeting"
+    }
+
+    // ── 브랜드(업체)별 flavor ── 한 코드베이스로 여러 브랜드 앱을 빌드.
+    // 리소스(아이콘/스플래시)는 src/<flavor>/res 로 덮어쓴다.
+    // 빌드 예: flutter build apk --release --flavor gbled --dart-define=APP_BRAND=글로벌전자
+    flavorDimensions += "brand"
+    productFlavors {
+        create("prism") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.meeting.prism"
+            manifestPlaceholders["appLabel"] = "Prism Meeting"
+        }
+        create("gbled") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.meeting.gbled"
+            manifestPlaceholders["appLabel"] = "글로벌전자"
+        }
+        create("viewplus") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.meeting.viewplus"
+            manifestPlaceholders["appLabel"] = "뷰플러스"
+        }
     }
 
     signingConfigs {
@@ -63,14 +84,11 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
-        // [feature/translation] debug 빌드는 별개 앱으로 설치되게 접미사를 붙인다.
-        // → applicationId = ...prism.dev 라 릴리즈 앱과 한 기기에 공존(아이콘 2개).
-        // release 빌드는 손대지 않으므로 main에 병합해도 프로덕션은 영향 없음.
-        // 주의: .dev 는 별개 패키지라 딥링크(App Links/assetlinks)는 동작 안 함(번역 테스트엔 무관).
+        // debug 빌드는 .dev 접미사로 릴리즈와 공존(같은 브랜드 debug↔release 동시설치).
+        // 앱 이름은 flavor의 appLabel(브랜드명)을 그대로 사용. release는 손대지 않음.
         debug {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            manifestPlaceholders["appLabel"] = "Prism 번역(dev)"
         }
     }
 }
