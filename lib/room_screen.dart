@@ -740,6 +740,20 @@ class _RoomScreenState extends State<RoomScreen> {
       if (mounted) setState(() => _micOn = false);
     }
 
+    // 카메라 자동 켜기 끔(START_CAMERA=false) → 시도 자체를 안 한다.
+    // 카메라가 고장난 일부 TV박스는 "카메라 있음"으로 보고하면서 open 시 네이티브가
+    // 멈춰 앱이 굳는다. 그런 기기 빌드는 이 플래그로 자동 켜기를 꺼서 회피.
+    if (!AppConfig.startCamera) {
+      if (mounted) setState(() => _camOn = false);
+      try {
+        _cameras = await Hardware.instance
+            .videoInputs()
+            .timeout(const Duration(seconds: 5));
+        if (mounted) setState(() {});
+      } catch (_) {}
+      return;
+    }
+
     // 카메라: 기기에 카메라가 "있는지 먼저 확인" 후에만 켠다.
     // 카메라 없는 태블릿/TV박스에서 setCameraEnabled 가 네이티브(Camera2)에서
     // 멈춰 UI 전체가 굳던 문제 방지(카메라 연결 시에만 버튼이 눌리던 증상).

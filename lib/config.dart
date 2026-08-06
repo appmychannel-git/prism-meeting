@@ -36,6 +36,15 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// 입장 시 카메라 자동 켜기(기본 true).
+  /// 카메라가 없거나 고장난 기기(일부 TV박스·디스플레이)는 카메라 open이
+  /// 네이티브에서 멈춰 앱이 굳는다. 그런 기기용 빌드는
+  /// --dart-define=START_CAMERA=false 로 자동 켜기를 끈다(입장 후 수동 켜기 가능).
+  static const bool startCamera = bool.fromEnvironment(
+    'START_CAMERA',
+    defaultValue: true,
+  );
+
   /// 채팅 번역·음성 자막 기능 노출 여부(기본 노출).
   /// 국내 브랜드 등 번역이 필요 없는 빌드는 --dart-define=SHOW_TRANSLATION=false
   /// 로 번역/자막 UI를 숨긴다.
