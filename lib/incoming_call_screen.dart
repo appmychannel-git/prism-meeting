@@ -7,6 +7,7 @@ import 'call.dart';
 import 'call_signaling.dart';
 import 'device_id.dart';
 import 'l10n.dart';
+import 'push_service.dart';
 
 /// 수신 통화 화면 — 상대가 나에게 전화를 걸었을 때 표시.
 /// 수락 → DM 방 입장, 거절 → 상태 갱신 후 닫기.
@@ -38,6 +39,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void initState() {
     super.initState();
+    // 풀스크린 알림으로 진입한 경우, 그 알림은 제거(화면이 대신 표시).
+    cancelIncomingCallNotification();
     // 수신 벨을 계속(반복) 울린다. asAlarm: 무음/저음량에서도 들리게.
     _ringtone.playRingtone(looping: true, asAlarm: true);
     // 발신자가 취소/종료하면 자동으로 닫기.

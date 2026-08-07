@@ -203,6 +203,11 @@ class L {
     },
     'friend_suggestions': {'ko': '친구 추천 (나를 추가한 사람)', 'en': 'Suggestions (added you)'},
     'added_you': {'ko': '나를 친구추가함', 'en': 'Added you'},
+    'from_gallery': {'ko': '갤러리에서 선택', 'en': 'Choose from gallery'},
+    'qr_not_found': {
+      'ko': '이미지에서 QR을 찾지 못했습니다.',
+      'en': 'No QR code found in the image.',
+    },
 
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},

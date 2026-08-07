@@ -13,11 +13,76 @@ import 'incoming_call_screen.dart';
 /// 앱 전역 Navigator 키. 백그라운드 알림 탭/수신 통화에서 화면 전환에 사용.
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
+/// 수신 통화 풀스크린 알림 ID(한 번에 한 통화 → 고정 ID로 갱신/취소).
+const int kIncomingCallNotifId = 1001;
+const String kCallChannelId = 'incoming_calls';
+
+/// 잠금화면 위로 뜨는 CATEGORY_CALL 풀스크린 통화 알림을 띄운다.
+/// 백그라운드/종료 isolate 에서도 쓰이므로 top-level 로 둔다.
+Future<void> showIncomingCallNotification({
+  required String callId,
+  required String fromName,
+  required bool video,
+}) async {
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin
+        .initialize(settings: const InitializationSettings(android: androidInit));
+    // 백그라운드 isolate 에도 채널이 있어야 하므로 멱등 생성.
+    const channel = AndroidNotificationChannel(
+      kCallChannelId,
+      '수신 전화',
+      description: '친구의 음성·영상 통화 수신 알림',
+      importance: Importance.max,
+      playSound: true,
+    );
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+
+    final details = AndroidNotificationDetails(
+      kCallChannelId,
+      '수신 전화',
+      channelDescription: '친구의 음성·영상 통화 수신 알림',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true, // 잠금화면 위로 통화 UI 실행
+      ongoing: true,
+      autoCancel: false,
+      ticker: '수신 전화',
+      visibility: NotificationVisibility.public,
+    );
+    await plugin.show(
+      id: kIncomingCallNotifId,
+      title: fromName.isNotEmpty ? fromName : '전화',
+      body: video ? '영상통화 수신' : '음성통화 수신',
+      notificationDetails: NotificationDetails(android: details),
+      payload: callId,
+    );
+  } catch (_) {}
+}
+
+/// 표시 중인 수신 통화 알림 제거(수락/거절/취소·화면 진입 시).
+Future<void> cancelIncomingCallNotification() async {
+  try {
+    await FlutterLocalNotificationsPlugin().cancel(id: kIncomingCallNotifId);
+  } catch (_) {}
+}
+
 /// FCM 백그라운드 수신 핸들러(별도 isolate). 반드시 top-level + vm:entry-point.
-/// notification 페이로드는 시스템이 트레이에 표시하므로 여기선 할 일 없음.
+/// data-only 메시지가 오면 풀스크린 통화 알림을 직접 띄운다(잠금화면에서도 울림).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // 백그라운드에서 UI를 띄우진 않는다(트레이 알림 탭 → onMessageOpenedApp 로 라우팅).
+  final d = message.data;
+  if (d['type'] != 'incoming_call') return;
+  await showIncomingCallNotification(
+    callId: (d['callId'] ?? '').toString(),
+    fromName: (d['fromName'] ?? '').toString(),
+    video: d['video'] == 'true' || d['video'] == true,
+  );
 }
 
 /// FCM(수신벨) + 기기 등록(Firestore) 을 담당.
@@ -153,6 +218,7 @@ class PushService {
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
     _handled.add(callId);
+    cancelIncomingCallNotification(); // 풀스크린 알림이 떠 있었다면 정리
     nav.push(MaterialPageRoute(
       builder: (_) => IncomingCallScreen(
         callId: callId,
