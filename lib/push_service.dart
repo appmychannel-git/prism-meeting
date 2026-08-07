@@ -49,11 +49,13 @@ Future<void> showIncomingCallNotification({
       importance: Importance.max,
       priority: Priority.max,
       category: AndroidNotificationCategory.call,
-      fullScreenIntent: true, // 잠금화면 위로 통화 UI 실행
+      fullScreenIntent: true, // 잠금화면 위로 통화 UI 실행(권한 허용 시)
       ongoing: true,
       autoCancel: false,
       ticker: '수신 전화',
       visibility: NotificationVisibility.public,
+      // FLAG_INSISTENT(4): 풀스크린 권한이 없어도 알림이 뜨는 동안 소리를 반복(계속 벨).
+      additionalFlags: Int32List.fromList(<int>[4]),
     );
     await plugin.show(
       id: kIncomingCallNotifId,

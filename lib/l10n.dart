@@ -204,6 +204,21 @@ class L {
     'friend_suggestions': {'ko': '친구 추천 (나를 추가한 사람)', 'en': 'Suggestions (added you)'},
     'added_you': {'ko': '나를 친구추가함', 'en': 'Added you'},
     'from_gallery': {'ko': '갤러리에서 선택', 'en': 'Choose from gallery'},
+    // ── 전체화면 통화 알림 권한(Android 14+) ──
+    'fs_perm_title': {'ko': '통화 알림 권한', 'en': 'Call notification permission'},
+    'fs_perm_desc': {
+      'ko': '잠금화면에서도 전화가 울리려면 "전체 화면 알림"을 허용해야 합니다. '
+          '설정을 열어 허용해 주세요. (허용 전엔 상단 알림으로만 표시됩니다)',
+      'en': 'To ring on the lock screen, allow "full-screen notifications". '
+          'Open settings to enable it. (Otherwise it shows only as a banner.)',
+    },
+    'fs_perm_menu': {'ko': '통화 알림 설정', 'en': 'Call notification settings'},
+    'fs_perm_menu_sub': {
+      'ko': '잠금화면 통화 표시 허용',
+      'en': 'Allow full-screen call on lock screen',
+    },
+    'open_settings': {'ko': '설정 열기', 'en': 'Open settings'},
+    'later': {'ko': '나중에', 'en': 'Later'},
     'qr_not_found': {
       'ko': '이미지에서 QR을 찾지 못했습니다.',
       'en': 'No QR code found in the image.',

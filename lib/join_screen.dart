@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'friends_screen.dart';
+import 'fullscreen_perm.dart';
 import 'l10n.dart';
 import 'my_id_screen.dart';
 import 'room_screen.dart';
@@ -59,6 +60,34 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       // 네이티브(App Links): 초대 링크로 앱이 열리면 그 방으로
       _initDeepLinks();
     }
+    // 통화 기능 사용 시, Android 14+ 전체화면 통화 알림 권한을 1회 안내.
+    if (AppConfig.callEnabled) {
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _maybePromptFullScreen());
+    }
+  }
+
+  // 전체화면 통화 알림 권한이 없으면(안 잠금화면에 안 뜸) 설정으로 안내.
+  Future<void> _maybePromptFullScreen() async {
+    if (await FullScreenPerm.canUse() || !mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('fs_perm_title')),
+        content: Text(L.t('fs_perm_desc')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(L.t('later')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(L.t('open_settings')),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) FullScreenPerm.openSettings();
   }
 
   Future<void> _initDeepLinks() async {
@@ -337,6 +366,16 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                   );
                 },
               ),
+              if (AppConfig.callEnabled)
+                ListTile(
+                  leading: const Icon(Icons.ring_volume),
+                  title: Text(L.t('fs_perm_menu')),
+                  subtitle: Text(L.t('fs_perm_menu_sub')),
+                  onTap: () {
+                    Navigator.pop(context);
+                    FullScreenPerm.openSettings();
+                  },
+                ),
               const Divider(),
             ],
             ListTile(
