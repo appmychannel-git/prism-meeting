@@ -17,7 +17,11 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// 수신 통화 풀스크린 알림 ID(한 번에 한 통화 → 고정 ID로 갱신/취소).
 const int kIncomingCallNotifId = 1001;
-const String kCallChannelId = 'incoming_calls';
+// 커스텀 벨소리(res/raw/ring_classic)를 쓰려고 새 채널 ID로 만든다.
+// (안드로이드는 채널 생성 후 사운드를 못 바꾸므로 기존 'incoming_calls' 대신 신규.)
+const String kCallChannelId = 'incoming_calls_v2';
+const RawResourceAndroidNotificationSound kCallSound =
+    RawResourceAndroidNotificationSound('ring_classic');
 
 /// 잠금화면 위로 뜨는 CATEGORY_CALL 풀스크린 통화 알림을 띄운다.
 /// 백그라운드/종료 isolate 에서도 쓰이므로 top-level 로 둔다.
@@ -38,6 +42,7 @@ Future<void> showIncomingCallNotification({
       description: '친구의 음성·영상 통화 수신 알림',
       importance: Importance.max,
       playSound: true,
+      sound: kCallSound, // 커스텀 벨소리
     );
     await plugin
         .resolvePlatformSpecificImplementation<
@@ -56,6 +61,7 @@ Future<void> showIncomingCallNotification({
       autoCancel: false,
       ticker: '수신 전화',
       visibility: NotificationVisibility.public,
+      sound: kCallSound, // 커스텀 벨소리
       // FLAG_INSISTENT(4): 풀스크린 권한이 없어도 알림이 뜨는 동안 소리를 반복(계속 벨).
       additionalFlags: Int32List.fromList(<int>[4]),
     );
@@ -94,9 +100,6 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class PushService {
   PushService._();
   static final PushService instance = PushService._();
-
-  /// 서버 /call 이 지정하는 알림 채널 ID와 동일해야 한다(고importance=헤드업+소리).
-  static const String callChannelId = 'incoming_calls';
 
   bool _started = false;
   String? _myUuid;
@@ -159,11 +162,12 @@ class PushService {
       await plugin.initialize(
           settings: const InitializationSettings(android: androidInit));
       const channel = AndroidNotificationChannel(
-        callChannelId,
+        kCallChannelId,
         '수신 전화',
         description: '친구의 음성·영상 통화 수신 알림',
         importance: Importance.max,
         playSound: true,
+        sound: kCallSound, // 커스텀 벨소리
       );
       await plugin
           .resolvePlatformSpecificImplementation<

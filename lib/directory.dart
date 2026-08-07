@@ -84,6 +84,17 @@ class DirectoryService {
     } catch (_) {}
   }
 
+  /// 친구 삭제 시 서버 관계도 제거(안 그러면 복구 로직이 다시 되살림).
+  static Future<void> removeEdge({
+    required String from,
+    required String to,
+  }) async {
+    if (from.isEmpty || to.isEmpty) return;
+    try {
+      await _db.collection('edges').doc('${from}__$to').delete();
+    } catch (_) {}
+  }
+
   /// 내가 추가한 친구들(재설치 후 로컬 친구목록 복구용).
   /// from == 나 인 edge 들 → 상대(to)와 저장해둔 이름(toName).
   static Future<List<Friend>> myFriends(String myUuid) async {

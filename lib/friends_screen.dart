@@ -286,6 +286,8 @@ class _FriendsScreenState extends State<FriendsScreen> {
             tooltip: L.t('remove_friend'),
             onPressed: () async {
               await FriendStore.remove(f.uuid);
+              // 서버 관계도 제거해야 복구 로직이 되살리지 않음.
+              await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
               await _load();
             },
           ),

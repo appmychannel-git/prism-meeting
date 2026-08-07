@@ -1,7 +1,7 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 
 import 'call.dart';
 import 'call_signaling.dart';
@@ -34,15 +34,29 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   StreamSubscription? _sub;
   bool _answering = false;
   bool _closed = false;
-  final _ringtone = FlutterRingtonePlayer();
+  final AudioPlayer _ringtone = AudioPlayer();
+
+  Future<void> _startRing() async {
+    try {
+      await _ringtone.setReleaseMode(ReleaseMode.loop); // 계속 반복
+      // 벨소리 스트림(ringtone)으로 라우팅 → 미디어 음량과 무관하게 울림.
+      await _ringtone.setAudioContext(AudioContext(
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          usageType: AndroidUsageType.notificationRingtone,
+        ),
+      ));
+      await _ringtone.play(AssetSource('sounds/ring_classic.wav'), volume: 1.0);
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
     // 풀스크린 알림으로 진입한 경우, 그 알림은 제거(화면이 대신 표시).
     cancelIncomingCallNotification();
-    // 수신 벨을 계속(반복) 울린다. asAlarm: 무음/저음량에서도 들리게.
-    _ringtone.playRingtone(looping: true, asAlarm: true);
+    // 수신 벨을 계속(반복) 울린다.
+    _startRing();
     // 발신자가 취소/종료하면 자동으로 닫기.
     _sub = CallSignaling.watch(widget.callId).listen((c) {
       if (!mounted || _answering) return;
@@ -64,6 +78,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   @override
   void dispose() {
     _stopRing();
+    _ringtone.dispose();
     _sub?.cancel();
     super.dispose();
   }
