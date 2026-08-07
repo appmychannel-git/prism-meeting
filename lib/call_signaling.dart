@@ -105,6 +105,39 @@ class CallSignaling {
     }
   }
 
+  /// 통화 문서 삭제(발신자가 통화 종료·취소 시). 실패는 무시.
+  static Future<void> deleteCall(String callId) async {
+    try {
+      await _calls.doc(callId).delete();
+    } catch (_) {}
+  }
+
+  /// 내 통화 문서 중 "끝났거나 오래된" 것을 정리(비용↓ + 오래된 벨 방지).
+  /// 진행 중(ringing·최근)인 통화는 건드리지 않아 경쟁 조건이 없다.
+  /// 앱 시작 시 1회 호출.
+  static Future<void> sweepMyOldCalls(String myUuid) async {
+    if (myUuid.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    const maxAgeMs = 5 * 60 * 1000; // 5분 지난 문서는 정리
+    for (final field in ['fromUuid', 'toUuid']) {
+      try {
+        final q = await _calls.where(field, isEqualTo: myUuid).get();
+        for (final d in q.docs) {
+          final m = d.data();
+          final status = (m['status'] ?? '').toString();
+          final started = (m['startedAtMs'] is int)
+              ? m['startedAtMs'] as int
+              : int.tryParse('${m['startedAtMs']}') ?? 0;
+          final old = started > 0 && (now - started) > maxAgeMs;
+          // 끝난(=ringing 아님) 것 또는 오래된 것만 삭제.
+          if (status != CallStatus.ringing || old) {
+            await d.reference.delete();
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
   /// 나에게 온 수신 통화 스트림(앱이 떠 있을 때의 1차 벨 — 포그라운드/백그라운드 복귀).
   /// toUuid 단일 equality 쿼리라 복합 색인이 필요 없다. 상태·유효시간은 코드에서 필터.
   static Stream<CallDoc> incoming(String myUuid) {

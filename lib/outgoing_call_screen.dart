@@ -86,6 +86,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
   void _close([String? msg]) {
     if (_done || !mounted) return;
     _done = true;
+    CallSignaling.deleteCall(widget.callId); // 발신자가 통화문서 정리
     Navigator.of(context).pop();
     if (msg != null) {
       ScaffoldMessenger.of(context)
@@ -97,6 +98,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
     if (_done) return;
     _done = true;
     await CallSignaling.setStatus(widget.callId, CallStatus.canceled);
+    await CallSignaling.deleteCall(widget.callId); // 취소 후 정리
     if (!mounted) return;
     Navigator.of(context).pop();
   }

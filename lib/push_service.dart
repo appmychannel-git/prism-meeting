@@ -134,6 +134,11 @@ class PushService {
         await FriendStore.mergeAll(mine);
       } catch (_) {}
 
+      // 끝났거나 오래된 통화 문서 정리(비용↓). 진행 중 통화는 안 건드림.
+      try {
+        await CallSignaling.sweepMyOldCalls(_myUuid!);
+      } catch (_) {}
+
       // 포그라운드 수신
       FirebaseMessaging.onMessage.listen(_onRemoteMessage);
       // 백그라운드에서 알림 탭으로 열림

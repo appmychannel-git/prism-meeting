@@ -57,11 +57,11 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     cancelIncomingCallNotification();
     // 수신 벨을 계속(반복) 울린다.
     _startRing();
-    // 발신자가 취소/종료하면 자동으로 닫기.
+    // 발신자가 취소/종료(문서 삭제 포함)하면 자동으로 닫기.
     _sub = CallSignaling.watch(widget.callId).listen((c) {
       if (!mounted || _answering) return;
-      if (c == null) return;
-      if (c.status == CallStatus.canceled ||
+      if (c == null ||
+          c.status == CallStatus.canceled ||
           c.status == CallStatus.ended ||
           c.status == CallStatus.declined) {
         _close(L.t('call_canceled_by_caller'));
