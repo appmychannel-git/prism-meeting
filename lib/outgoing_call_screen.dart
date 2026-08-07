@@ -113,7 +113,9 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0E1116),
         body: SafeArea(
-          child: Column(
+          child: SizedBox(
+            width: double.infinity, // 폭을 꽉 채워 자식들을 가운데로.
+            child: Column(
             children: [
               const Spacer(),
               Icon(
@@ -163,6 +165,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
                   ),
                 ),
             ],
+            ),
           ),
         ),
       ),

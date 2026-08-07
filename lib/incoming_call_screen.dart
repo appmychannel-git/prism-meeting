@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 
 import 'call.dart';
 import 'call_signaling.dart';
@@ -32,10 +33,13 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   StreamSubscription? _sub;
   bool _answering = false;
   bool _closed = false;
+  final _ringtone = FlutterRingtonePlayer();
 
   @override
   void initState() {
     super.initState();
+    // 수신 벨을 계속(반복) 울린다. asAlarm: 무음/저음량에서도 들리게.
+    _ringtone.playRingtone(looping: true, asAlarm: true);
     // 발신자가 취소/종료하면 자동으로 닫기.
     _sub = CallSignaling.watch(widget.callId).listen((c) {
       if (!mounted || _answering) return;
@@ -48,8 +52,15 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     });
   }
 
+  void _stopRing() {
+    try {
+      _ringtone.stop();
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
+    _stopRing();
     _sub?.cancel();
     super.dispose();
   }
@@ -57,6 +68,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   void _close([String? msg]) {
     if (_closed || !mounted) return;
     _closed = true;
+    _stopRing();
     Navigator.of(context).pop();
     if (msg != null) {
       ScaffoldMessenger.of(context)
@@ -65,6 +77,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   }
 
   Future<void> _accept() async {
+    _stopRing();
     setState(() => _answering = true);
     await CallSignaling.setStatus(widget.callId, CallStatus.accepted);
     final uuid = await DeviceId.uuid();
@@ -82,6 +95,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   }
 
   Future<void> _decline() async {
+    _stopRing();
     await CallSignaling.setStatus(widget.callId, CallStatus.declined);
     _close();
   }
@@ -92,7 +106,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0E1116),
       body: SafeArea(
-        child: Column(
+        child: SizedBox(
+          width: double.infinity, // 폭을 꽉 채워 자식들을 가운데로.
+          child: Column(
           children: [
             const Spacer(),
             Icon(
@@ -139,6 +155,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
                 ),
               ),
           ],
+          ),
         ),
       ),
     );
