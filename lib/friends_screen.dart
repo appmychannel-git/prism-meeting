@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'block_store.dart';
 import 'call.dart';
 import 'device_id.dart';
 import 'directory.dart';
@@ -39,11 +40,15 @@ class _FriendsScreenState extends State<FriendsScreen> {
       await FriendStore.mergeAll(await DirectoryService.myFriends(id));
     } catch (_) {}
     final fs = await FriendStore.list();
-    // 나를 추가한 사람들 중, 내가 아직 친구로 안 넣은 사람만 추천으로.
+    // 나를 추가한 사람들 중, 내가 아직 친구로 안 넣은 사람만 추천으로(차단 제외).
     final added = await DirectoryService.whoAddedMe(id);
     final friendIds = fs.map((f) => f.uuid).toSet();
+    final blocked = (await BlockStore.list()).map((f) => f.uuid).toSet();
     final sugg = added
-        .where((f) => f.uuid != id && !friendIds.contains(f.uuid))
+        .where((f) =>
+            f.uuid != id &&
+            !friendIds.contains(f.uuid) &&
+            !blocked.contains(f.uuid))
         .toList();
     if (!mounted) return;
     setState(() {
@@ -276,9 +281,22 @@ class _FriendsScreenState extends State<FriendsScreen> {
       title: Text(f.name.isNotEmpty ? f.name : L.t('unnamed')),
       subtitle: Text(L.t('added_you'),
           style: const TextStyle(fontSize: 12, color: Colors.white54)),
-      trailing: FilledButton.tonal(
-        onPressed: () => _addFriend(f),
-        child: Text(L.t('add_friend')),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton.tonal(
+            onPressed: () => _addFriend(f),
+            child: Text(L.t('add_friend')),
+          ),
+          IconButton(
+            icon: const Icon(Icons.block),
+            tooltip: L.t('block'),
+            onPressed: () async {
+              await BlockStore.add(f);
+              await _load();
+            },
+          ),
+        ],
       ),
     );
   }

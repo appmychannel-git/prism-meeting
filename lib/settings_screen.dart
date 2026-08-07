@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app_settings.dart';
+import 'blocked_list_screen.dart';
 import 'fullscreen_perm.dart';
 import 'l10n.dart';
 
@@ -35,6 +36,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text(L.t('fs_perm_menu')),
             subtitle: Text(L.t('fs_perm_menu_sub')),
             onTap: () => FullScreenPerm.openSettings(),
+          ),
+          ListTile(
+            leading: const Icon(Icons.block),
+            title: Text(L.t('blocked_list')),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const BlockedListScreen()),
+            ),
           ),
         ],
       ),

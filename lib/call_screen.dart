@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart';
 
 import 'connection_service.dart';
 import 'l10n.dart';
+import 'proximity.dart';
 import 'push_service.dart';
 
 /// 1:1 통화 전용 화면(회의방과 별개 UI).
@@ -67,8 +68,18 @@ class _CallScreenState extends State<CallScreen> {
     _connect();
   }
 
+  // 음성통화 + 이어피스(스피커 off)일 때만 근접센서 화면끄기 적용.
+  void _applyProximity() {
+    if (!widget.video && !_speakerOn) {
+      ProximityLock.acquire();
+    } else {
+      ProximityLock.release();
+    }
+  }
+
   @override
   void dispose() {
+    ProximityLock.release(); // 근접 잠금 해제
     PushService.instance.setInCall(false); // 통화중 해제
     _tick?.cancel();
     _room.removeListener(_onChange);
@@ -146,6 +157,7 @@ class _CallScreenState extends State<CallScreen> {
     try {
       await AudioManager.instance.setSpeakerOutputPreferred(_speakerOn);
     } catch (_) {}
+    _applyProximity();
   }
 
   Future<void> _toggleSpeaker() async {
@@ -156,6 +168,7 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {
       if (mounted) setState(() => _speakerOn = !next);
     }
+    _applyProximity();
   }
 
   Future<void> _flipCamera() async {

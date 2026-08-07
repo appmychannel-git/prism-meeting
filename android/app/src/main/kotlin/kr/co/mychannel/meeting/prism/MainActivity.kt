@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -14,6 +15,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private val channelName = "app/fullscreen"
+    private var proximityLock: PowerManager.WakeLock? = null
 
     // 수신 통화(풀스크린 인텐트)가 잠금화면 위로 뜨고 화면을 켜도록.
     // 매니페스트의 showWhenLocked/turnScreenOn(API 27+)에 더해, 구버전(23~26)은
@@ -75,6 +77,39 @@ class MainActivity : FlutterActivity() {
                         } catch (e: Exception) {
                             result.success(false)
                         }
+                    }
+                    // 음성통화 시 귀에 대면 화면 끄기(근접센서 wake lock).
+                    "acquireProximityLock" -> {
+                        try {
+                            val pm = getSystemService(Context.POWER_SERVICE)
+                                as PowerManager
+                            @Suppress("DEPRECATION")
+                            if (pm.isWakeLockLevelSupported(
+                                    PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+                                if (proximityLock == null) {
+                                    proximityLock = pm.newWakeLock(
+                                        PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK,
+                                        "prism:call")
+                                }
+                                if (proximityLock?.isHeld != true) {
+                                    proximityLock?.acquire(60 * 60 * 1000L)
+                                }
+                                result.success(true)
+                            } else {
+                                result.success(false)
+                            }
+                        } catch (e: Exception) {
+                            result.success(false)
+                        }
+                    }
+                    "releaseProximityLock" -> {
+                        try {
+                            if (proximityLock?.isHeld == true) {
+                                proximityLock?.release()
+                            }
+                        } catch (e: Exception) {
+                        }
+                        result.success(true)
                     }
                     else -> result.notImplemented()
                 }

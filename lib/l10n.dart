@@ -195,6 +195,10 @@ class L {
     'history_empty': {'ko': '통화 기록이 없습니다.', 'en': 'No call history.'},
     'clear': {'ko': '지우기', 'en': 'Clear'},
     'peer_busy': {'ko': '상대가 통화 중입니다.', 'en': 'They are on another call.'},
+    'block': {'ko': '차단', 'en': 'Block'},
+    'unblock': {'ko': '차단 해제', 'en': 'Unblock'},
+    'blocked_list': {'ko': '차단 목록', 'en': 'Blocked'},
+    'blocked_empty': {'ko': '차단한 사람이 없습니다.', 'en': 'No blocked people.'},
     'require_accept': {'ko': '수락형 친구요청', 'en': 'Require accepted friends'},
     'require_accept_sub': {
       'ko': '켜면 내 친구가 아닌 사람의 전화는 자동 거절됩니다. (기본 꺼짐)',

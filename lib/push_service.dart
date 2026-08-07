@@ -9,6 +9,7 @@ import 'dart:async';
 
 import 'app_settings.dart';
 import 'auth_service.dart';
+import 'block_store.dart';
 import 'call_signaling.dart';
 import 'config.dart';
 import 'device_id.dart';
@@ -321,6 +322,12 @@ class PushService with WidgetsBindingObserver {
     if (callId.isEmpty || room.isEmpty) return;
     if (_handled.contains(callId)) return; // 중복 방지
     _handled.add(callId);
+    // 차단한 사람의 전화는 무조건 자동 거절.
+    if (fromUuid.isNotEmpty && await BlockStore.isBlocked(fromUuid)) {
+      await CallSignaling.setStatus(callId, CallStatus.declined);
+      cancelIncomingCallNotification();
+      return;
+    }
     // 수락형 친구요청: 켜져 있으면 "내 친구가 아닌 사람"의 전화는 자동 거절.
     if (AppSettings.requireAccept && fromUuid.isNotEmpty) {
       final ok = await FriendStore.isFriend(fromUuid);
