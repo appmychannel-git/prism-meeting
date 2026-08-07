@@ -9,7 +9,9 @@ import 'package:permission_handler/permission_handler.dart';
 
 import 'config.dart';
 import 'connection_service.dart';
+import 'friends_screen.dart';
 import 'l10n.dart';
+import 'my_id_screen.dart';
 import 'room_screen.dart';
 
 class JoinScreen extends StatefulWidget {
@@ -23,6 +25,7 @@ enum _Tab { join, create }
 
 class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   final _nameCtrl = TextEditingController();
+  final _scaffoldKey = GlobalKey<ScaffoldState>(); // 햄버거 Drawer 제어
   final _codeCtrl = TextEditingController(); // 참여: 방 코드
   final _customCtrl = TextEditingController(); // 만들기: 지정 이름(선택)
   final _pinCtrl = TextEditingController(); // 비공개 방 입장 코드
@@ -289,6 +292,68 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     }
   }
 
+  // 좌측 햄버거 Drawer: 앱 언어 + (기능 켜진 경우) 내 ID·친구.
+  Widget _buildDrawer(BuildContext context) {
+    final showFriendMenu =
+        AppConfig.friendsEnabled || AppConfig.callEnabled;
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Color(0xFF2E5AC0)),
+              margin: EdgeInsets.zero,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: Text(
+                  AppConfig.appBrand,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            if (showFriendMenu) ...[
+              ListTile(
+                leading: const Icon(Icons.qr_code_2),
+                title: Text(L.t('menu_my_id')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const MyIdScreen()),
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.people_outline),
+                title: Text(L.t('menu_friends')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const FriendsScreen()),
+                  );
+                },
+              ),
+              const Divider(),
+            ],
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: Text(L.t('app_language')),
+              subtitle: Text(L.uiLanguages[L.lang] ?? L.lang),
+              onTap: () {
+                Navigator.pop(context);
+                showAppLanguagePicker(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 초대 링크로 자동 입장 중이면 폼 대신 로딩 화면(바로 회의 시작 느낌)
@@ -322,6 +387,8 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
         }
       },
       child: Scaffold(
+        key: _scaffoldKey,
+        drawer: _buildDrawer(context),
         body: Stack(
           children: [
             Center(
@@ -595,14 +662,15 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            // 앱 언어 선택 (좌측 상단)
+            // 햄버거 메뉴 (좌측 상단) → Drawer 열기
             Positioned(
               top: 0,
               left: 0,
               child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 4, left: 6),
-                  child: const AppLanguageButton(),
+                child: IconButton(
+                  icon: const Icon(Icons.menu),
+                  tooltip: L.t('menu'),
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                 ),
               ),
             ),

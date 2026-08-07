@@ -144,6 +144,31 @@ class L {
     },
     'transcript': {'ko': '자막 기록', 'en': 'Transcript'},
 
+    // ── 메뉴 / 친구 · 통화 ──
+    'menu': {'ko': '메뉴', 'en': 'Menu'},
+    'menu_my_id': {'ko': '내 ID (QR)', 'en': 'My ID (QR)'},
+    'menu_friends': {'ko': '친구', 'en': 'Friends'},
+    'my_id_title': {'ko': '내 ID', 'en': 'My ID'},
+    'my_id_desc': {
+      'ko': '상대가 이 QR을 스캔하면 나를 친구로 추가하거나 전화할 수 있어요.',
+      'en': 'Others can scan this QR to add you as a friend or call you.',
+    },
+    'my_id_name_hint': {'ko': '친구에게 보일 이름', 'en': 'Name shown to friends'},
+    'friends_empty': {
+      'ko': '아직 친구가 없습니다.\nQR을 스캔해 친구를 추가하세요.',
+      'en': 'No friends yet.\nScan a QR to add a friend.',
+    },
+    'scan_qr': {'ko': 'QR 스캔', 'en': 'Scan QR'},
+    'add_friend': {'ko': '친구 추가', 'en': 'Add friend'},
+    'already_friend': {'ko': '이미 친구', 'en': 'Already a friend'},
+    'friend_added': {'ko': '친구로 추가했습니다', 'en': 'Added as a friend'},
+    'remove_friend': {'ko': '친구 삭제', 'en': 'Remove friend'},
+    'call_voice': {'ko': '음성통화', 'en': 'Voice call'},
+    'call_video': {'ko': '영상통화', 'en': 'Video call'},
+    'scan_invalid': {'ko': '올바른 ID QR이 아닙니다.', 'en': 'Not a valid ID QR.'},
+    'calling': {'ko': '전화 거는 중...', 'en': 'Calling...'},
+    'unnamed': {'ko': '이름 없음', 'en': 'Unnamed'},
+
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},
     'usb_camera': {'ko': 'USB 카메라', 'en': 'USB camera'},

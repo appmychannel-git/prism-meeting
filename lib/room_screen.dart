@@ -59,6 +59,9 @@ class RoomScreen extends StatefulWidget {
   final bool isHost; // 방을 만든 사람(방장) → 나가면 방 종료
   // 링크로 바로 입장한 경우 true → 입장 직후 이름 설정 팝업을 띄운다.
   final bool promptNameOnEnter;
+  // 통화 진입 시 카메라 시작 여부 강제(영상통화=true, 음성통화=false).
+  // null이면 기본 정책(AppConfig.startCamera) 사용.
+  final bool? startVideo;
 
   const RoomScreen({
     super.key,
@@ -68,6 +71,7 @@ class RoomScreen extends StatefulWidget {
     this.pin,
     this.isHost = false,
     this.promptNameOnEnter = false,
+    this.startVideo,
   });
 
   @override
@@ -740,10 +744,11 @@ class _RoomScreenState extends State<RoomScreen> {
       if (mounted) setState(() => _micOn = false);
     }
 
-    // 카메라 자동 켜기 끔(START_CAMERA=false) → 시도 자체를 안 한다.
-    // 카메라가 고장난 일부 TV박스는 "카메라 있음"으로 보고하면서 open 시 네이티브가
-    // 멈춰 앱이 굳는다. 그런 기기 빌드는 이 플래그로 자동 켜기를 꺼서 회피.
-    if (!AppConfig.startCamera) {
+    // 카메라 자동 켜기 여부: 통화 진입 시 startVideo(영상=true/음성=false)가 우선,
+    // 없으면 빌드 정책(START_CAMERA). 끄면 카메라 시도 자체를 안 한다(고장난
+    // 카메라 기기 UI 멈춤 회피 + 음성통화).
+    final wantCamera = widget.startVideo ?? AppConfig.startCamera;
+    if (!wantCamera) {
       if (mounted) setState(() => _camOn = false);
       try {
         _cameras = await Hardware.instance
