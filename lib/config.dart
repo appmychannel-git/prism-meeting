@@ -1,6 +1,7 @@
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 /// Prism Meeting - 앱 전역 설정
 ///
@@ -45,13 +46,39 @@ class AppConfig {
     defaultValue: true,
   );
 
-  /// 채팅 번역·음성 자막 기능 노출 여부(기본 노출).
-  /// 국내 브랜드 등 번역이 필요 없는 빌드는 --dart-define=SHOW_TRANSLATION=false
-  /// 로 번역/자막 UI를 숨긴다.
+  // ─────────────────────────────────────────────────────────────
+  // 기능 플래그 (브랜드/빌드별 on·off). 빌드 시 --dart-define=<NAME>=true|false
+  // ─────────────────────────────────────────────────────────────
+
+  /// 채팅 번역·음성 자막 기능 노출 여부. **기본 숨김(false)** — 전 브랜드.
+  /// 번역을 쓰는 거래처 빌드만 --dart-define=SHOW_TRANSLATION=true 로 켠다.
   static const bool showTranslation = bool.fromEnvironment(
     'SHOW_TRANSLATION',
-    defaultValue: true,
+    defaultValue: false,
   );
+
+  // 아래 3개는 "회원 없이 기기 UUID로 식별 + 푸시"가 필요한 기능이라
+  // 모바일(Android/iOS) 전용이다. PC(윈도/맥)·웹에선 기기 식별/푸시 수단이
+  // 없어 자동 비활성된다([supportsDeviceFeatures]). 기본 off.
+  static const bool _enableCctv =
+      bool.fromEnvironment('ENABLE_CCTV', defaultValue: false);
+  static const bool _enableFriends =
+      bool.fromEnvironment('ENABLE_FRIENDS', defaultValue: false);
+  static const bool _enableCall =
+      bool.fromEnvironment('ENABLE_CALL', defaultValue: false);
+
+  /// 기기 UUID 기반 기능(친구·통화·CCTV)을 이 플랫폼에서 쓸 수 있는가.
+  /// 회원 없이 기기 고유값으로 식별하므로, 안정적 기기 식별·푸시가 없는
+  /// PC(윈도/맥)·웹에선 false → 해당 기능들 강제 비활성.
+  static bool get supportsDeviceFeatures =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS);
+
+  /// 실제 활성 여부 = 빌드 플래그 AND 플랫폼 지원.
+  static bool get cctvEnabled => _enableCctv && supportsDeviceFeatures;
+  static bool get friendsEnabled => _enableFriends && supportsDeviceFeatures;
+  static bool get callEnabled => _enableCall && supportsDeviceFeatures;
 
   /// 토큰 서버의 /token 엔드포인트 주소.
   ///   - 웹(같은 PC) 테스트:  http://localhost:3000/token
