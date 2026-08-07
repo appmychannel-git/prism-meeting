@@ -8,6 +8,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'call_signaling.dart';
 import 'config.dart';
 import 'device_id.dart';
+import 'directory.dart';
+import 'friends.dart';
 import 'incoming_call_screen.dart';
 
 /// 앱 전역 Navigator 키. 백그라운드 알림 탭/수신 통화에서 화면 전환에 사용.
@@ -119,6 +121,12 @@ class PushService {
       _myUuid = await DeviceId.uuid();
       await _registerDevice();
       msg.onTokenRefresh.listen((_) => _registerDevice());
+
+      // 재설치 후 로컬 친구목록이 비어도, 서버(내가 추가한 edge)에서 복구.
+      try {
+        final mine = await DirectoryService.myFriends(_myUuid!);
+        await FriendStore.mergeAll(mine);
+      } catch (_) {}
 
       // 포그라운드 수신
       FirebaseMessaging.onMessage.listen(_onRemoteMessage);

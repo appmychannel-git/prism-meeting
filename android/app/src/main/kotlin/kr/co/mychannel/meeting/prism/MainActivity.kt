@@ -47,6 +47,19 @@ class MainActivity : FlutterActivity() {
                             result.success(true)
                         }
                     }
+                    // 재설치해도 유지되는 기기 신원(ANDROID_ID). (앱 서명키+기기 기준,
+                    // 공장초기화 시에만 변경) → 회원 없이 안정적 식별.
+                    "getAndroidId" -> {
+                        try {
+                            val id = Settings.Secure.getString(
+                                contentResolver,
+                                Settings.Secure.ANDROID_ID,
+                            )
+                            result.success(id)
+                        } catch (e: Exception) {
+                            result.success(null)
+                        }
+                    }
                     // 해당 앱의 "전체 화면 알림 허용" 설정 화면으로 이동.
                     "openFullScreenSettings" -> {
                         try {

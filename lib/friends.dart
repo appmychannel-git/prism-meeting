@@ -57,6 +57,21 @@ class FriendStore {
     fs.removeWhere((f) => f.uuid == uuid);
     await _save(fs);
   }
+
+  /// 서버에서 불러온 친구들을 로컬에 병합(없는 것만 추가). 재설치 후 복구용.
+  /// 이미 있는 친구의 로컬 이름은 유지한다.
+  static Future<void> mergeAll(List<Friend> incoming) async {
+    final fs = await list();
+    final ids = fs.map((f) => f.uuid).toSet();
+    var changed = false;
+    for (final f in incoming) {
+      if (f.uuid.isEmpty || ids.contains(f.uuid)) continue;
+      fs.add(f);
+      ids.add(f.uuid);
+      changed = true;
+    }
+    if (changed) await _save(fs);
+  }
 }
 
 /// 내 ID QR 페이로드. 초대 링크처럼 URL 형태로 만들어 두면 나중에

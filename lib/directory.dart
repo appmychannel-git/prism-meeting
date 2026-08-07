@@ -65,10 +65,12 @@ class DirectoryService {
   }
 
   /// "내가 상대를 친구추가함"을 기록 → 상대의 '친구 추천'에 내가 뜬다.
+  /// [toName]도 저장해 두면, 재설치 후 내 친구목록을 서버에서 복구할 수 있다.
   static Future<void> addEdge({
     required String from,
     required String to,
     required String fromName,
+    String toName = '',
   }) async {
     if (from.isEmpty || to.isEmpty || from == to) return;
     try {
@@ -76,9 +78,29 @@ class DirectoryService {
         'from': from,
         'to': to,
         'fromName': fromName,
+        'toName': toName,
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (_) {}
+  }
+
+  /// 내가 추가한 친구들(재설치 후 로컬 친구목록 복구용).
+  /// from == 나 인 edge 들 → 상대(to)와 저장해둔 이름(toName).
+  static Future<List<Friend>> myFriends(String myUuid) async {
+    try {
+      final q =
+          await _db.collection('edges').where('from', isEqualTo: myUuid).get();
+      final out = <Friend>[];
+      for (final d in q.docs) {
+        final m = d.data();
+        final uid = (m['to'] ?? '').toString();
+        if (uid.isEmpty) continue;
+        out.add(Friend(uuid: uid, name: (m['toName'] ?? '').toString()));
+      }
+      return out;
+    } catch (_) {
+      return [];
+    }
   }
 
   /// 나를 친구추가한 사람들(단일 equality 쿼리 → 복합색인 불필요).

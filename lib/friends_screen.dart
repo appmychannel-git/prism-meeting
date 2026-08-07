@@ -31,9 +31,13 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   Future<void> _load() async {
-    final fs = await FriendStore.list();
     final id = await DeviceId.uuid();
     final nm = await DeviceId.name();
+    // 재설치 후 로컬이 비었으면 서버(내가 추가한 친구)에서 복구·병합.
+    try {
+      await FriendStore.mergeAll(await DirectoryService.myFriends(id));
+    } catch (_) {}
+    final fs = await FriendStore.list();
     // 나를 추가한 사람들 중, 내가 아직 친구로 안 넣은 사람만 추천으로.
     final added = await DirectoryService.whoAddedMe(id);
     final friendIds = fs.map((f) => f.uuid).toSet();
@@ -56,7 +60,7 @@ class _FriendsScreenState extends State<FriendsScreen> {
     if (!await FriendStore.isFriend(f.uuid)) {
       await FriendStore.add(f);
       await DirectoryService.addEdge(
-          from: _myUuid, to: f.uuid, fromName: _myName);
+          from: _myUuid, to: f.uuid, fromName: _myName, toName: f.name);
     }
     await _load();
   }
