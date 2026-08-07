@@ -165,12 +165,6 @@ class _MyIdScreenState extends State<MyIdScreen> {
                       label: Text(L.t('share_my_link')),
                     ),
                   ],
-                  const SizedBox(height: 20),
-                  SelectableText(
-                    'ID: $uuid',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 11, color: Colors.white38),
-                  ),
                 ],
               ),
             ),
