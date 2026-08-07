@@ -69,7 +69,8 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
           name: widget.myName,
           uuid: widget.myUuid,
           video: widget.video,
-          replace: true, // 발신 화면을 방 화면으로 교체
+          peerName: widget.friend.name, // 상대(수신자) 이름
+          replace: true, // 발신 화면을 통화 화면으로 교체
         );
         break;
       case CallStatus.declined:

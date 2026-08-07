@@ -76,7 +76,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
       name: nm.isNotEmpty ? nm : L.t('guest'),
       uuid: uuid,
       video: widget.video,
-      replace: true, // 수신 화면을 방 화면으로 교체
+      peerName: widget.fromName, // 상대(발신자) 이름
+      replace: true, // 수신 화면을 통화 화면으로 교체
     );
   }
 

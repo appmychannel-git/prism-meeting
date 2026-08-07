@@ -184,6 +184,25 @@ class L {
       'en': 'The call was canceled.',
     },
     'call_failed': {'ko': '통화 연결에 실패했습니다', 'en': 'Failed to place the call'},
+    'call_hangup': {'ko': '통화 종료', 'en': 'Hang up'},
+    'call_ended': {'ko': '통화가 종료되었습니다.', 'en': 'Call ended.'},
+    'my_id_need_name': {
+      'ko': '먼저 아래에서 표시 이름을 입력하면\nQR이 생성됩니다.',
+      'en': 'Enter a display name below\nto generate your QR.',
+    },
+    // ── 코드/링크 공유 · 친구 추천 ──
+    'my_code': {'ko': '내 코드', 'en': 'My code'},
+    'code_copied': {'ko': '코드를 복사했습니다', 'en': 'Code copied'},
+    'copy': {'ko': '복사', 'en': 'Copy'},
+    'share_my_link': {'ko': '내 ID 링크 공유', 'en': 'Share my ID link'},
+    'add_by_code': {'ko': '코드로 추가', 'en': 'Add by code'},
+    'code_hint': {'ko': '상대의 코드 입력 (예: ABC123)', 'en': "Enter their code (e.g. ABC123)"},
+    'code_not_found': {
+      'ko': '코드를 찾을 수 없습니다. 다시 확인하세요.',
+      'en': 'Code not found. Please check it.',
+    },
+    'friend_suggestions': {'ko': '친구 추천 (나를 추가한 사람)', 'en': 'Suggestions (added you)'},
+    'added_you': {'ko': '나를 친구추가함', 'en': 'Added you'},
 
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},

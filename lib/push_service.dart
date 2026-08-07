@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'call_signaling.dart';
 import 'config.dart';
@@ -25,6 +26,9 @@ class PushService {
   PushService._();
   static final PushService instance = PushService._();
 
+  /// 서버 /call 이 지정하는 알림 채널 ID와 동일해야 한다(고importance=헤드업+소리).
+  static const String callChannelId = 'incoming_calls';
+
   bool _started = false;
   String? _myUuid;
 
@@ -40,6 +44,7 @@ class PushService {
     try {
       await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      await _createCallChannel(); // 수신벨용 고importance 채널(백그라운드 헤드업+소리)
 
       final msg = FirebaseMessaging.instance;
       await msg.requestPermission(); // Android 13+ 알림 권한 프롬프트 포함
@@ -67,6 +72,30 @@ class PushService {
       _started = true;
     } catch (e) {
       debugPrint('[PushService] init skipped: $e');
+    }
+  }
+
+  /// 백그라운드/종료 상태에서 FCM notification 이 헤드업+소리로 뜨도록
+  /// 고importance 알림 채널을 미리 만든다(서버 /call 이 이 채널로 보냄).
+  Future<void> _createCallChannel() async {
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      await plugin.initialize(
+          settings: const InitializationSettings(android: androidInit));
+      const channel = AndroidNotificationChannel(
+        callChannelId,
+        '수신 전화',
+        description: '친구의 음성·영상 통화 수신 알림',
+        importance: Importance.max,
+        playSound: true,
+      );
+      await plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+    } catch (e) {
+      debugPrint('[PushService] createCallChannel failed: $e');
     }
   }
 

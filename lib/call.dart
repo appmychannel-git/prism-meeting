@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import 'call_screen.dart';
 import 'call_signaling.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'friends.dart';
 import 'l10n.dart';
 import 'outgoing_call_screen.dart';
-import 'room_screen.dart';
 
 /// 친구에게 1:1 전화를 건다.
 /// 방 이름은 두 UUID를 정렬해 만들어 양쪽이 같은 방으로 들어간다.
@@ -72,13 +72,15 @@ Future<void> startDmCall(
 
 /// DM 방 입장(발신자 수락 확인 후 / 수신자 수락 시 공통).
 /// 방이 없으면 만들고(먼저 들어온 쪽이 생성), 있으면 참여한다.
-/// [replace] true 면 현재 화면(발신/수신)을 방 화면으로 교체.
+/// 회의방이 아니라 1:1 통화 전용 화면([CallScreen])으로 들어간다.
+/// [replace] true 면 현재 화면(발신/수신)을 통화 화면으로 교체.
 Future<void> joinDmRoom(
   BuildContext context, {
   required String room,
   required String name,
   required String uuid,
   required bool video,
+  required String peerName,
   bool replace = true,
 }) async {
   showDialog<void>(
@@ -108,11 +110,12 @@ Future<void> joinDmRoom(
   }
 
   final route = MaterialPageRoute<void>(
-    builder: (_) => RoomScreen(
+    builder: (_) => CallScreen(
       details: details!,
       roomName: room,
       displayName: name,
-      startVideo: video,
+      peerName: peerName,
+      video: video,
     ),
   );
   if (replace) {
