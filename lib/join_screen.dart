@@ -14,6 +14,7 @@ import 'fullscreen_perm.dart';
 import 'l10n.dart';
 import 'my_id_screen.dart';
 import 'room_screen.dart';
+import 'settings_screen.dart';
 
 class JoinScreen extends StatefulWidget {
   const JoinScreen({super.key});
@@ -368,12 +369,13 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
               ),
               if (AppConfig.callEnabled)
                 ListTile(
-                  leading: const Icon(Icons.ring_volume),
-                  title: Text(L.t('fs_perm_menu')),
-                  subtitle: Text(L.t('fs_perm_menu_sub')),
+                  leading: const Icon(Icons.settings_outlined),
+                  title: Text(L.t('menu_settings')),
                   onTap: () {
                     Navigator.pop(context);
-                    FullScreenPerm.openSettings();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    );
                   },
                 ),
               const Divider(),

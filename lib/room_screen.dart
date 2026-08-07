@@ -251,6 +251,8 @@ class _RoomScreenState extends State<RoomScreen> {
         _syncScreenShareState();
       })
       ..on<ParticipantNameUpdatedEvent>((_) => _onRoomChange()) // 이름 변경 반영
+      ..on<ParticipantConnectionQualityUpdatedEvent>(
+          (_) => _onRoomChange()) // 인터넷(연결) 품질 변화 반영
       ..on<ActiveSpeakersChangedEvent>((_) {
         final speakers = _room.activeSpeakers;
         if (speakers.isNotEmpty) _spotlightIdentity = speakers.first.identity;
@@ -2061,6 +2063,11 @@ class _ParticipantTile extends StatelessWidget {
                           color: Colors.white,
                         ),
                       ),
+                      // 인터넷(연결) 품질 표시 — 화면공유 타일 제외.
+                      if (!isScreen) ...[
+                        const SizedBox(width: 6),
+                        _QualityIcon(p.connectionQuality),
+                      ],
                     ],
                   ),
                 ),
@@ -2070,6 +2077,39 @@ class _ParticipantTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// 참가자 인터넷(연결) 품질 아이콘. unknown 이면 표시 안 함.
+class _QualityIcon extends StatelessWidget {
+  final ConnectionQuality quality;
+  const _QualityIcon(this.quality);
+
+  @override
+  Widget build(BuildContext context) {
+    IconData icon;
+    Color color;
+    switch (quality) {
+      case ConnectionQuality.excellent:
+        icon = Icons.signal_cellular_alt;
+        color = const Color(0xFF4ADE80);
+        break;
+      case ConnectionQuality.good:
+        icon = Icons.signal_cellular_alt_2_bar;
+        color = const Color(0xFFFACC15);
+        break;
+      case ConnectionQuality.poor:
+        icon = Icons.signal_cellular_alt_1_bar;
+        color = const Color(0xFFFF6B6B);
+        break;
+      case ConnectionQuality.lost:
+        icon = Icons.signal_cellular_off;
+        color = const Color(0xFFFF6B6B);
+        break;
+      case ConnectionQuality.unknown:
+        return const SizedBox.shrink();
+    }
+    return Icon(icon, size: 14, color: color);
   }
 }
 

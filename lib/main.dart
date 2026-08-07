@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_settings.dart';
 import 'config.dart';
 import 'join_screen.dart';
 import 'l10n.dart';
@@ -6,6 +7,7 @@ import 'push_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppSettings.load(); // 사용자 설정(수락형 등) 로드
   // 통화/친구 기능이 켜진 모바일에서만 Firebase(FCM/Firestore) 초기화.
   // (내부에서 예외를 삼키므로 구성이 없어도 앱 실행엔 영향 없음.)
   await PushService.instance.initIfEnabled();

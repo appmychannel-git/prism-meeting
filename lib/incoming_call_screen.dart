@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:vibration/vibration.dart';
 
 import 'call.dart';
 import 'call_signaling.dart';
@@ -48,6 +49,12 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
       ));
       await _ringtone.play(AssetSource('sounds/ring_classic.wav'), volume: 1.0);
     } catch (_) {}
+    // 진동도 함께 반복(대기 0.8s, 진동 0.6s 패턴 루프).
+    try {
+      if (await Vibration.hasVibrator()) {
+        Vibration.vibrate(pattern: const [0, 600, 800], repeat: 0);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -72,6 +79,9 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   void _stopRing() {
     try {
       _ringtone.stop();
+    } catch (_) {}
+    try {
+      Vibration.cancel();
     } catch (_) {}
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 
 import 'call.dart';
@@ -36,10 +37,25 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
   Timer? _timeout;
   bool _joining = false;
   bool _done = false;
+  final AudioPlayer _ringback = AudioPlayer();
+
+  Future<void> _startRingback() async {
+    try {
+      await _ringback.setReleaseMode(ReleaseMode.loop);
+      await _ringback.play(AssetSource('sounds/ringback.wav'), volume: 0.6);
+    } catch (_) {}
+  }
+
+  void _stopRingback() {
+    try {
+      _ringback.stop();
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
+    _startRingback(); // 발신 중 "뚜—뚜—"
     _sub = CallSignaling.watch(widget.callId).listen(_onChange);
     // 응답 없음: 45초 후 자동 취소.
     _timeout = Timer(const Duration(seconds: 45), () {
@@ -51,6 +67,8 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
 
   @override
   void dispose() {
+    _stopRingback();
+    _ringback.dispose();
     _sub?.cancel();
     _timeout?.cancel();
     super.dispose();
@@ -61,6 +79,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
     switch (c.status) {
       case CallStatus.accepted:
         _done = true;
+        _stopRingback();
         setState(() => _joining = true);
         _timeout?.cancel();
         await joinDmRoom(
@@ -86,6 +105,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
   void _close([String? msg]) {
     if (_done || !mounted) return;
     _done = true;
+    _stopRingback();
     CallSignaling.deleteCall(widget.callId); // 발신자가 통화문서 정리
     Navigator.of(context).pop();
     if (msg != null) {
@@ -97,6 +117,7 @@ class _OutgoingCallScreenState extends State<OutgoingCallScreen> {
   Future<void> _cancel() async {
     if (_done) return;
     _done = true;
+    _stopRingback();
     await CallSignaling.setStatus(widget.callId, CallStatus.canceled);
     await CallSignaling.deleteCall(widget.callId); // 취소 후 정리
     if (!mounted) return;

@@ -186,6 +186,16 @@ class L {
     'call_failed': {'ko': '통화 연결에 실패했습니다', 'en': 'Failed to place the call'},
     'call_hangup': {'ko': '통화 종료', 'en': 'Hang up'},
     'call_ended': {'ko': '통화가 종료되었습니다.', 'en': 'Call ended.'},
+    'speaker': {'ko': '스피커', 'en': 'Speaker'},
+    'earpiece': {'ko': '수화기', 'en': 'Earpiece'},
+    'cam_flip': {'ko': '카메라 전환', 'en': 'Flip camera'},
+    // ── 설정 ──
+    'menu_settings': {'ko': '설정', 'en': 'Settings'},
+    'require_accept': {'ko': '수락형 친구요청', 'en': 'Require accepted friends'},
+    'require_accept_sub': {
+      'ko': '켜면 내 친구가 아닌 사람의 전화는 자동 거절됩니다. (기본 꺼짐)',
+      'en': 'When on, calls from non-friends are auto-declined. (Default off)',
+    },
     'my_id_need_name': {
       'ko': '먼저 아래에서 표시 이름을 입력하면\nQR이 생성됩니다.',
       'en': 'Enter a display name below\nto generate your QR.',

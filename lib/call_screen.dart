@@ -48,6 +48,9 @@ class _CallScreenState extends State<CallScreen> {
   String? _error;
   bool _micOn = true;
   late bool _camOn = widget.video;
+  // 영상통화는 스피커 기본 on, 음성통화는 이어피스(스피커 off) 기본.
+  late bool _speakerOn = widget.video;
+  bool _frontCamera = true;
   bool _peerWasHere = false;
   bool _leaving = false;
 
@@ -136,6 +139,40 @@ class _CallScreenState extends State<CallScreen> {
         if (mounted) setState(() => _camOn = false);
       }
     }
+    // 오디오 출력(스피커/이어피스) 초기화.
+    try {
+      await AudioManager.instance.setSpeakerOutputPreferred(_speakerOn);
+    } catch (_) {}
+  }
+
+  Future<void> _toggleSpeaker() async {
+    final next = !_speakerOn;
+    setState(() => _speakerOn = next);
+    try {
+      await AudioManager.instance.setSpeakerOutputPreferred(next);
+    } catch (_) {
+      if (mounted) setState(() => _speakerOn = !next);
+    }
+  }
+
+  Future<void> _flipCamera() async {
+    LocalVideoTrack? cam;
+    final lp = _room.localParticipant;
+    if (lp != null) {
+      for (final pub in lp.videoTrackPublications) {
+        if (pub.source == TrackSource.camera) {
+          final t = pub.track;
+          if (t is LocalVideoTrack) cam = t;
+          break;
+        }
+      }
+    }
+    if (cam == null) return;
+    try {
+      await cam.setCameraPosition(
+          _frontCamera ? CameraPosition.back : CameraPosition.front);
+      if (mounted) setState(() => _frontCamera = !_frontCamera);
+    } catch (_) {}
   }
 
   Future<void> _toggleMic() async {
@@ -357,8 +394,10 @@ class _CallScreenState extends State<CallScreen> {
       left: 0,
       right: 0,
       bottom: 40,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 22,
+        runSpacing: 12,
         children: [
           _btn(
             icon: _micOn ? Icons.mic : Icons.mic_off,
@@ -366,16 +405,26 @@ class _CallScreenState extends State<CallScreen> {
             bg: _micOn ? const Color(0xFF2E3742) : const Color(0xFF5A3A3A),
             onTap: _toggleMic,
           ),
+          _btn(
+            icon: _speakerOn ? Icons.volume_up : Icons.hearing,
+            label: _speakerOn ? L.t('speaker') : L.t('earpiece'),
+            bg: _speakerOn ? const Color(0xFF2E5AC0) : const Color(0xFF2E3742),
+            onTap: _toggleSpeaker,
+          ),
           if (widget.video) ...[
-            const SizedBox(width: 28),
             _btn(
               icon: _camOn ? Icons.videocam : Icons.videocam_off,
               label: _camOn ? L.t('cam_off') : L.t('cam_on'),
               bg: _camOn ? const Color(0xFF2E3742) : const Color(0xFF5A3A3A),
               onTap: _toggleCam,
             ),
+            _btn(
+              icon: Icons.cameraswitch,
+              label: L.t('cam_flip'),
+              bg: const Color(0xFF2E3742),
+              onTap: _flipCamera,
+            ),
           ],
-          const SizedBox(width: 28),
           _btn(
             icon: Icons.call_end,
             label: L.t('call_hangup'),

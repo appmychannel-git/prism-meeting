@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'app_settings.dart';
 import 'auth_service.dart';
 import 'call_signaling.dart';
 import 'config.dart';
@@ -220,6 +221,7 @@ class PushService {
     if (d['type'] != 'incoming_call') return;
     _showIncoming(
       callId: (d['callId'] ?? '').toString(),
+      fromUuid: (d['fromUuid'] ?? '').toString(),
       fromName: (d['fromName'] ?? '').toString(),
       room: (d['room'] ?? '').toString(),
       video: d['video'] == 'true' || d['video'] == true,
@@ -229,23 +231,34 @@ class PushService {
   void _onIncomingDoc(CallDoc c) {
     _showIncoming(
       callId: c.callId,
+      fromUuid: c.fromUuid,
       fromName: c.fromName,
       room: c.room,
       video: c.video,
     );
   }
 
-  void _showIncoming({
+  Future<void> _showIncoming({
     required String callId,
+    required String fromUuid,
     required String fromName,
     required String room,
     required bool video,
-  }) {
+  }) async {
     if (callId.isEmpty || room.isEmpty) return;
     if (_handled.contains(callId)) return; // 중복 방지
+    _handled.add(callId);
+    // 수락형 친구요청: 켜져 있으면 "내 친구가 아닌 사람"의 전화는 자동 거절.
+    if (AppSettings.requireAccept && fromUuid.isNotEmpty) {
+      final ok = await FriendStore.isFriend(fromUuid);
+      if (!ok) {
+        await CallSignaling.setStatus(callId, CallStatus.declined);
+        cancelIncomingCallNotification();
+        return;
+      }
+    }
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
-    _handled.add(callId);
     cancelIncomingCallNotification(); // 풀스크린 알림이 떠 있었다면 정리
     nav.push(MaterialPageRoute(
       builder: (_) => IncomingCallScreen(
