@@ -169,6 +169,22 @@ class L {
     'calling': {'ko': '전화 거는 중...', 'en': 'Calling...'},
     'unnamed': {'ko': '이름 없음', 'en': 'Unnamed'},
 
+    // ── 통화(발신/수신) ──
+    'incoming_voice': {'ko': '음성통화 수신', 'en': 'Incoming voice call'},
+    'incoming_video': {'ko': '영상통화 수신', 'en': 'Incoming video call'},
+    'call_accept': {'ko': '수락', 'en': 'Accept'},
+    'call_decline': {'ko': '거절', 'en': 'Decline'},
+    'call_cancel': {'ko': '취소', 'en': 'Cancel'},
+    'call_calling': {'ko': '연결 중...', 'en': 'Ringing...'},
+    'call_connecting': {'ko': '입장 중...', 'en': 'Connecting...'},
+    'call_declined': {'ko': '상대가 통화를 거절했습니다.', 'en': 'Call was declined.'},
+    'call_no_answer': {'ko': '응답이 없습니다.', 'en': 'No answer.'},
+    'call_canceled_by_caller': {
+      'ko': '통화가 취소되었습니다.',
+      'en': 'The call was canceled.',
+    },
+    'call_failed': {'ko': '통화 연결에 실패했습니다', 'en': 'Failed to place the call'},
+
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},
     'usb_camera': {'ko': 'USB 카메라', 'en': 'USB camera'},

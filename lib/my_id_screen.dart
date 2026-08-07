@@ -4,6 +4,7 @@ import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'device_id.dart';
 import 'friends.dart';
 import 'l10n.dart';
+import 'push_service.dart';
 
 /// 내 ID QR 화면. 상대가 이 QR을 스캔하면 나를 친구추가/전화할 수 있다.
 class MyIdScreen extends StatefulWidget {
@@ -34,6 +35,8 @@ class _MyIdScreenState extends State<MyIdScreen> {
 
   @override
   void dispose() {
+    // 편집한 이름을 기기 등록(Firestore)에도 반영 → 친구에게 새 이름으로 표시.
+    PushService.instance.refreshDevice();
     _nameCtrl.dispose();
     super.dispose();
   }

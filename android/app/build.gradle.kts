@@ -6,6 +6,9 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Firebase(FCM/Firestore): android/app/google-services.json 을 읽는다.
+    // 반드시 Flutter/Android 플러그인 뒤에 적용.
+    id("com.google.gms.google-services")
 }
 
 // 릴리즈 서명 정보(android/key.properties)를 읽는다. 파일이 있으면 릴리즈 키로 서명.
@@ -39,6 +42,8 @@ android {
         versionName = flutter.versionName
         // 앱 표시 이름(매니페스트 android:label). flavor에서 브랜드별로 덮어씀.
         manifestPlaceholders["appLabel"] = "Prism Meeting"
+        // Firestore/Firebase 등 메서드 수가 많아 64K DEX 한계 회피.
+        multiDexEnabled = true
     }
 
     // ── 브랜드(업체)별 flavor ── 한 코드베이스로 여러 브랜드 앱을 빌드.
@@ -54,12 +59,12 @@ android {
         create("gbled") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.gbled"
-            manifestPlaceholders["appLabel"] = "글로벌전자"
+            manifestPlaceholders["appLabel"] = "Gbled Meeting"
         }
         create("viewplus") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.viewplus"
-            manifestPlaceholders["appLabel"] = "뷰플러스"
+            manifestPlaceholders["appLabel"] = " Viewplus Meeting"
         }
         create("mychannel") {
             dimension = "brand"
@@ -89,10 +94,10 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
-        // debug 빌드는 .dev 접미사로 릴리즈와 공존(같은 브랜드 debug↔release 동시설치).
-        // 앱 이름은 flavor의 appLabel(브랜드명)을 그대로 사용. release는 손대지 않음.
+        // debug 빌드 표식(버전명에 -dev). applicationId 는 release 와 동일하게 둔다.
+        // (FCM 은 각 applicationId 가 Firebase 에 등록돼야 하므로 .dev 접미사를 쓰지 않음.
+        //  dev/release 동시설치가 필요하면 .dev 4개 패키지를 Firebase 에 추가 등록 후 접미사 복원.)
         debug {
-            applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
         }
     }
