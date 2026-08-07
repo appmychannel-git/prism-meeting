@@ -5,6 +5,7 @@ import 'package:livekit_client/livekit_client.dart';
 
 import 'connection_service.dart';
 import 'l10n.dart';
+import 'push_service.dart';
 
 /// 1:1 통화 전용 화면(회의방과 별개 UI).
 /// - 음성통화: 상대 아바타 + 이름 + 통화시간, 하단에 음소거/종료.
@@ -68,6 +69,7 @@ class _CallScreenState extends State<CallScreen> {
 
   @override
   void dispose() {
+    PushService.instance.setInCall(false); // 통화중 해제
     _tick?.cancel();
     _room.removeListener(_onChange);
     _listener.dispose();
@@ -119,6 +121,7 @@ class _CallScreenState extends State<CallScreen> {
       return;
     }
     if (mounted) setState(() => _connecting = false);
+    PushService.instance.setInCall(true); // 통화중 표시(친구목록)
     _connectedAt = DateTime.now();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted || _connectedAt == null) return;

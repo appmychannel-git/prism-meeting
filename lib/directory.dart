@@ -2,6 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'friends.dart';
 
+/// 상대 기기의 현재 상태(온라인/통화중/이름).
+class DeviceStatus {
+  final String name;
+  final bool inCall;
+  final int lastSeenMs;
+  const DeviceStatus({
+    required this.name,
+    required this.inCall,
+    required this.lastSeenMs,
+  });
+
+  /// 최근 90초 내 heartbeat 가 있으면 온라인으로 본다.
+  bool get online =>
+      lastSeenMs > 0 &&
+      DateTime.now().millisecondsSinceEpoch - lastSeenMs < 90000;
+
+  /// 통화 중 표시(온라인이면서 inCall). 오프라인이면 stale 로 보고 통화중 아님.
+  bool get busy => online && inCall;
+}
+
 /// 서버(Firestore) 기반 친구 디렉터리.
 ///  - codes/{code}   : 짧은 코드 → uuid (TV/태블릿 등 스캔 어려운 기기용 수동 등록)
 ///  - devices/{uuid} : 기기 문서에 code 필드 저장(내 코드 표시용)
@@ -46,6 +66,25 @@ class DirectoryService {
       }
     } catch (_) {}
     return '';
+  }
+
+  /// 상대 기기 상태(온라인/통화중/이름) 조회.
+  static Future<DeviceStatus?> status(String uuid) async {
+    if (uuid.isEmpty) return null;
+    try {
+      final d = await _db.collection('devices').doc(uuid).get();
+      if (!d.exists) return null;
+      final m = d.data()!;
+      final ls = m['lastSeen'];
+      final ms = ls is Timestamp ? ls.millisecondsSinceEpoch : 0;
+      return DeviceStatus(
+        name: (m['name'] ?? '').toString(),
+        inCall: m['inCall'] == true,
+        lastSeenMs: ms,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 코드로 상대 찾기(수동 등록). 없으면 null.

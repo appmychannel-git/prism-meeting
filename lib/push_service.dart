@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'dart:async';
+
 import 'app_settings.dart';
 import 'auth_service.dart';
 import 'call_signaling.dart';
@@ -99,12 +101,13 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 /// FCM(수신벨) + 기기 등록(Firestore) 을 담당.
 /// 회원 없이 기기 UUID 로 식별하며, 모바일(Android/iOS)에서만 동작.
-class PushService {
+class PushService with WidgetsBindingObserver {
   PushService._();
   static final PushService instance = PushService._();
 
   bool _started = false;
   String? _myUuid;
+  Timer? _heartbeat;
 
   /// 이미 처리(표시)한 통화 ID — 스트림/푸시 중복 표시 방지.
   final Set<String> _handled = <String>{};
@@ -128,6 +131,10 @@ class PushService {
       await AuthService.ensureSignedIn(_myUuid!);
       await _registerDevice();
       msg.onTokenRefresh.listen((_) => _registerDevice());
+
+      // presence: 앱이 떠 있는 동안 주기적으로 lastSeen 갱신 + 생명주기 관찰.
+      WidgetsBinding.instance.addObserver(this);
+      _startHeartbeat();
 
       // 재설치 후 로컬 친구목록이 비어도, 서버(내가 추가한 edge)에서 복구.
       try {
@@ -198,6 +205,7 @@ class PushService {
       await db.collection('devices').doc(uuid).set({
         'name': name,
         'platform': defaultTargetPlatform.name,
+        'lastSeen': FieldValue.serverTimestamp(), // presence
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
       // FCM 토큰: 클라이언트는 못 읽는 별도 컬렉션(서버 Admin만 읽음) → 토큰 탈취 방지.
@@ -214,6 +222,71 @@ class PushService {
   Future<void> refreshDevice() async {
     if (!_started) return;
     await _registerDevice();
+  }
+
+  // ── presence(온라인 표시) ──
+  void _startHeartbeat() {
+    _heartbeat?.cancel();
+    _heartbeat = Timer.periodic(const Duration(seconds: 45), (_) => _touch());
+  }
+
+  Future<void> _touch() async {
+    final uuid = _myUuid;
+    if (uuid == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('devices').doc(uuid).set(
+        {'lastSeen': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _touch();
+  }
+
+  /// 통화 시작/종료 시 통화중 상태 갱신(친구 목록의 "통화중" 표시용).
+  Future<void> setInCall(bool value) async {
+    final uuid = _myUuid;
+    if (uuid == null) return;
+    try {
+      await FirebaseFirestore.instance.collection('devices').doc(uuid).set(
+        {'inCall': value, 'lastSeen': FieldValue.serverTimestamp()},
+        SetOptions(merge: true),
+      );
+    } catch (_) {}
+  }
+
+  /// 부재중 전화 알림(로컬). 기본 채널로 1회 표시.
+  Future<void> showMissedCall(String fromName) async {
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      await plugin.initialize(
+          settings: const InitializationSettings(android: androidInit));
+      const channel = AndroidNotificationChannel(
+        'missed_calls',
+        '부재중 전화',
+        importance: Importance.defaultImportance,
+      );
+      await plugin
+          .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+      const details = AndroidNotificationDetails(
+        'missed_calls',
+        '부재중 전화',
+        importance: Importance.defaultImportance,
+        priority: Priority.defaultPriority,
+      );
+      await plugin.show(
+        id: 2001,
+        title: '부재중 전화',
+        body: fromName.isNotEmpty ? fromName : '전화',
+        notificationDetails: const NotificationDetails(android: details),
+      );
+    } catch (_) {}
   }
 
   void _onRemoteMessage(RemoteMessage m) {
@@ -263,6 +336,7 @@ class PushService {
     nav.push(MaterialPageRoute(
       builder: (_) => IncomingCallScreen(
         callId: callId,
+        fromUuid: fromUuid,
         fromName: fromName,
         room: room,
         video: video,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
 
 import 'call.dart';
+import 'call_log.dart';
 import 'call_signaling.dart';
 import 'device_id.dart';
 import 'l10n.dart';
@@ -15,6 +16,7 @@ import 'push_service.dart';
 /// 발신자가 취소하면(상태 canceled) 자동으로 닫힌다.
 class IncomingCallScreen extends StatefulWidget {
   final String callId;
+  final String fromUuid;
   final String fromName;
   final String room;
   final bool video;
@@ -22,6 +24,7 @@ class IncomingCallScreen extends StatefulWidget {
   const IncomingCallScreen({
     super.key,
     required this.callId,
+    required this.fromUuid,
     required this.fromName,
     required this.room,
     required this.video,
@@ -64,14 +67,17 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     cancelIncomingCallNotification();
     // 수신 벨을 계속(반복) 울린다.
     _startRing();
-    // 발신자가 취소/종료(문서 삭제 포함)하면 자동으로 닫기.
+    // 발신자가 취소/종료(문서 삭제 포함)하면 = 부재중.
     _sub = CallSignaling.watch(widget.callId).listen((c) {
-      if (!mounted || _answering) return;
-      if (c == null ||
+      if (!mounted || _answering || _closed) return;
+      final callerEnded = c == null ||
           c.status == CallStatus.canceled ||
-          c.status == CallStatus.ended ||
-          c.status == CallStatus.declined) {
+          c.status == CallStatus.ended;
+      if (callerEnded) {
+        _onMissed();
         _close(L.t('call_canceled_by_caller'));
+      } else if (c.status == CallStatus.declined) {
+        _close(); // 내가(또는 다른기기서) 거절 처리됨
       }
     });
   }
@@ -104,9 +110,29 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     }
   }
 
+  void _onMissed() {
+    // 부재중 기록 + 알림(1회).
+    CallLog.add(CallLogEntry(
+      peerUuid: widget.fromUuid,
+      peerName: widget.fromName,
+      type: CallType.missed,
+      video: widget.video,
+      ts: DateTime.now().millisecondsSinceEpoch,
+    ));
+    PushService.instance.showMissedCall(widget.fromName);
+  }
+
   Future<void> _accept() async {
     _stopRing();
     setState(() => _answering = true);
+    // 받은 전화 기록.
+    CallLog.add(CallLogEntry(
+      peerUuid: widget.fromUuid,
+      peerName: widget.fromName,
+      type: CallType.incoming,
+      video: widget.video,
+      ts: DateTime.now().millisecondsSinceEpoch,
+    ));
     await CallSignaling.setStatus(widget.callId, CallStatus.accepted);
     final uuid = await DeviceId.uuid();
     final nm = await DeviceId.name();

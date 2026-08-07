@@ -191,6 +191,10 @@ class L {
     'cam_flip': {'ko': '카메라 전환', 'en': 'Flip camera'},
     // ── 설정 ──
     'menu_settings': {'ko': '설정', 'en': 'Settings'},
+    'menu_history': {'ko': '통화 기록', 'en': 'Call history'},
+    'history_empty': {'ko': '통화 기록이 없습니다.', 'en': 'No call history.'},
+    'clear': {'ko': '지우기', 'en': 'Clear'},
+    'peer_busy': {'ko': '상대가 통화 중입니다.', 'en': 'They are on another call.'},
     'require_accept': {'ko': '수락형 친구요청', 'en': 'Require accepted friends'},
     'require_accept_sub': {
       'ko': '켜면 내 친구가 아닌 사람의 전화는 자동 거절됩니다. (기본 꺼짐)',

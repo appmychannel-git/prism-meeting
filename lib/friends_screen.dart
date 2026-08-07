@@ -20,6 +20,7 @@ class FriendsScreen extends StatefulWidget {
 class _FriendsScreenState extends State<FriendsScreen> {
   List<Friend> _friends = [];
   List<Friend> _suggestions = []; // 나를 추가했지만 내가 아직 안 추가한 사람
+  final Map<String, DeviceStatus> _status = {}; // uuid → 온라인/통화중/이름
   String _myUuid = '';
   String _myName = '';
   bool _loading = true;
@@ -52,6 +53,36 @@ class _FriendsScreenState extends State<FriendsScreen> {
       _suggestions = sugg;
       _loading = false;
     });
+    _loadStatuses(fs); // 온라인/통화중 + 이름 동기화(비동기, 뒤에 갱신)
+  }
+
+  /// 각 친구의 현재 상태(온라인/통화중)와 최신 이름을 조회해 갱신.
+  Future<void> _loadStatuses(List<Friend> friends) async {
+    var nameChanged = false;
+    for (final f in friends) {
+      final st = await DirectoryService.status(f.uuid);
+      if (st == null) continue;
+      _status[f.uuid] = st;
+      // 상대가 이름을 바꿨으면 로컬 친구 이름도 갱신(자동 동기화).
+      if (st.name.isNotEmpty && st.name != f.name) {
+        await FriendStore.add(Friend(uuid: f.uuid, name: st.name));
+        nameChanged = true;
+      }
+    }
+    if (!mounted) return;
+    if (nameChanged) {
+      _friends = await FriendStore.list();
+    }
+    setState(() {});
+  }
+
+  /// 상태 색: 온라인=초록, 통화중=주황, 오프라인=회색.
+  Color? _statusColor(String uuid) {
+    final st = _status[uuid];
+    if (st == null) return null;
+    if (st.busy) return const Color(0xFFF59E0B);
+    if (st.online) return const Color(0xFF4ADE80);
+    return const Color(0xFF6B7280);
   }
 
   /// 친구추가(로컬 저장 + 서버에 "내가 추가함" 기록 → 상대 추천에 내가 뜸).
@@ -253,12 +284,32 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   Widget _friendTile(Friend f) {
+    final dot = _statusColor(f.uuid);
     return ListTile(
-      leading: CircleAvatar(
-        child: Text((f.name.isNotEmpty ? f.name : '?')
-            .characters
-            .first
-            .toUpperCase()),
+      leading: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          CircleAvatar(
+            child: Text((f.name.isNotEmpty ? f.name : '?')
+                .characters
+                .first
+                .toUpperCase()),
+          ),
+          if (dot != null)
+            Positioned(
+              right: -1,
+              bottom: -1,
+              child: Container(
+                width: 13,
+                height: 13,
+                decoration: BoxDecoration(
+                  color: dot,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF0E1116), width: 2),
+                ),
+              ),
+            ),
+        ],
       ),
       title: Text(f.name.isNotEmpty ? f.name : L.t('unnamed')),
       subtitle: Text(

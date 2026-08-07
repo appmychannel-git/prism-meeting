@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'call_history_screen.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'friends_screen.dart';
@@ -367,6 +368,18 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                   );
                 },
               ),
+              if (AppConfig.callEnabled)
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: Text(L.t('menu_history')),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const CallHistoryScreen()),
+                    );
+                  },
+                ),
               if (AppConfig.callEnabled)
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import 'call_log.dart';
 import 'call_screen.dart';
 import 'call_signaling.dart';
 import 'config.dart';
 import 'connection_service.dart';
+import 'directory.dart';
 import 'friends.dart';
 import 'l10n.dart';
 import 'outgoing_call_screen.dart';
@@ -23,11 +25,29 @@ Future<void> startDmCall(
   required Friend friend,
   required bool video,
 }) async {
+  // 상대가 통화 중이면 헛걸기 방지(오프라인은 FCM으로 울리므로 허용).
+  final st = await DirectoryService.status(friend.uuid);
+  if (st != null && st.busy) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(L.t('peer_busy'))));
+    return;
+  }
+
   final ids = [myUuid, friend.uuid]..sort();
   final room = 'dm-${ids.join('-')}';
   final name = myName.isNotEmpty ? myName : L.t('guest');
   final callId = const Uuid().v4();
   final startedAtMs = DateTime.now().millisecondsSinceEpoch;
+
+  // 통화 기록(건 전화).
+  CallLog.add(CallLogEntry(
+    peerUuid: friend.uuid,
+    peerName: friend.name,
+    type: CallType.outgoing,
+    video: video,
+    ts: startedAtMs,
+  ));
 
   try {
     await CallSignaling.createCall(
