@@ -43,13 +43,16 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   Future<void> _startRing() async {
     try {
       await _ringtone.setReleaseMode(ReleaseMode.loop); // 계속 반복
-      // 벨소리 스트림(ringtone)으로 라우팅 → 미디어 음량과 무관하게 울림.
+      // 알람 스트림으로 라우팅 → 미디어 음량과 무관하게 크게(앱 꺼졌을 때 알림과 동일 크기).
       await _ringtone.setAudioContext(AudioContext(
         android: const AudioContextAndroid(
-          isSpeakerphoneOn: true,
-          usageType: AndroidUsageType.notificationRingtone,
+          isSpeakerphoneOn: false,
+          contentType: AndroidContentType.sonification,
+          usageType: AndroidUsageType.alarm,
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
         ),
       ));
+      await _ringtone.setVolume(1.0);
       await _ringtone.play(AssetSource('sounds/ring_classic.wav'), volume: 1.0);
     } catch (_) {}
     // 진동도 함께 반복(대기 0.8s, 진동 0.6s 패턴 루프).
