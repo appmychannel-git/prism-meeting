@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'auth_service.dart';
 import 'call_signaling.dart';
 import 'config.dart';
 import 'device_id.dart';
@@ -122,6 +123,8 @@ class PushService {
       await msg.requestPermission(); // Android 13+ 알림 권한 프롬프트 포함
 
       _myUuid = await DeviceId.uuid();
+      // Firestore 접근 전에 우리 uuid 로 로그인(보안 규칙용). 실패해도 진행.
+      await AuthService.ensureSignedIn(_myUuid!);
       await _registerDevice();
       msg.onTokenRefresh.listen((_) => _registerDevice());
 
@@ -184,10 +187,16 @@ class PushService {
       final uuid = _myUuid ?? await DeviceId.uuid();
       final name = await DeviceId.name();
       final token = await FirebaseMessaging.instance.getToken();
-      await FirebaseFirestore.instance.collection('devices').doc(uuid).set({
+      final db = FirebaseFirestore.instance;
+      // 프로필(이름/플랫폼): 친구에게 이름 표시용 → 인증 사용자면 조회 가능.
+      await db.collection('devices').doc(uuid).set({
         'name': name,
-        'fcmToken': token,
         'platform': defaultTargetPlatform.name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      // FCM 토큰: 클라이언트는 못 읽는 별도 컬렉션(서버 Admin만 읽음) → 토큰 탈취 방지.
+      await db.collection('deviceTokens').doc(uuid).set({
+        'fcmToken': token,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
