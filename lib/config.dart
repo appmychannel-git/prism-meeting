@@ -76,7 +76,9 @@ class AppConfig {
           defaultTargetPlatform == TargetPlatform.iOS);
 
   /// 실제 활성 여부 = 빌드 플래그 AND 플랫폼 지원.
-  static bool get cctvEnabled => _enableCctv && supportsDeviceFeatures;
+  /// CCTV는 기기 UUID/FCM이 필요 없고(방+비밀번호 기반), 시청은 PC/웹도 대상이라
+  /// supportsDeviceFeatures 를 요구하지 않는다(빌드 플래그만).
+  static bool get cctvEnabled => _enableCctv;
   static bool get friendsEnabled => _enableFriends && supportsDeviceFeatures;
   static bool get callEnabled => _enableCall && supportsDeviceFeatures;
 

@@ -199,6 +199,36 @@ class L {
     'unblock': {'ko': '차단 해제', 'en': 'Unblock'},
     'blocked_list': {'ko': '차단 목록', 'en': 'Blocked'},
     'blocked_empty': {'ko': '차단한 사람이 없습니다.', 'en': 'No blocked people.'},
+    // ── CCTV ──
+    'menu_cctv': {'ko': 'CCTV', 'en': 'CCTV'},
+    'cctv_share': {'ko': '이 기기를 CCTV로 공유', 'en': 'Share this device as CCTV'},
+    'cctv_share_desc': {
+      'ko': '이 기기 카메라를 송출합니다(화면 켜둔 동안).',
+      'en': "Broadcast this device's camera (while screen is on).",
+    },
+    'cctv_view': {'ko': 'CCTV 시청', 'en': 'View CCTV'},
+    'cctv_code': {'ko': '코드', 'en': 'Code'},
+    'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
+    'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},
+    'cctv_need_code_pw': {
+      'ko': '코드와 비밀번호를 입력하세요.',
+      'en': 'Enter the code and password.',
+    },
+    'cctv_share_hint': {
+      'ko': '시청자는 CCTV 시청에서 위 코드와 비밀번호(또는 QR)로 접속합니다. '
+          '이 화면을 나가면 송출이 중지됩니다.',
+      'en': 'Viewers connect with the code + password (or QR). '
+          'Leaving this screen stops the broadcast.',
+    },
+    'cctv_viewers': {'ko': '시청자 {n}명', 'en': '{n} viewer(s)'},
+    'cctv_waiting': {'ko': '카메라 신호 대기 중...', 'en': 'Waiting for camera...'},
+    'cctv_continue_title': {'ko': '계속 시청', 'en': 'Keep watching'},
+    'cctv_continue_msg': {
+      'ko': '계속 시청하시겠습니까? (응답이 없으면 자동 종료됩니다)',
+      'en': 'Keep watching? (Auto-stops if no response)',
+    },
+    'cctv_continue': {'ko': '계속 시청', 'en': 'Keep watching'},
+    'cctv_stop': {'ko': '종료', 'en': 'Stop'},
     'require_accept': {'ko': '수락형 친구요청', 'en': 'Require accepted friends'},
     'require_accept_sub': {
       'ko': '켜면 내 친구가 아닌 사람의 전화는 자동 거절됩니다. (기본 꺼짐)',

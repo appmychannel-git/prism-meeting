@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'call_history_screen.dart';
+import 'cctv_hub_screen.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'friends_screen.dart';
@@ -391,6 +392,20 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                     );
                   },
                 ),
+              const Divider(),
+            ],
+            // CCTV(브랜드별 플래그로 노출). 친구·통화와 독립.
+            if (AppConfig.cctvEnabled) ...[
+              ListTile(
+                leading: const Icon(Icons.videocam_outlined),
+                title: Text(L.t('menu_cctv')),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const CctvHubScreen()),
+                  );
+                },
+              ),
               const Divider(),
             ],
             ListTile(
