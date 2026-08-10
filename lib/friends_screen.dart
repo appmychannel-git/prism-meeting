@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'block_store.dart';
 import 'call.dart';
+import 'confirm_dialog.dart';
 import 'device_id.dart';
 import 'directory.dart';
 import 'friends.dart';
@@ -380,6 +381,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
   }
 
   Future<void> _removeFriend(Friend f) async {
+    if (!await confirmDialog(context, L.t('confirm_remove_friend'),
+        confirmLabel: L.t('remove_friend'))) {
+      return;
+    }
     await FriendStore.remove(f.uuid);
     // 서버 관계도 제거해야 복구 로직이 되살리지 않음.
     await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
@@ -389,6 +394,10 @@ class _FriendsScreenState extends State<FriendsScreen> {
   /// 친구 목록에서 바로 차단: 차단목록 추가 + 친구 삭제 + 서버 관계 제거.
   /// (차단하면 그 사람의 전화가 자동 거절되고, 추천에도 안 뜬다.)
   Future<void> _blockFriend(Friend f) async {
+    if (!await confirmDialog(context, L.t('confirm_block'),
+        confirmLabel: L.t('block'))) {
+      return;
+    }
     await BlockStore.add(f);
     await FriendStore.remove(f.uuid);
     await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);

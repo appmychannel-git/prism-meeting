@@ -196,6 +196,19 @@ class L {
     'clear': {'ko': '지우기', 'en': 'Clear'},
     'peer_busy': {'ko': '상대가 통화 중입니다.', 'en': 'They are on another call.'},
     'block': {'ko': '차단', 'en': 'Block'},
+    'delete': {'ko': '삭제', 'en': 'Delete'},
+    'confirm_remove_friend': {
+      'ko': '이 친구를 삭제할까요?',
+      'en': 'Remove this friend?',
+    },
+    'confirm_block': {
+      'ko': '이 사람을 차단할까요? 전화가 자동 거절됩니다.',
+      'en': 'Block this person? Their calls will be auto-declined.',
+    },
+    'confirm_remove_cctv': {
+      'ko': '이 CCTV를 목록에서 삭제할까요?',
+      'en': 'Remove this CCTV from the list?',
+    },
     'unblock': {'ko': '차단 해제', 'en': 'Unblock'},
     'blocked_list': {'ko': '차단 목록', 'en': 'Blocked'},
     'blocked_empty': {'ko': '차단한 사람이 없습니다.', 'en': 'No blocked people.'},

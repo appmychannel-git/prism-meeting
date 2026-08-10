@@ -4,6 +4,7 @@ import 'cctv_share_screen.dart';
 import 'cctv_store.dart';
 import 'cctv_view_screen.dart';
 import 'config.dart';
+import 'confirm_dialog.dart';
 import 'device_id.dart';
 import 'directory.dart';
 import 'l10n.dart';
@@ -131,6 +132,11 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
                       IconButton(
                         icon: const Icon(Icons.delete_outline),
                         onPressed: () async {
+                          if (!await confirmDialog(
+                              context, L.t('confirm_remove_cctv'),
+                              confirmLabel: L.t('delete'))) {
+                            return;
+                          }
                           await CctvStore.remove(e.code);
                           await _load();
                         },
