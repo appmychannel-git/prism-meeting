@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <!-- 정사각 mmy 아이콘을 풀블리드 전경으로(런처 마스크로 둥글게).
+         @drawable/ic_launcher_foreground(실제 이미지) 참조 — 순환참조 방지. -->
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

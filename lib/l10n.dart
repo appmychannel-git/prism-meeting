@@ -144,6 +144,104 @@ class L {
     },
     'transcript': {'ko': '자막 기록', 'en': 'Transcript'},
 
+    // ── 메뉴 / 친구 · 통화 ──
+    'menu': {'ko': '메뉴', 'en': 'Menu'},
+    'menu_my_id': {'ko': '내 ID (QR)', 'en': 'My ID (QR)'},
+    'menu_friends': {'ko': '친구', 'en': 'Friends'},
+    'my_id_title': {'ko': '내 ID', 'en': 'My ID'},
+    'my_id_desc': {
+      'ko': '상대가 이 QR을 스캔하면 나를 친구로 추가하거나 전화할 수 있어요.',
+      'en': 'Others can scan this QR to add you as a friend or call you.',
+    },
+    'my_id_name_hint': {'ko': '친구에게 보일 이름', 'en': 'Name shown to friends'},
+    'friends_empty': {
+      'ko': '아직 친구가 없습니다.\nQR을 스캔해 친구를 추가하세요.',
+      'en': 'No friends yet.\nScan a QR to add a friend.',
+    },
+    'scan_qr': {'ko': 'QR 스캔', 'en': 'Scan QR'},
+    'add_friend': {'ko': '친구 추가', 'en': 'Add friend'},
+    'already_friend': {'ko': '이미 친구', 'en': 'Already a friend'},
+    'friend_added': {'ko': '친구로 추가했습니다', 'en': 'Added as a friend'},
+    'remove_friend': {'ko': '친구 삭제', 'en': 'Remove friend'},
+    'call_voice': {'ko': '음성통화', 'en': 'Voice call'},
+    'call_video': {'ko': '영상통화', 'en': 'Video call'},
+    'scan_invalid': {'ko': '올바른 ID QR이 아닙니다.', 'en': 'Not a valid ID QR.'},
+    'calling': {'ko': '전화 거는 중...', 'en': 'Calling...'},
+    'unnamed': {'ko': '이름 없음', 'en': 'Unnamed'},
+
+    // ── 통화(발신/수신) ──
+    'incoming_voice': {'ko': '음성통화 수신', 'en': 'Incoming voice call'},
+    'incoming_video': {'ko': '영상통화 수신', 'en': 'Incoming video call'},
+    'call_accept': {'ko': '수락', 'en': 'Accept'},
+    'call_decline': {'ko': '거절', 'en': 'Decline'},
+    'call_cancel': {'ko': '취소', 'en': 'Cancel'},
+    'call_calling': {'ko': '연결 중...', 'en': 'Ringing...'},
+    'call_connecting': {'ko': '입장 중...', 'en': 'Connecting...'},
+    'call_declined': {'ko': '상대가 통화를 거절했습니다.', 'en': 'Call was declined.'},
+    'call_no_answer': {'ko': '응답이 없습니다.', 'en': 'No answer.'},
+    'call_canceled_by_caller': {
+      'ko': '통화가 취소되었습니다.',
+      'en': 'The call was canceled.',
+    },
+    'call_failed': {'ko': '통화 연결에 실패했습니다', 'en': 'Failed to place the call'},
+    'call_hangup': {'ko': '통화 종료', 'en': 'Hang up'},
+    'call_ended': {'ko': '통화가 종료되었습니다.', 'en': 'Call ended.'},
+    'speaker': {'ko': '스피커', 'en': 'Speaker'},
+    'earpiece': {'ko': '수화기', 'en': 'Earpiece'},
+    'cam_flip': {'ko': '카메라 전환', 'en': 'Flip camera'},
+    // ── 설정 ──
+    'menu_settings': {'ko': '설정', 'en': 'Settings'},
+    'menu_history': {'ko': '통화 기록', 'en': 'Call history'},
+    'history_empty': {'ko': '통화 기록이 없습니다.', 'en': 'No call history.'},
+    'clear': {'ko': '지우기', 'en': 'Clear'},
+    'peer_busy': {'ko': '상대가 통화 중입니다.', 'en': 'They are on another call.'},
+    'block': {'ko': '차단', 'en': 'Block'},
+    'unblock': {'ko': '차단 해제', 'en': 'Unblock'},
+    'blocked_list': {'ko': '차단 목록', 'en': 'Blocked'},
+    'blocked_empty': {'ko': '차단한 사람이 없습니다.', 'en': 'No blocked people.'},
+    'require_accept': {'ko': '수락형 친구요청', 'en': 'Require accepted friends'},
+    'require_accept_sub': {
+      'ko': '켜면 내 친구가 아닌 사람의 전화는 자동 거절됩니다. (기본 꺼짐)',
+      'en': 'When on, calls from non-friends are auto-declined. (Default off)',
+    },
+    'my_id_need_name': {
+      'ko': '먼저 아래에서 표시 이름을 입력하면\nQR이 생성됩니다.',
+      'en': 'Enter a display name below\nto generate your QR.',
+    },
+    // ── 코드/링크 공유 · 친구 추천 ──
+    'my_code': {'ko': '내 코드', 'en': 'My code'},
+    'code_copied': {'ko': '코드를 복사했습니다', 'en': 'Code copied'},
+    'copy': {'ko': '복사', 'en': 'Copy'},
+    'share_my_link': {'ko': '내 ID 링크 공유', 'en': 'Share my ID link'},
+    'add_by_code': {'ko': '코드로 추가', 'en': 'Add by code'},
+    'code_hint': {'ko': '상대의 코드 입력 (예: ABC123)', 'en': "Enter their code (e.g. ABC123)"},
+    'code_not_found': {
+      'ko': '코드를 찾을 수 없습니다. 다시 확인하세요.',
+      'en': 'Code not found. Please check it.',
+    },
+    'friend_suggestions': {'ko': '친구 추천 (나를 추가한 사람)', 'en': 'Suggestions (added you)'},
+    'added_you': {'ko': '나를 친구추가함', 'en': 'Added you'},
+    'from_gallery': {'ko': '갤러리에서 선택', 'en': 'Choose from gallery'},
+    // ── 전체화면 통화 알림 권한(Android 14+) ──
+    'fs_perm_title': {'ko': '통화 알림 권한', 'en': 'Call notification permission'},
+    'fs_perm_desc': {
+      'ko': '잠금화면에서도 전화가 울리려면 "전체 화면 알림"을 허용해야 합니다. '
+          '설정을 열어 허용해 주세요. (허용 전엔 상단 알림으로만 표시됩니다)',
+      'en': 'To ring on the lock screen, allow "full-screen notifications". '
+          'Open settings to enable it. (Otherwise it shows only as a banner.)',
+    },
+    'fs_perm_menu': {'ko': '통화 알림 설정', 'en': 'Call notification settings'},
+    'fs_perm_menu_sub': {
+      'ko': '잠금화면 통화 표시 허용',
+      'en': 'Allow full-screen call on lock screen',
+    },
+    'open_settings': {'ko': '설정 열기', 'en': 'Open settings'},
+    'later': {'ko': '나중에', 'en': 'Later'},
+    'qr_not_found': {
+      'ko': '이미지에서 QR을 찾지 못했습니다.',
+      'en': 'No QR code found in the image.',
+    },
+
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},
     'usb_camera': {'ko': 'USB 카메라', 'en': 'USB camera'},

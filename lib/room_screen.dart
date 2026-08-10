@@ -59,6 +59,9 @@ class RoomScreen extends StatefulWidget {
   final bool isHost; // 방을 만든 사람(방장) → 나가면 방 종료
   // 링크로 바로 입장한 경우 true → 입장 직후 이름 설정 팝업을 띄운다.
   final bool promptNameOnEnter;
+  // 통화 진입 시 카메라 시작 여부 강제(영상통화=true, 음성통화=false).
+  // null이면 기본 정책(AppConfig.startCamera) 사용.
+  final bool? startVideo;
 
   const RoomScreen({
     super.key,
@@ -68,6 +71,7 @@ class RoomScreen extends StatefulWidget {
     this.pin,
     this.isHost = false,
     this.promptNameOnEnter = false,
+    this.startVideo,
   });
 
   @override
@@ -188,7 +192,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
       _loadCameras();
     });
-    _initSpeech();
+    if (AppConfig.showTranslation) _initSpeech();
     _connect();
   }
 
@@ -247,6 +251,8 @@ class _RoomScreenState extends State<RoomScreen> {
         _syncScreenShareState();
       })
       ..on<ParticipantNameUpdatedEvent>((_) => _onRoomChange()) // 이름 변경 반영
+      ..on<ParticipantConnectionQualityUpdatedEvent>(
+          (_) => _onRoomChange()) // 인터넷(연결) 품질 변화 반영
       ..on<ActiveSpeakersChangedEvent>((_) {
         final speakers = _room.activeSpeakers;
         if (speakers.isNotEmpty) _spotlightIdentity = speakers.first.identity;
@@ -732,22 +738,53 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<void> _enableLocalDevices() async {
     final lp = _room.localParticipant;
     if (lp == null) return;
-    try {
-      await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
-    } catch (_) {
-      // 기본(내장) 카메라 실패 → 외장/사용 가능한 카메라로 재시도.
-      // 내장 카메라 없는 TV에 USB 웹캠을 꽂은 경우 여기서 자동으로 잡힌다.
-      final ok = await _tryEnableAnyCamera();
-      if (!ok && mounted) setState(() => _camOn = false);
-    }
+
+    // 마이크 먼저 켠다(회의 핵심). 카메라 문제로 오디오가 막히지 않게.
     try {
       await lp.setMicrophoneEnabled(true).timeout(const Duration(seconds: 8));
     } catch (_) {
       if (mounted) setState(() => _micOn = false);
     }
-    // 라벨이 채워진(권한 허용 후) 카메라 목록 로드
-    await _loadCameras();
-    // 처음 켜진(기본) 카메라의 deviceId를 파악해 선택 메뉴 체크 표시에 반영
+
+    // 카메라 자동 켜기 여부: 통화 진입 시 startVideo(영상=true/음성=false)가 우선,
+    // 없으면 빌드 정책(START_CAMERA). 끄면 카메라 시도 자체를 안 한다(고장난
+    // 카메라 기기 UI 멈춤 회피 + 음성통화).
+    final wantCamera = widget.startVideo ?? AppConfig.startCamera;
+    if (!wantCamera) {
+      if (mounted) setState(() => _camOn = false);
+      try {
+        _cameras = await Hardware.instance
+            .videoInputs()
+            .timeout(const Duration(seconds: 5));
+        if (mounted) setState(() {});
+      } catch (_) {}
+      return;
+    }
+
+    // 카메라: 기기에 카메라가 "있는지 먼저 확인" 후에만 켠다.
+    // 카메라 없는 태블릿/TV박스에서 setCameraEnabled 가 네이티브(Camera2)에서
+    // 멈춰 UI 전체가 굳던 문제 방지(카메라 연결 시에만 버튼이 눌리던 증상).
+    List<MediaDevice> cams = const [];
+    try {
+      cams = await Hardware.instance
+          .videoInputs()
+          .timeout(const Duration(seconds: 5));
+    } catch (_) {}
+    if (mounted) setState(() => _cameras = cams);
+
+    if (cams.isEmpty) {
+      // 카메라 없음 → 아바타로 참여(시도 안 함).
+      if (mounted) setState(() => _camOn = false);
+    } else {
+      try {
+        await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
+      } catch (_) {
+        // 기본(내장) 실패 → 외장/사용 가능한 카메라로 재시도(USB 웹캠 등).
+        final ok = await _tryEnableAnyCamera();
+        if (!ok && mounted) setState(() => _camOn = false);
+      }
+    }
+    // 처음 켜진 카메라의 deviceId를 선택 메뉴 체크 표시에 반영
     _syncCurrentCameraId();
   }
 
@@ -1607,7 +1644,8 @@ class _RoomScreenState extends State<RoomScreen> {
                 }
               },
               itemBuilder: (_) => [
-                // ── 자막 ──
+                // ── 자막·번역 (SHOW_TRANSLATION=false 빌드에선 숨김) ──
+                if (AppConfig.showTranslation) ...[
                 PopupMenuItem<String>(
                   value: 'caption',
                   child: Row(
@@ -1667,6 +1705,7 @@ class _RoomScreenState extends State<RoomScreen> {
                     ],
                   ),
                 ),
+                ],
                 const PopupMenuDivider(),
                 PopupMenuItem<String>(
                   value: 'applang',
@@ -2024,6 +2063,11 @@ class _ParticipantTile extends StatelessWidget {
                           color: Colors.white,
                         ),
                       ),
+                      // 인터넷(연결) 품질 표시 — 화면공유 타일 제외.
+                      if (!isScreen) ...[
+                        const SizedBox(width: 6),
+                        _QualityIcon(p.connectionQuality),
+                      ],
                     ],
                   ),
                 ),
@@ -2033,6 +2077,39 @@ class _ParticipantTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// 참가자 인터넷(연결) 품질 아이콘. unknown 이면 표시 안 함.
+class _QualityIcon extends StatelessWidget {
+  final ConnectionQuality quality;
+  const _QualityIcon(this.quality);
+
+  @override
+  Widget build(BuildContext context) {
+    IconData icon;
+    Color color;
+    switch (quality) {
+      case ConnectionQuality.excellent:
+        icon = Icons.signal_cellular_alt;
+        color = const Color(0xFF4ADE80);
+        break;
+      case ConnectionQuality.good:
+        icon = Icons.signal_cellular_alt_2_bar;
+        color = const Color(0xFFFACC15);
+        break;
+      case ConnectionQuality.poor:
+        icon = Icons.signal_cellular_alt_1_bar;
+        color = const Color(0xFFFF6B6B);
+        break;
+      case ConnectionQuality.lost:
+        icon = Icons.signal_cellular_off;
+        color = const Color(0xFFFF6B6B);
+        break;
+      case ConnectionQuality.unknown:
+        return const SizedBox.shrink();
+    }
+    return Icon(icon, size: 14, color: color);
   }
 }
 

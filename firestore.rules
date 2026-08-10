@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// Prism/MyChannel Meeting — Firestore 보안 규칙
+//
+// 원리: "아무나 앱은 쓰되, 자기·당사자 데이터에만 접근"(은행 앱과 동일).
+// 앱은 토큰서버 /authtoken 으로 받은 커스텀 토큰으로 로그인하므로
+// request.auth.uid == 그 기기의 uuid 이다.
+//
+// 적용 순서(중요):
+//   1) Firebase 콘솔 → Authentication → "시작하기"(Identity Toolkit 활성화)
+//   2) 인증 포함된 새 앱 설치·실행(자동 로그인)
+//   3) 이 규칙을 콘솔 → Firestore → 규칙에 붙여넣고 "게시"
+// (서버는 Admin 권한이라 이 규칙의 영향을 받지 않는다 — /call 등 그대로 동작)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+
+    // 기기 프로필(이름/플랫폼): 친구 이름 표시용 → 로그인 사용자 조회, 쓰기는 본인만.
+    match /devices/{id} {
+      allow read: if signedIn();
+      allow write: if signedIn() && uid() == id;
+    }
+
+    // FCM 토큰: 클라이언트는 절대 못 읽음(서버 Admin만). 쓰기는 본인만.
+    match /deviceTokens/{id} {
+      allow read: if false;
+      allow write: if signedIn() && uid() == id;
+    }
+
+    // 코드 → uuid: 로그인 사용자 조회, 생성/수정은 "내 uuid"를 가리키는 코드만.
+    match /codes/{code} {
+      allow read: if signedIn();
+      allow write: if signedIn() && request.resource.data.uuid == uid();
+    }
+
+    // 친구 관계(내가 상대를 추가): 당사자만 조회, 생성·수정·삭제는 from(추가한 사람)만.
+    match /edges/{id} {
+      allow read: if signedIn() &&
+        (resource.data.from == uid() || resource.data.to == uid());
+      allow create: if signedIn() && request.resource.data.from == uid();
+      allow update, delete: if signedIn() && resource.data.from == uid();
+    }
+
+    // 통화: 발신자·수신자만.
+    match /calls/{id} {
+      allow read: if signedIn() &&
+        (resource.data.fromUuid == uid() || resource.data.toUuid == uid());
+      allow create: if signedIn() && request.resource.data.fromUuid == uid();
+      allow update, delete: if signedIn() &&
+        (resource.data.fromUuid == uid() || resource.data.toUuid == uid());
+    }
+
+    // 그 외 전부 차단.
+    match /{document=**} { allow read, write: if false; }
+  }
+}
