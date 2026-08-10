@@ -350,18 +350,48 @@ class _FriendsScreenState extends State<FriendsScreen> {
             tooltip: L.t('call_video'),
             onPressed: () => _call(f, video: true),
           ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: L.t('remove_friend'),
-            onPressed: () async {
-              await FriendStore.remove(f.uuid);
-              // 서버 관계도 제거해야 복구 로직이 되살리지 않음.
-              await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
-              await _load();
+          PopupMenuButton<String>(
+            onSelected: (v) {
+              if (v == 'remove') _removeFriend(f);
+              if (v == 'block') _blockFriend(f);
             },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'remove',
+                child: Row(children: [
+                  const Icon(Icons.delete_outline, size: 20),
+                  const SizedBox(width: 10),
+                  Text(L.t('remove_friend')),
+                ]),
+              ),
+              PopupMenuItem(
+                value: 'block',
+                child: Row(children: [
+                  const Icon(Icons.block, size: 20, color: Color(0xFFFF6B6B)),
+                  const SizedBox(width: 10),
+                  Text(L.t('block')),
+                ]),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _removeFriend(Friend f) async {
+    await FriendStore.remove(f.uuid);
+    // 서버 관계도 제거해야 복구 로직이 되살리지 않음.
+    await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
+    await _load();
+  }
+
+  /// 친구 목록에서 바로 차단: 차단목록 추가 + 친구 삭제 + 서버 관계 제거.
+  /// (차단하면 그 사람의 전화가 자동 거절되고, 추천에도 안 뜬다.)
+  Future<void> _blockFriend(Friend f) async {
+    await BlockStore.add(f);
+    await FriendStore.remove(f.uuid);
+    await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
+    await _load();
   }
 }
