@@ -11,6 +11,7 @@ import 'app_settings.dart';
 import 'auth_service.dart';
 import 'block_store.dart';
 import 'call_signaling.dart';
+import 'cctv_share_screen.dart';
 import 'config.dart';
 import 'device_id.dart';
 import 'directory.dart';
@@ -22,6 +23,7 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 /// 수신 통화 풀스크린 알림 ID(한 번에 한 통화 → 고정 ID로 갱신/취소).
 const int kIncomingCallNotifId = 1001;
+const int kCctvWakeNotifId = 1002;
 // 커스텀 벨소리(res/raw/ring_classic)를 쓰려고 새 채널 ID로 만든다.
 // (안드로이드는 채널 생성 후 사운드를 못 바꾸므로 기존 'incoming_calls' 대신 신규.)
 const String kCallChannelId = 'incoming_calls_v2';
@@ -92,12 +94,59 @@ Future<void> cancelIncomingCallNotification() async {
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   final d = message.data;
-  if (d['type'] != 'incoming_call') return;
-  await showIncomingCallNotification(
-    callId: (d['callId'] ?? '').toString(),
-    fromName: (d['fromName'] ?? '').toString(),
-    video: d['video'] == 'true' || d['video'] == true,
-  );
+  final type = d['type'];
+  if (type == 'incoming_call') {
+    await showIncomingCallNotification(
+      callId: (d['callId'] ?? '').toString(),
+      fromName: (d['fromName'] ?? '').toString(),
+      video: d['video'] == 'true' || d['video'] == true,
+    );
+  } else if (type == 'cctv_wake') {
+    // 대기모드에서 CCTV 송출을 시작하도록 풀스크린 알림으로 앱을 깨운다.
+    await showCctvWakeNotification();
+  }
+}
+
+/// CCTV 원격 켜기 풀스크린 알림 — 잠금/대기화면 위로 앱을 실행해 송출 시작.
+Future<void> showCctvWakeNotification() async {
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin
+        .initialize(settings: const InitializationSettings(android: androidInit));
+    const channel = AndroidNotificationChannel(
+      kCallChannelId,
+      '수신 전화',
+      importance: Importance.max,
+    );
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+    const details = AndroidNotificationDetails(
+      kCallChannelId,
+      '수신 전화',
+      importance: Importance.max,
+      priority: Priority.max,
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true,
+      ongoing: true,
+      autoCancel: false,
+    );
+    await plugin.show(
+      id: kCctvWakeNotifId,
+      title: 'CCTV',
+      body: 'CCTV 송출을 시작합니다',
+      notificationDetails: const NotificationDetails(android: details),
+      payload: 'cctv_wake',
+    );
+  } catch (_) {}
+}
+
+Future<void> cancelCctvWakeNotification() async {
+  try {
+    await FlutterLocalNotificationsPlugin().cancel(id: kCctvWakeNotifId);
+  } catch (_) {}
 }
 
 /// FCM(수신벨) + 기기 등록(Firestore) 을 담당.
@@ -118,11 +167,16 @@ class PushService with WidgetsBindingObserver {
   Future<void> initIfEnabled() async {
     if (_started) return;
     if (!AppConfig.supportsDeviceFeatures) return;
-    if (!(AppConfig.callEnabled || AppConfig.friendsEnabled)) return;
+    if (!(AppConfig.callEnabled ||
+        AppConfig.friendsEnabled ||
+        AppConfig.cctvEnabled)) {
+      return;
+    }
     try {
       await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       await _createCallChannel(); // 수신벨용 고importance 채널(백그라운드 헤드업+소리)
+      await _setupLocalNotifRouting(); // 알림으로 앱 실행 시 라우팅(CCTV 원격 켜기)
 
       final msg = FirebaseMessaging.instance;
       await msg.requestPermission(); // Android 13+ 알림 권한 프롬프트 포함
@@ -167,6 +221,29 @@ class PushService with WidgetsBindingObserver {
       _started = true;
     } catch (e) {
       debugPrint('[PushService] init skipped: $e');
+    }
+  }
+
+  /// 알림 탭/풀스크린으로 앱이 열린 경우 라우팅(CCTV 원격 켜기).
+  Future<void> _setupLocalNotifRouting() async {
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      await plugin.initialize(
+        settings: const InitializationSettings(android: androidInit),
+        onDidReceiveNotificationResponse: (resp) {
+          if (resp.payload == 'cctv_wake') _showCctvShare();
+        },
+      );
+      // 종료 상태에서 CCTV 깨우기 알림으로 실행된 경우.
+      final launch = await plugin.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp == true &&
+          launch?.notificationResponse?.payload == 'cctv_wake') {
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _showCctvShare());
+      }
+    } catch (e) {
+      debugPrint('[PushService] notif routing setup failed: $e');
     }
   }
 
@@ -292,6 +369,10 @@ class PushService with WidgetsBindingObserver {
 
   void _onRemoteMessage(RemoteMessage m) {
     final d = m.data;
+    if (d['type'] == 'cctv_wake') {
+      _showCctvShare();
+      return;
+    }
     if (d['type'] != 'incoming_call') return;
     _showIncoming(
       callId: (d['callId'] ?? '').toString(),
@@ -300,6 +381,15 @@ class PushService with WidgetsBindingObserver {
       room: (d['room'] ?? '').toString(),
       video: d['video'] == 'true' || d['video'] == true,
     );
+  }
+
+  /// CCTV 원격 켜기 수신 → 송출 화면 열기(중복 방지).
+  void _showCctvShare() {
+    cancelCctvWakeNotification();
+    if (CctvShareScreen.active) return; // 이미 송출 중이면 무시
+    final nav = appNavigatorKey.currentState;
+    if (nav == null) return;
+    nav.push(MaterialPageRoute(builder: (_) => const CctvShareScreen()));
   }
 
   void _onIncomingDoc(CallDoc c) {

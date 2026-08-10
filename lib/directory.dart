@@ -1,5 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+
+import 'config.dart';
 import 'friends.dart';
 
 /// 상대 기기의 현재 상태(온라인/통화중/이름).
@@ -151,6 +155,47 @@ class DirectoryService {
     } catch (_) {
       return [];
     }
+  }
+
+  // ── CCTV 원격 켜기 ──
+
+  /// 이 기기를 "원격 켜기 가능한 CCTV 카메라"로 등록(code → 내 uuid).
+  static Future<void> registerCctvCamera({
+    required String code,
+    required String uuid,
+    required String name,
+  }) async {
+    if (code.isEmpty || uuid.isEmpty) return;
+    try {
+      await _db.collection('cctvCameras').doc(code).set({
+        'uuid': uuid,
+        'name': name,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
+  static Future<void> unregisterCctvCamera(String code) async {
+    if (code.isEmpty) return;
+    try {
+      await _db.collection('cctvCameras').doc(code).delete();
+    } catch (_) {}
+  }
+
+  /// 시청자가 CCTV 기기를 원격으로 깨운다(토큰서버 /cctv-wake → FCM).
+  /// 실패해도 예외 없음(이미 켜져 있으면 그냥 시청됨).
+  static Future<void> requestCctvWake(String code) async {
+    final url =
+        AppConfig.tokenServerUrl.replaceFirst(RegExp(r'/token/?$'), '/cctv-wake');
+    try {
+      await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'code': code}),
+          )
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   /// 나를 친구추가한 사람들(단일 equality 쿼리 → 복합색인 불필요).

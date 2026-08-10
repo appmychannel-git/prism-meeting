@@ -7,11 +7,16 @@ import 'cctv_store.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'l10n.dart';
+import 'push_service.dart';
 
 /// CCTV 공유(카메라) 화면 — 이 기기 카메라를 송출한다.
 /// 이 화면을 켜둔 동안만 송출(나가면 종료). QR(코드)+비밀번호로 시청자가 접속.
 class CctvShareScreen extends StatefulWidget {
   const CctvShareScreen({super.key});
+
+  /// 원격 켜기 중복 실행 방지용(송출 화면이 떠 있는지).
+  static bool active = false;
+
   @override
   State<CctvShareScreen> createState() => _CctvShareScreenState();
 }
@@ -37,6 +42,8 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   @override
   void initState() {
     super.initState();
+    CctvShareScreen.active = true;
+    cancelCctvWakeNotification(); // 원격 켜기 알림이 있었다면 정리
     WakelockPlus.enable();
     _listener
       ..on<ParticipantConnectedEvent>((_) => _updateViewers())
@@ -55,6 +62,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
 
   @override
   void dispose() {
+    CctvShareScreen.active = false;
     WakelockPlus.disable();
     _listener.dispose();
     _room.dispose();

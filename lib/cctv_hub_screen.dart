@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'cctv_share_screen.dart';
 import 'cctv_store.dart';
 import 'cctv_view_screen.dart';
+import 'config.dart';
+import 'device_id.dart';
+import 'directory.dart';
 import 'l10n.dart';
 import 'scan_screen.dart';
 
@@ -18,6 +21,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   final _codeCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   List<CctvEntry> _saved = [];
+  bool _isCamera = false;
 
   @override
   void initState() {
@@ -35,8 +39,27 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
 
   Future<void> _load() async {
     final s = await CctvStore.list();
+    final cam = await CctvStore.isCamera();
     if (!mounted) return;
-    setState(() => _saved = s);
+    setState(() {
+      _saved = s;
+      _isCamera = cam;
+    });
+  }
+
+  /// 이 기기를 "대기 중 원격 켜기 가능한 CCTV"로 등록/해제.
+  Future<void> _toggleCamera(bool on) async {
+    final (code, _) = await CctvStore.myShareCredentials();
+    final uuid = await DeviceId.uuid();
+    final name = await DeviceId.name();
+    if (on) {
+      await DirectoryService.registerCctvCamera(
+          code: code, uuid: uuid, name: name.isNotEmpty ? name : 'CCTV');
+    } else {
+      await DirectoryService.unregisterCctvCamera(code);
+    }
+    await CctvStore.setIsCamera(on);
+    if (mounted) setState(() => _isCamera = on);
   }
 
   Future<void> _scan() async {
@@ -49,6 +72,8 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   }
 
   void _open(CctvEntry e) {
+    // 대기 중인 CCTV면 원격으로 깨운다(이미 켜져 있으면 무시됨).
+    DirectoryService.requestCctvWake(e.code);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => CctvViewScreen(roomId: e.roomId, pin: e.pin),
     ));
@@ -130,6 +155,17 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
               },
             ),
           ),
+          // 대기 중 원격 켜기 등록(모바일 기기만 — 카메라 + 푸시 필요)
+          if (AppConfig.supportsDeviceFeatures)
+            Card(
+              child: SwitchListTile(
+                secondary: const Icon(Icons.power_settings_new),
+                title: Text(L.t('cctv_remote_register')),
+                subtitle: Text(L.t('cctv_remote_register_sub')),
+                value: _isCamera,
+                onChanged: _toggleCamera,
+              ),
+            ),
           const SizedBox(height: 20),
 
           // 새 CCTV 추가(시청)

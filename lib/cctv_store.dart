@@ -27,6 +27,18 @@ class CctvStore {
   static const _kMyCode = 'cctv_my_code';
   static const _kMyPin = 'cctv_my_pin';
   static const _kSaved = 'cctv_saved';
+  static const _kIsCamera = 'cctv_is_camera';
+
+  /// 이 기기가 "대기 중 원격 켜기 가능한 CCTV 카메라"로 등록됐는지.
+  static Future<bool> isCamera() async {
+    final sp = await SharedPreferences.getInstance();
+    return sp.getBool(_kIsCamera) ?? false;
+  }
+
+  static Future<void> setIsCamera(bool v) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool(_kIsCamera, v);
+  }
 
   /// 이 기기를 CCTV로 공유할 때 쓰는 **고정** 코드/비번(최초 1회 생성 후 유지).
   static Future<(String code, String pin)> myShareCredentials() async {

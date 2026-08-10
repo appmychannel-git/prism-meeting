@@ -64,7 +64,10 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
         participantName: 'Viewer',
         identity: 'viewer-${DateTime.now().millisecondsSinceEpoch}',
         pin: widget.pin,
-        create: false, // 시청자는 생성 안 함(없는 CCTV면 거부)
+        // 원격 켜기 중이면 카메라가 아직 방을 안 만들었을 수 있어, 시청자가 방을
+        // 먼저 만들어 두고 기다린다(cctv- 방은 create 중복 허용). 카메라가 깨어나
+        // 같은 방에 들어와 송출하면 화면에 뜬다.
+        create: true,
       );
       await _room.connect(d.serverUrl, d.token,
           connectOptions: const ConnectOptions(autoSubscribe: true));

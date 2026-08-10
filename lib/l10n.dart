@@ -215,6 +215,14 @@ class L {
     'cctv_add_view': {'ko': '추가하고 시청', 'en': 'Add & view'},
     'cctv_name': {'ko': '이름(선택)', 'en': 'Name (optional)'},
     'cctv_name_hint': {'ko': '예: 거실 TV', 'en': 'e.g. Living room TV'},
+    'cctv_remote_register': {
+      'ko': '대기 중 원격 켜기 허용',
+      'en': 'Allow remote wake (standby)',
+    },
+    'cctv_remote_register_sub': {
+      'ko': '켜면 이 기기가 대기 중이어도 시청 요청 시 자동으로 CCTV를 켭니다.',
+      'en': 'When on, this device auto-starts CCTV on a view request even from standby.',
+    },
     'cctv_need_code_pw': {
       'ko': '코드와 비밀번호를 입력하세요.',
       'en': 'Enter the code and password.',

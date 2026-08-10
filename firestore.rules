@@ -52,6 +52,14 @@ service cloud.firestore {
         (resource.data.fromUuid == uid() || resource.data.toUuid == uid());
     }
 
+    // CCTV 카메라 등록부(code → 소유 기기 uuid). 조회는 서버(Admin)만,
+    // 생성·수정·삭제는 본인(uuid) 것만.
+    match /cctvCameras/{code} {
+      allow read: if false;
+      allow create, update: if signedIn() && request.resource.data.uuid == uid();
+      allow delete: if signedIn() && resource.data.uuid == uid();
+    }
+
     // 그 외 전부 차단.
     match /{document=**} { allow read, write: if false; }
   }
