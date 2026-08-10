@@ -113,9 +113,14 @@ Future<void> joinDmRoom(
   String? err;
   try {
     try {
-      details = await _fetch(room, name, uuid, create: false);
+      details = await _fetch(room, name, uuid, create: false); // 참여
     } catch (_) {
-      details = await _fetch(room, name, uuid, create: true);
+      try {
+        details = await _fetch(room, name, uuid, create: true); // 없으면 생성
+      } catch (_) {
+        // 경쟁 조건(상대가 방금 만들어 "이미 사용 중") → 다시 참여 시도.
+        details = await _fetch(room, name, uuid, create: false);
+      }
     }
   } catch (e) {
     err = e.toString().replaceFirst('Exception: ', '');
