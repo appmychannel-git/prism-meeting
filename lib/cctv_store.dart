@@ -1,0 +1,83 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'config.dart';
+
+/// 저장된 CCTV(시청 목록) 한 건.
+class CctvEntry {
+  final String code; // cctv- 제외한 코드
+  final String pin;
+  final String name;
+  const CctvEntry({required this.code, required this.pin, required this.name});
+
+  Map<String, dynamic> toJson() => {'code': code, 'pin': pin, 'name': name};
+  factory CctvEntry.fromJson(Map<String, dynamic> j) => CctvEntry(
+        code: (j['code'] ?? '').toString(),
+        pin: (j['pin'] ?? '').toString(),
+        name: (j['name'] ?? '').toString(),
+      );
+
+  String get roomId => 'cctv-$code';
+}
+
+/// CCTV 로컬 저장: ① 내 공유 기기의 고정 코드/비번 ② 시청 목록.
+class CctvStore {
+  static const _kMyCode = 'cctv_my_code';
+  static const _kMyPin = 'cctv_my_pin';
+  static const _kSaved = 'cctv_saved';
+
+  /// 이 기기를 CCTV로 공유할 때 쓰는 **고정** 코드/비번(최초 1회 생성 후 유지).
+  static Future<(String code, String pin)> myShareCredentials() async {
+    final sp = await SharedPreferences.getInstance();
+    var code = sp.getString(_kMyCode);
+    var pin = sp.getString(_kMyPin);
+    if (code == null || code.isEmpty) {
+      code = AppConfig.generateRoomCode();
+      pin = (1000 + Random().nextInt(9000)).toString(); // 4자리
+      await sp.setString(_kMyCode, code);
+      await sp.setString(_kMyPin, pin);
+    }
+    return (code, pin ?? '');
+  }
+
+  // ── 시청 목록 ──
+  static Future<List<CctvEntry>> list() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kSaved);
+    if (raw == null || raw.isEmpty) return [];
+    try {
+      final arr = jsonDecode(raw) as List;
+      return arr
+          .map((e) => CctvEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static Future<void> _save(List<CctvEntry> items) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(
+        _kSaved, jsonEncode(items.map((e) => e.toJson()).toList()));
+  }
+
+  /// 시청 목록에 추가/갱신(코드 기준). 다음부턴 목록에서 원터치 시청.
+  static Future<void> add(CctvEntry e) async {
+    final items = await list();
+    final i = items.indexWhere((x) => x.code == e.code);
+    if (i >= 0) {
+      items[i] = e;
+    } else {
+      items.add(e);
+    }
+    await _save(items);
+  }
+
+  static Future<void> remove(String code) async {
+    final items = await list();
+    items.removeWhere((x) => x.code == code);
+    await _save(items);
+  }
+}

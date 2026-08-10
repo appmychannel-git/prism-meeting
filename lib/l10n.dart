@@ -210,6 +210,11 @@ class L {
     'cctv_code': {'ko': '코드', 'en': 'Code'},
     'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
     'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},
+    'cctv_my_list': {'ko': '내 CCTV', 'en': 'My CCTV'},
+    'cctv_add': {'ko': '새 CCTV 추가', 'en': 'Add CCTV'},
+    'cctv_add_view': {'ko': '추가하고 시청', 'en': 'Add & view'},
+    'cctv_name': {'ko': '이름(선택)', 'en': 'Name (optional)'},
+    'cctv_name_hint': {'ko': '예: 거실 TV', 'en': 'e.g. Living room TV'},
     'cctv_need_code_pw': {
       'ko': '코드와 비밀번호를 입력하세요.',
       'en': 'Enter the code and password.',

@@ -1,10 +1,9 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'cctv_store.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'l10n.dart';
@@ -28,9 +27,9 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   );
   late final EventsListener<RoomEvent> _listener = _room.createListener();
 
-  late final String _code; // 표시/입력용 코드(cctv- 제외)
-  late final String _roomId; // 실제 방 이름 cctv-<code>
-  late final String _pin;
+  String _code = ''; // 표시/입력용 코드(cctv- 제외). 이 기기 고정값.
+  String _roomId = ''; // 실제 방 이름 cctv-<code>
+  String _pin = '';
   bool _connecting = true;
   String? _error;
   int _viewers = 0;
@@ -38,14 +37,20 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   @override
   void initState() {
     super.initState();
-    _code = AppConfig.generateRoomCode();
-    _roomId = 'cctv-$_code';
-    _pin = (1000 + Random().nextInt(9000)).toString(); // 4자리
     WakelockPlus.enable();
     _listener
       ..on<ParticipantConnectedEvent>((_) => _updateViewers())
       ..on<ParticipantDisconnectedEvent>((_) => _updateViewers());
-    _connect();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // 이 기기의 고정 코드/비번(최초 1회 생성 후 유지) → 매번 같은 코드로 공유.
+    final (code, pin) = await CctvStore.myShareCredentials();
+    _code = code;
+    _roomId = 'cctv-$code';
+    _pin = pin;
+    await _connect();
   }
 
   @override

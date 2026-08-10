@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import 'cctv_share_screen.dart';
+import 'cctv_store.dart';
 import 'cctv_view_screen.dart';
 import 'l10n.dart';
 import 'scan_screen.dart';
 
-/// CCTV 허브 — 공유(카메라) / 시청 진입.
+/// CCTV 허브 — 내 CCTV(저장) 시청 / 새 CCTV 추가 / 이 기기 공유.
 class CctvHubScreen extends StatefulWidget {
   const CctvHubScreen({super.key});
   @override
@@ -13,19 +14,29 @@ class CctvHubScreen extends StatefulWidget {
 }
 
 class _CctvHubScreenState extends State<CctvHubScreen> {
+  final _nameCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
+  List<CctvEntry> _saved = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
 
   @override
   void dispose() {
+    _nameCtrl.dispose();
     _codeCtrl.dispose();
     _pinCtrl.dispose();
     super.dispose();
   }
 
-  String _roomIdFrom(String code) {
-    final c = code.trim();
-    return c.startsWith('cctv-') ? c : 'cctv-$c';
+  Future<void> _load() async {
+    final s = await CctvStore.list();
+    if (!mounted) return;
+    setState(() => _saved = s);
   }
 
   Future<void> _scan() async {
@@ -33,12 +44,18 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       MaterialPageRoute(builder: (_) => const ScanScreen()),
     );
     if (raw == null || !mounted) return;
-    // QR은 방ID(cctv-...) 를 담고 있음. 코드 칸에 표시.
     _codeCtrl.text = raw.startsWith('cctv-') ? raw.substring(5) : raw;
     setState(() {});
   }
 
-  void _view() {
+  void _open(CctvEntry e) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => CctvViewScreen(roomId: e.roomId, pin: e.pin),
+    ));
+  }
+
+  /// 새 CCTV 추가 → 목록에 저장하고 바로 시청.
+  Future<void> _addAndView() async {
     final code = _codeCtrl.text.trim();
     final pin = _pinCtrl.text.trim();
     if (code.isEmpty || pin.isEmpty) {
@@ -46,9 +63,15 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
           .showSnackBar(SnackBar(content: Text(L.t('cctv_need_code_pw'))));
       return;
     }
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => CctvViewScreen(roomId: _roomIdFrom(code), pin: pin),
-    ));
+    final name = _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : code;
+    final e = CctvEntry(code: code, pin: pin, name: name);
+    await CctvStore.add(e); // 저장 → 다음부턴 목록에서 원터치
+    _nameCtrl.clear();
+    _codeCtrl.clear();
+    _pinCtrl.clear();
+    await _load();
+    if (!mounted) return;
+    _open(e);
   }
 
   @override
@@ -56,25 +79,73 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     return Scaffold(
       appBar: AppBar(title: Text(L.t('menu_cctv'))),
       body: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         children: [
-          // 공유
+          // 내 CCTV(저장된 것) — 원터치 시청
+          if (_saved.isNotEmpty) ...[
+            Text(L.t('cctv_my_list'),
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, color: Colors.white70)),
+            const SizedBox(height: 8),
+            for (final e in _saved)
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.videocam),
+                  title: Text(e.name),
+                  subtitle: Text(e.code,
+                      style: const TextStyle(fontSize: 12)),
+                  onTap: () => _open(e),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.play_arrow),
+                        tooltip: L.t('cctv_start_view'),
+                        onPressed: () => _open(e),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () async {
+                          await CctvStore.remove(e.code);
+                          await _load();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            const SizedBox(height: 20),
+          ],
+
+          // 이 기기 공유
           Card(
             child: ListTile(
-              leading: const Icon(Icons.videocam, size: 32),
+              leading: const Icon(Icons.cast, size: 30),
               title: Text(L.t('cctv_share')),
               subtitle: Text(L.t('cctv_share_desc')),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CctvShareScreen()),
-              ),
+              onTap: () async {
+                await Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CctvShareScreen()),
+                );
+              },
             ),
           ),
           const SizedBox(height: 20),
-          // 시청
-          Text(L.t('cctv_view'),
+
+          // 새 CCTV 추가(시청)
+          Text(L.t('cctv_add'),
               style: const TextStyle(
                   fontWeight: FontWeight.bold, color: Colors.white70)),
           const SizedBox(height: 10),
+          TextField(
+            controller: _nameCtrl,
+            maxLength: 20,
+            decoration: InputDecoration(
+              labelText: L.t('cctv_name'),
+              hintText: L.t('cctv_name_hint'),
+              border: const OutlineInputBorder(),
+            ),
+          ),
           TextField(
             controller: _codeCtrl,
             decoration: InputDecoration(
@@ -99,9 +170,9 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            onPressed: _view,
-            icon: const Icon(Icons.play_arrow),
-            label: Text(L.t('cctv_start_view')),
+            onPressed: _addAndView,
+            icon: const Icon(Icons.add),
+            label: Text(L.t('cctv_add_view')),
           ),
         ],
       ),
