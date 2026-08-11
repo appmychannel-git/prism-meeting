@@ -228,42 +228,45 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       context: context,
       backgroundColor: const Color(0xFF0E1116),
       showDragHandle: true,
+      isScrollControlled: true, // 내용이 길면 화면 높이만큼 확장
       builder: (_) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: SizedBox(
-                    width: 200,
-                    height: 200,
-                    child: PrettyQrView.data(
-                      data: _roomId,
-                      decoration: const PrettyQrDecoration(
-                        shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: SizedBox(
+                      width: 170,
+                      height: 170,
+                      child: PrettyQrView.data(
+                        data: _roomId,
+                        decoration: const PrettyQrDecoration(
+                          shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _kv(L.t('cctv_code'), _code),
-              const SizedBox(height: 8),
-              _kv(L.t('cctv_password'), _pin),
-              const SizedBox(height: 16),
-              Text(
-                L.t('cctv_share_hint'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: Colors.white70),
-              ),
-            ],
+                const SizedBox(height: 16),
+                _kv(L.t('cctv_code'), _code),
+                const SizedBox(height: 10),
+                _kv(L.t('cctv_password'), _pin),
+                const SizedBox(height: 16),
+                Text(
+                  L.t('cctv_share_hint'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 13, color: Colors.white70),
+                ),
+              ],
+            ),
           ),
         ),
       ),
