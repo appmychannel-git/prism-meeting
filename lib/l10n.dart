@@ -229,6 +229,8 @@ class L {
       'en': "Broadcast this device's camera (while screen is on).",
     },
     'cctv_view': {'ko': 'CCTV 시청', 'en': 'View CCTV'},
+    'cctv_tab_view': {'ko': '시청', 'en': 'View'},
+    'cctv_tab_share': {'ko': '송출', 'en': 'Share'},
     'cctv_code': {'ko': '코드', 'en': 'Code'},
     'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
     'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},

@@ -102,122 +102,147 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(L.t('menu_cctv'))),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 내 CCTV(저장된 것) — 원터치 시청
-          if (_saved.isNotEmpty) ...[
-            Text(L.t('cctv_my_list'),
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold, color: Colors.white70)),
-            const SizedBox(height: 8),
-            for (final e in _saved)
-              Card(
-                child: ListTile(
-                  leading: const Icon(Icons.videocam),
-                  title: Text(e.name),
-                  subtitle: Text(e.code,
-                      style: const TextStyle(fontSize: 12)),
-                  onTap: () => _open(e),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.play_arrow),
-                        tooltip: L.t('cctv_start_view'),
-                        onPressed: () => _open(e),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () async {
-                          if (!await confirmDialog(
-                              context, L.t('confirm_remove_cctv'),
-                              confirmLabel: L.t('delete'))) {
-                            return;
-                          }
-                          await CctvStore.remove(e.code);
-                          await _load();
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            const SizedBox(height: 20),
-          ],
-
-          // 이 기기 공유
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.cast, size: 30),
-              title: Text(L.t('cctv_share')),
-              subtitle: Text(L.t('cctv_share_desc')),
-              onTap: () async {
-                await Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const CctvShareScreen()),
-                );
-              },
-            ),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(L.t('menu_cctv')),
+          bottom: TabBar(
+            tabs: [
+              Tab(icon: const Icon(Icons.play_circle_outline),
+                  text: L.t('cctv_tab_view')),
+              Tab(icon: const Icon(Icons.cast),
+                  text: L.t('cctv_tab_share')),
+            ],
           ),
-          // 대기 중 원격 켜기 등록(모바일 기기만 — 카메라 + 푸시 필요)
-          if (AppConfig.supportsDeviceFeatures)
+        ),
+        body: TabBarView(
+          children: [
+            _viewTab(),
+            _shareTab(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 시청 탭: 저장한 CCTV 목록 + 새 CCTV 추가.
+  Widget _viewTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (_saved.isNotEmpty) ...[
+          Text(L.t('cctv_my_list'),
+              style: const TextStyle(
+                  fontWeight: FontWeight.bold, color: Colors.white70)),
+          const SizedBox(height: 8),
+          for (final e in _saved)
             Card(
-              child: SwitchListTile(
-                secondary: const Icon(Icons.power_settings_new),
-                title: Text(L.t('cctv_remote_register')),
-                subtitle: Text(L.t('cctv_remote_register_sub')),
-                value: _isCamera,
-                onChanged: _toggleCamera,
+              child: ListTile(
+                leading: const Icon(Icons.videocam),
+                title: Text(e.name),
+                subtitle:
+                    Text(e.code, style: const TextStyle(fontSize: 12)),
+                onTap: () => _open(e),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.play_arrow),
+                      tooltip: L.t('cctv_start_view'),
+                      onPressed: () => _open(e),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () async {
+                        if (!await confirmDialog(
+                            context, L.t('confirm_remove_cctv'),
+                            confirmLabel: L.t('delete'))) {
+                          return;
+                        }
+                        await CctvStore.remove(e.code);
+                        await _load();
+                      },
+                    ),
+                  ],
+                ),
               ),
             ),
           const SizedBox(height: 20),
-
-          // 새 CCTV 추가(시청)
-          Text(L.t('cctv_add'),
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, color: Colors.white70)),
-          const SizedBox(height: 10),
-          TextField(
-            controller: _nameCtrl,
-            maxLength: 20,
-            decoration: InputDecoration(
-              labelText: L.t('cctv_name'),
-              hintText: L.t('cctv_name_hint'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          TextField(
-            controller: _codeCtrl,
-            decoration: InputDecoration(
-              labelText: L.t('cctv_code'),
-              hintText: 'abc-def-hij',
-              border: const OutlineInputBorder(),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.qr_code_scanner),
-                tooltip: L.t('scan_qr'),
-                onPressed: _scan,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _pinCtrl,
-            keyboardType: TextInputType.number,
-            decoration: InputDecoration(
-              labelText: L.t('cctv_password'),
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: _addAndView,
-            icon: const Icon(Icons.add),
-            label: Text(L.t('cctv_add_view')),
-          ),
         ],
-      ),
+        Text(L.t('cctv_add'),
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: Colors.white70)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _nameCtrl,
+          maxLength: 20,
+          decoration: InputDecoration(
+            labelText: L.t('cctv_name'),
+            hintText: L.t('cctv_name_hint'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        TextField(
+          controller: _codeCtrl,
+          decoration: InputDecoration(
+            labelText: L.t('cctv_code'),
+            hintText: 'abc-def-hij',
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              icon: const Icon(Icons.qr_code_scanner),
+              tooltip: L.t('scan_qr'),
+              onPressed: _scan,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _pinCtrl,
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: L.t('cctv_password'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 16),
+        FilledButton.icon(
+          onPressed: _addAndView,
+          icon: const Icon(Icons.add),
+          label: Text(L.t('cctv_add_view')),
+        ),
+      ],
+    );
+  }
+
+  // 송출 탭: 이 기기 공유 + 대기 중 원격 켜기.
+  Widget _shareTab() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.cast, size: 30),
+            title: Text(L.t('cctv_share')),
+            subtitle: Text(L.t('cctv_share_desc')),
+            onTap: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const CctvShareScreen()),
+              );
+            },
+          ),
+        ),
+        if (AppConfig.supportsDeviceFeatures)
+          Card(
+            child: SwitchListTile(
+              secondary: const Icon(Icons.power_settings_new),
+              title: Text(L.t('cctv_remote_register')),
+              subtitle: Text(L.t('cctv_remote_register_sub')),
+              value: _isCamera,
+              onChanged: _toggleCamera,
+            ),
+          ),
+      ],
     );
   }
 }
