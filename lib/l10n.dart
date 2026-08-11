@@ -83,12 +83,12 @@ class L {
       'en': 'Enter the password to join.',
     },
     'entry_code_join': {
-      'ko': '입장 코드 (비공개 방일 경우)',
-      'en': 'Entry code (if private room)',
+      'ko': '비밀번호',
+      'en': 'Password',
     },
     'entry_code_join_hint': {
-      'ko': '공개 방이면 비워두세요',
-      'en': 'Leave blank for public rooms',
+      'ko': '방 비밀번호를 입력하세요',
+      'en': 'Enter the room password',
     },
     'my_name_opt': {'ko': '내 이름 (선택)', 'en': 'My name (optional)'},
     'connecting': {'ko': '접속 중...', 'en': 'Connecting...'},
@@ -104,8 +104,8 @@ class L {
     },
     'err_room_required': {'ko': '방 코드를 입력하세요.', 'en': 'Please enter a room code.'},
     'err_private_pin': {
-      'ko': '비공개 방은 입장 코드를 입력하세요.',
-      'en': 'A private room requires an entry code.',
+      'ko': '비밀번호를 입력하세요.',
+      'en': 'Please enter a password.',
     },
     'err_no_token': {
       'ko': '토큰 서버 주소가 설정되지 않았습니다. (LK_TOKEN_URL)',
