@@ -348,18 +348,17 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
-            DrawerHeader(
-              decoration: const BoxDecoration(color: Color(0xFF2E5AC0)),
-              margin: EdgeInsets.zero,
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Text(
-                  AppConfig.appBrand,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+            // 파란 헤더를 컴팩트한 바로 축소(기본 DrawerHeader는 높이가 큼).
+            Container(
+              width: double.infinity,
+              color: const Color(0xFF2E5AC0),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Text(
+                AppConfig.appBrand,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
