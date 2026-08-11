@@ -40,7 +40,6 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   late final FocusNode _nameFocus = _fieldNode();
 
   _Tab _tab = _Tab.create;
-  bool _private = false; // 방 만들기: 비공개 방 여부
   bool _connecting = false;
   String? _error;
   bool _autoJoining = false; // 초대 링크로 자동 입장 중(폼 대신 로딩 표시)
@@ -139,9 +138,18 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     } else {
       assign();
     }
-    // 첫 프레임 후 이름 팝업 → 확인/랜덤=바로 입장, 취소/닫기=참여하기 폼 유지
+    // 링크에 pin 이 있으면(레거시) 바로 입장, 없으면(보안 기본) 비밀번호를
+    // 직접 입력하도록 참여 폼에서 비밀번호 칸에 포커스.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _promptNameThenJoin();
+      if (!mounted) return;
+      if ((pin ?? '').trim().isNotEmpty) {
+        _promptNameThenJoin();
+      } else {
+        _pinFocus.requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L.t('enter_pw_to_join'))),
+        );
+      }
     });
   }
 
@@ -269,12 +277,9 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       } else {
         final custom = _customCtrl.text.trim();
         room = custom.isEmpty ? AppConfig.generateRoomCode() : custom;
-        if (_private) {
-          pin = _pinCtrl.text.trim();
-          if (pin.isEmpty) throw Exception(L.t('err_private_pin'));
-        } else {
-          pin = '';
-        }
+        // 보안: 회의 방은 비밀번호 필수(모든 방이 비공개).
+        pin = _pinCtrl.text.trim();
+        if (pin.isEmpty) throw Exception(L.t('err_private_pin'));
       }
 
       final name = _nameCtrl.text.trim().isEmpty
@@ -555,66 +560,23 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                         ),
                       SizedBox(height: gap),
 
-                      // 방 만들기: 비공개 체크 + (체크 시) 옆에 입장 코드
+                      // 방 만들기: 비밀번호 필수(모든 방 비공개). QR엔 안 담기고 직접 입력.
                       if (!isJoin)
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // 행 전체를 InkWell로 → 리모컨(D-pad) 포커스 이동 가능
-                            Expanded(
-                              child: InkWell(
-                                onTap: () =>
-                                    setState(() => _private = !_private),
-                                borderRadius: BorderRadius.circular(8),
-                                focusColor: Colors.white24,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      // 체크박스는 포커스 대상에서 제외(InkWell이 담당)
-                                      ExcludeFocus(
-                                        child: Checkbox(
-                                          value: _private,
-                                          onChanged: (v) => setState(
-                                            () => _private = v ?? false,
-                                          ),
-                                        ),
-                                      ),
-                                      Flexible(
-                                        child: Text(
-                                          L.t('private_room'),
-                                          style: const TextStyle(fontSize: 14),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_private) ...[
-                              const SizedBox(width: 8),
-                              SizedBox(
-                                width: 180,
-                                child: TextField(
-                                  controller: _pinCtrl,
-                                  focusNode: _pinFocus,
-                                  textInputAction: TextInputAction.next,
-                                  keyboardType: TextInputType.number,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(6),
-                                  ],
-                                  decoration: InputDecoration(
-                                    labelText: L.t('entry_code'),
-                                    hintText: L.t('entry_code_hint6'),
-                                    border: const OutlineInputBorder(),
-                                  ),
-                                ),
-                              ),
-                            ],
+                        TextField(
+                          controller: _pinCtrl,
+                          focusNode: _pinFocus,
+                          textInputAction: TextInputAction.next,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(6),
                           ],
+                          decoration: InputDecoration(
+                            labelText: L.t('entry_code_req'),
+                            hintText: L.t('entry_code_hint6'),
+                            prefixIcon: const Icon(Icons.password_outlined),
+                            border: const OutlineInputBorder(),
+                          ),
                         ),
 
                       // 참여 탭: 입장 코드(선택) 전체폭

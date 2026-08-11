@@ -1250,14 +1250,15 @@ class _RoomScreenState extends State<RoomScreen> {
               L.t('room_code_val', {'room': widget.roomName}),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            if (widget.pin != null && widget.pin!.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  L.t('entry_code_val', {'pin': widget.pin!}),
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
+            // 보안: 비밀번호는 QR/초대 화면에 노출하지 않는다(방장이 별도로 전달).
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                L.t('invite_pw_note'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 12, color: Colors.white60),
               ),
+            ),
             const SizedBox(height: 8),
             Text(
               L.t('qr_scan_hint'),

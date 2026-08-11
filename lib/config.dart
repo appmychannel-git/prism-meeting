@@ -163,9 +163,10 @@ class AppConfig {
     return _inviteBaseNative;
   }
 
+  /// 초대 링크. 보안상 **비밀번호는 링크/QR에 담지 않는다**(직접 입력하도록).
+  /// pin 파라미터는 호출부 호환을 위해 남겨두지만 무시한다.
   static String inviteLink(String room, {String? pin}) {
     final params = <String, String>{'room': room};
-    if (pin != null && pin.isNotEmpty) params['pin'] = pin;
     final base = inviteBaseUrl;
     final sep = base.contains('?') ? '&' : '?';
     return '$base$sep${Uri(queryParameters: params).query}';

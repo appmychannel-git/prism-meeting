@@ -72,7 +72,16 @@ class L {
     },
     'private_room': {'ko': '비공개 방 (입장 코드)', 'en': 'Private room (entry code)'},
     'entry_code': {'ko': '입장 코드', 'en': 'Entry code'},
+    'entry_code_req': {'ko': '비밀번호(필수)', 'en': 'Password (required)'},
     'entry_code_hint6': {'ko': '숫자 6자리', 'en': '6 digits'},
+    'invite_pw_note': {
+      'ko': '비밀번호는 방장이 따로 알려줍니다 (QR에 포함 안 됨).',
+      'en': 'The host shares the password separately (not in the QR).',
+    },
+    'enter_pw_to_join': {
+      'ko': '비밀번호를 입력하고 참여하세요.',
+      'en': 'Enter the password to join.',
+    },
     'entry_code_join': {
       'ko': '입장 코드 (비공개 방일 경우)',
       'en': 'Entry code (if private room)',
