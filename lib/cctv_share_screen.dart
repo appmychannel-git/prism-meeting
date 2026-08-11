@@ -142,6 +142,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                   ),
                 )
               : Stack(
+                  fit: StackFit.expand, // Stack 이 화면 전체를 차지하도록
                   children: [
                     // 송출 영상 전체화면
                     Positioned.fill(
@@ -157,11 +158,15 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                               ),
                             ),
                     ),
-                    // 상단 오버레이: 뒤로 · LIVE·시청자 · QR/비번 버튼
-                    SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
+                    // 상단 오버레이: 뒤로 · LIVE·시청자 · QR/비번 버튼 (상단 고정)
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
                           children: [
                             _overlayBtn(Icons.arrow_back,
                                 () => Navigator.of(context).maybePop()),
@@ -193,6 +198,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                             _overlayBtn(Icons.qr_code_2, _showShareInfo),
                           ],
                         ),
+                      ),
                       ),
                     ),
                   ],
