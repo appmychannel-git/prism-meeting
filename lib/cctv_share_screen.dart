@@ -131,7 +131,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(L.t('cctv_share'))),
+      backgroundColor: Colors.black,
       body: _connecting
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -141,93 +141,126 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                     child: Text(_error!, textAlign: TextAlign.center),
                   ),
                 )
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // 방송 중 표시(빨간 배지) — 카메라가 켜져 있음을 명확히.
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE5484D),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.fiber_manual_record,
-                                  size: 12, color: Colors.white),
-                              const SizedBox(width: 6),
-                              Text(L.t('cctv_live_badge'),
-                                  style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      // 내 카메라 미리보기
-                      AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            color: const Color(0xFF1A1F27),
-                            child: _localCam() != null
-                                ? VideoTrackRenderer(_localCam()!,
-                                    fit: VideoViewFit.cover)
-                                : const Center(
-                                    child: Icon(Icons.videocam_off,
-                                        color: Colors.white38, size: 40)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        L.t('cctv_viewers', {'n': '$_viewers'}),
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white54),
-                      ),
-                      const SizedBox(height: 16),
-                      // QR + 코드 + 비밀번호
-                      Center(
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: SizedBox(
-                            width: 190,
-                            height: 190,
-                            child: PrettyQrView.data(
-                              data: _roomId,
-                              decoration: const PrettyQrDecoration(
-                                shape: PrettyQrSmoothSymbol(
-                                    color: Color(0xFF000000)),
+              : Stack(
+                  children: [
+                    // 송출 영상 전체화면
+                    Positioned.fill(
+                      child: _localCam() != null
+                          ? VideoTrackRenderer(_localCam()!,
+                              fit: VideoViewFit.cover,
+                              mirrorMode: VideoViewMirrorMode.off)
+                          : Container(
+                              color: const Color(0xFF1A1F27),
+                              child: const Center(
+                                child: Icon(Icons.videocam_off,
+                                    color: Colors.white38, size: 48),
                               ),
                             ),
-                          ),
+                    ),
+                    // 상단 오버레이: 뒤로 · LIVE·시청자 · QR/비번 버튼
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          children: [
+                            _overlayBtn(Icons.arrow_back,
+                                () => Navigator.of(context).maybePop()),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE5484D),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.fiber_manual_record,
+                                      size: 12, color: Colors.white),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '${L.t('cctv_live_badge')} · ${L.t('cctv_viewers', {'n': '$_viewers'})}',
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Spacer(),
+                            // 우측 상단: QR·비밀번호 보기
+                            _overlayBtn(Icons.qr_code_2, _showShareInfo),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      _kv(L.t('cctv_code'), _code),
-                      const SizedBox(height: 8),
-                      _kv(L.t('cctv_password'), _pin),
-                      const SizedBox(height: 16),
-                      Text(
-                        L.t('cctv_share_hint'),
-                        textAlign: TextAlign.center,
-                        style:
-                            const TextStyle(fontSize: 13, color: Colors.white70),
+                    ),
+                  ],
+                ),
+    );
+  }
+
+  // 반투명 원형 오버레이 버튼.
+  Widget _overlayBtn(IconData icon, VoidCallback onTap) {
+    return Material(
+      color: Colors.black.withValues(alpha: 0.45),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(icon, color: Colors.white, size: 24),
+        ),
+      ),
+    );
+  }
+
+  // QR + 코드 + 비밀번호를 하단 시트로 표시(버튼 누를 때만 노출).
+  void _showShareInfo() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0E1116),
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: SizedBox(
+                    width: 200,
+                    height: 200,
+                    child: PrettyQrView.data(
+                      data: _roomId,
+                      decoration: const PrettyQrDecoration(
+                        shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
                       ),
-                    ],
+                    ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 16),
+              _kv(L.t('cctv_code'), _code),
+              const SizedBox(height: 8),
+              _kv(L.t('cctv_password'), _pin),
+              const SizedBox(height: 16),
+              Text(
+                L.t('cctv_share_hint'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
