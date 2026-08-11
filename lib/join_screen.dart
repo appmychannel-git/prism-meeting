@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'call_history_screen.dart';
 import 'cctv_hub_screen.dart';
 import 'config.dart';
+import 'confirm_dialog.dart';
 import 'connection_service.dart';
 import 'friends_screen.dart';
 import 'fullscreen_perm.dart';
@@ -277,6 +278,15 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       } else {
         final custom = _customCtrl.text.trim();
         room = custom.isEmpty ? AppConfig.generateRoomCode() : custom;
+        // 보안: 추측하기 쉬운 방 이름(6자 미만) 경고.
+        if (custom.isNotEmpty && custom.length < 6) {
+          final ok = await confirmDialog(context, L.t('weak_room_warn'),
+              confirmLabel: L.t('create_enter'), danger: false);
+          if (!ok) {
+            if (mounted) setState(() => _connecting = false);
+            return;
+          }
+        }
         // 보안: 회의 방은 비밀번호 필수(모든 방이 비공개).
         pin = _pinCtrl.text.trim();
         if (pin.isEmpty) throw Exception(L.t('err_private_pin'));

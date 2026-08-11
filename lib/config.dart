@@ -57,6 +57,14 @@ class AppConfig {
     defaultValue: false,
   );
 
+  /// 미디어 종단간 암호화(E2EE). 회의·CCTV에서 비밀번호를 공유키로 사용.
+  /// **기본 off** — 켜려면 모든 참여자(앱/웹)가 같은 빌드여야 하고 브라우저 지원 필요.
+  /// --dart-define=ENABLE_E2EE=true 로 켠다.
+  static const bool e2ee = bool.fromEnvironment(
+    'ENABLE_E2EE',
+    defaultValue: false,
+  );
+
   // 아래 3개는 "회원 없이 기기 UUID로 식별 + 푸시"가 필요한 기능이라
   // 모바일(Android/iOS) 전용이다. PC(윈도/맥)·웹에선 기기 식별/푸시 수단이
   // 없어 자동 비활성된다([supportsDeviceFeatures]). 기본 off.

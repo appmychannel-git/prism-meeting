@@ -79,39 +79,35 @@ class RoomScreen extends StatefulWidget {
 }
 
 class _RoomScreenState extends State<RoomScreen> {
-  final Room _room = Room(
-    roomOptions: const RoomOptions(
-      // 아래 3개가 Zoom과 같은 원리의 다자간 최적화 핵심:
-      adaptiveStream: true, // 화면에 안 보이는/작은 영상은 저화질로 자동 조절
-      dynacast: true, // 아무도 안 보는 화질 레이어는 송신 중단(대역폭 절약)
-      defaultVideoPublishOptions: VideoPublishOptions(
-        simulcast: true, // 고/중/저 화질 동시 송신 → 수신자별 최적 화질 선택
-        // 코덱을 H.264로 고정. VP8은 저가 안드로이드TV/박스(예: MediaTek)의
-        // 하드웨어 디코더가 지원 안 해 영상이 안 나오거나 프리즈되는 경우가 있다.
-        // H.264는 하드웨어 디코더 지원이 가장 넓다.
-        videoCodec: 'h264',
-      ),
-      // ---- 오디오 음질 설정(회의 음질 우선) ----
-      // 코덱은 Opus 단일. 비트레이트를 기본 48k → 96k로 올려 음성/공유오디오(탭 소리)
-      // 모두 여유 있게. DTX(침묵 시 전송중단)·RED(패킷손실 대비 중복전송)는 유지.
-      defaultAudioPublishOptions: AudioPublishOptions(
-        encoding: AudioEncoding.presetMusicHighQuality, // 96kbps
-        dtx: true,
-        red: true,
-      ),
-      // 마이크 캡처 처리(기본값과 동일하나 의도를 명시): 노이즈억제·에코제거·자동게인·
-      // 음성분리 모두 ON. 회의에서 목소리를 또렷하게 유지한다.
-      defaultAudioCaptureOptions: AudioCaptureOptions(
-        noiseSuppression: true,
-        echoCancellation: true,
-        autoGainControl: true,
-        voiceIsolation: true,
-        typingNoiseDetection: true,
-      ),
-    ),
-  );
+  // E2EE 키를 비밀번호에서 파생하므로 방 생성이 비동기 → late 로 두고 initState 에서 구성.
+  late final Room _room;
+  late final EventsListener<RoomEvent> _listener;
+  bool _roomReady = false;
 
-  late final EventsListener<RoomEvent> _listener = _room.createListener();
+  RoomOptions _roomOptions(E2EEOptions? e2ee) => RoomOptions(
+        // 아래 3개가 Zoom과 같은 원리의 다자간 최적화 핵심:
+        adaptiveStream: true, // 화면에 안 보이는/작은 영상은 저화질로 자동 조절
+        dynacast: true, // 아무도 안 보는 화질 레이어는 송신 중단(대역폭 절약)
+        defaultVideoPublishOptions: const VideoPublishOptions(
+          simulcast: true, // 고/중/저 화질 동시 송신 → 수신자별 최적 화질 선택
+          // H.264 고정: 저가 안드로이드TV/박스 하드웨어 디코더 호환성 최대.
+          videoCodec: 'h264',
+        ),
+        defaultAudioPublishOptions: const AudioPublishOptions(
+          encoding: AudioEncoding.presetMusicHighQuality, // 96kbps
+          dtx: true,
+          red: true,
+        ),
+        defaultAudioCaptureOptions: const AudioCaptureOptions(
+          noiseSuppression: true,
+          echoCancellation: true,
+          autoGainControl: true,
+          voiceIsolation: true,
+          typingNoiseDetection: true,
+        ),
+        e2eeOptions: e2ee, // 종단간 암호화(옵션)
+      );
+
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   Timer? _rebuildTimer;
 
@@ -186,13 +182,26 @@ class _RoomScreenState extends State<RoomScreen> {
     super.initState();
     // 회의 중에는 화면이 꺼지지 않게 유지 (입장 화면에서는 적용 안 됨 → 정상 화면보호기)
     WakelockPlus.enable();
-    _room.addListener(_onRoomChange);
-    _setupListeners();
     // USB 카메라 연결/해제(핫플러그) 시 카메라 목록 갱신
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
       _loadCameras();
     });
     if (AppConfig.showTranslation) _initSpeech();
+    _initRoom();
+  }
+
+  /// 방(Room) 구성 → E2EE(옵션, 비밀번호 공유키) 적용 → 리스너 연결 → 접속.
+  Future<void> _initRoom() async {
+    final pin = widget.pin ?? '';
+    final e2ee = (AppConfig.e2ee && pin.isNotEmpty)
+        ? await E2EEOptions.sharedKey('${widget.roomName}:$pin')
+        : null;
+    _room = Room(roomOptions: _roomOptions(e2ee));
+    _listener = _room.createListener();
+    _room.addListener(_onRoomChange);
+    _setupListeners();
+    _roomReady = true;
+    if (mounted) setState(() {});
     _connect();
   }
 
@@ -203,9 +212,11 @@ class _RoomScreenState extends State<RoomScreen> {
     _deviceSub?.cancel();
     _rebuildTimer?.cancel();
     if (_speechAvailable) _speech.stop();
-    _room.removeListener(_onRoomChange);
-    _listener.dispose();
-    _room.dispose();
+    if (_roomReady) {
+      _room.removeListener(_onRoomChange);
+      _listener.dispose();
+      _room.dispose();
+    }
     super.dispose();
   }
 

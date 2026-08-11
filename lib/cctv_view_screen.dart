@@ -20,8 +20,9 @@ class CctvViewScreen extends StatefulWidget {
 }
 
 class _CctvViewScreenState extends State<CctvViewScreen> {
-  final Room _room = Room();
-  late final EventsListener<RoomEvent> _listener = _room.createListener();
+  late final Room _room;
+  late final EventsListener<RoomEvent> _listener;
+  bool _roomReady = false;
   bool _connecting = true;
   String? _error;
   bool _leaving = false;
@@ -34,21 +35,33 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   void initState() {
     super.initState();
     WakelockPlus.enable();
-    _listener
+    _init();
+  }
+
+  Future<void> _init() async {
+    // E2EE(옵션): 비밀번호를 공유키로 사용(회의/CCTV 당사자만 복호화).
+    final e2ee = (AppConfig.e2ee && widget.pin.isNotEmpty)
+        ? await E2EEOptions.sharedKey('${widget.roomId}:${widget.pin}')
+        : null;
+    _room = Room(roomOptions: RoomOptions(e2eeOptions: e2ee));
+    _listener = _room.createListener()
       ..on<RoomDisconnectedEvent>((_) => _end())
       ..on<TrackSubscribedEvent>((_) => _refresh())
       ..on<TrackUnsubscribedEvent>((_) => _refresh())
       ..on<ParticipantConnectedEvent>((_) => _refresh())
       ..on<ParticipantDisconnectedEvent>((_) => _refresh());
-    _connect();
+    _roomReady = true;
+    await _connect();
   }
 
   @override
   void dispose() {
     _continueTimer?.cancel();
     WakelockPlus.disable();
-    _listener.dispose();
-    _room.dispose();
+    if (_roomReady) {
+      _listener.dispose();
+      _room.dispose();
+    }
     super.dispose();
   }
 
@@ -151,6 +164,12 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_roomReady) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     final cam = _remoteCam();
     return PopScope(
       canPop: false,

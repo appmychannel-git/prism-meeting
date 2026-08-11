@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'cctv_store.dart';
@@ -22,15 +23,9 @@ class CctvShareScreen extends StatefulWidget {
 }
 
 class _CctvShareScreenState extends State<CctvShareScreen> {
-  final Room _room = Room(
-    roomOptions: const RoomOptions(
-      adaptiveStream: true,
-      dynacast: true,
-      defaultVideoPublishOptions:
-          VideoPublishOptions(simulcast: true, videoCodec: 'h264'),
-    ),
-  );
-  late final EventsListener<RoomEvent> _listener = _room.createListener();
+  late final Room _room;
+  late final EventsListener<RoomEvent> _listener;
+  bool _roomReady = false;
 
   String _code = ''; // 표시/입력용 코드(cctv- 제외). 이 기기 고정값.
   String _roomId = ''; // 실제 방 이름 cctv-<code>
@@ -45,9 +40,6 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     CctvShareScreen.active = true;
     cancelCctvWakeNotification(); // 원격 켜기 알림이 있었다면 정리
     WakelockPlus.enable();
-    _listener
-      ..on<ParticipantConnectedEvent>((_) => _updateViewers())
-      ..on<ParticipantDisconnectedEvent>((_) => _updateViewers());
     _init();
   }
 
@@ -57,20 +49,41 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     _code = code;
     _roomId = 'cctv-$code';
     _pin = pin;
+    // E2EE(옵션): 비밀번호를 공유키로.
+    final e2ee = (AppConfig.e2ee && pin.isNotEmpty)
+        ? await E2EEOptions.sharedKey('$_roomId:$pin')
+        : null;
+    _room = Room(
+      roomOptions: RoomOptions(
+        adaptiveStream: true,
+        dynacast: true,
+        defaultVideoPublishOptions:
+            const VideoPublishOptions(simulcast: true, videoCodec: 'h264'),
+        e2eeOptions: e2ee,
+      ),
+    );
+    _listener = _room.createListener()
+      ..on<ParticipantConnectedEvent>((_) => _updateViewers())
+      ..on<ParticipantDisconnectedEvent>((_) => _updateViewers());
+    _roomReady = true;
     await _connect();
   }
 
   @override
   void dispose() {
     CctvShareScreen.active = false;
+    cancelCctvLiveNotification(); // 송출 종료 → 상시 알림 제거
     WakelockPlus.disable();
-    _listener.dispose();
-    _room.dispose();
+    if (_roomReady) {
+      _listener.dispose();
+      _room.dispose();
+    }
     super.dispose();
   }
 
   void _updateViewers() {
     if (mounted) setState(() => _viewers = _room.remoteParticipants.length);
+    showCctvLiveNotification(_room.remoteParticipants.length); // 알림 갱신
   }
 
   Future<void> _connect() async {
@@ -88,6 +101,11 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       // 카메라만 송출(마이크는 끔).
       await _room.localParticipant?.setCameraEnabled(true);
       if (mounted) setState(() => _connecting = false);
+      // 방송 중 인지: 상시 알림 + 시작 진동(원격으로 켜져도 알아채도록).
+      showCctvLiveNotification(0);
+      try {
+        if (await Vibration.hasVibrator()) Vibration.vibrate(duration: 300);
+      } catch (_) {}
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -128,6 +146,30 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // 방송 중 표시(빨간 배지) — 카메라가 켜져 있음을 명확히.
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5484D),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.fiber_manual_record,
+                                  size: 12, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Text(L.t('cctv_live_badge'),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       // 내 카메라 미리보기
                       AspectRatio(
                         aspectRatio: 16 / 9,

@@ -24,6 +24,7 @@ final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 /// 수신 통화 풀스크린 알림 ID(한 번에 한 통화 → 고정 ID로 갱신/취소).
 const int kIncomingCallNotifId = 1001;
 const int kCctvWakeNotifId = 1002;
+const int kCctvLiveNotifId = 1003;
 // 커스텀 벨소리(res/raw/ring_classic)를 쓰려고 새 채널 ID로 만든다.
 // (안드로이드는 채널 생성 후 사운드를 못 바꾸므로 기존 'incoming_calls' 대신 신규.)
 const String kCallChannelId = 'incoming_calls_v2';
@@ -146,6 +147,48 @@ Future<void> showCctvWakeNotification() async {
 Future<void> cancelCctvWakeNotification() async {
   try {
     await FlutterLocalNotificationsPlugin().cancel(id: kCctvWakeNotifId);
+  } catch (_) {}
+}
+
+/// CCTV 송출 중 상시 알림(방송 중임을 사용자가 항상 인지하도록).
+Future<void> showCctvLiveNotification(int viewers) async {
+  try {
+    final plugin = FlutterLocalNotificationsPlugin();
+    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    await plugin
+        .initialize(settings: const InitializationSettings(android: androidInit));
+    const channel = AndroidNotificationChannel(
+      'cctv_live',
+      'CCTV 송출',
+      importance: Importance.low,
+    );
+    await plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+    final details = AndroidNotificationDetails(
+      'cctv_live',
+      'CCTV 송출',
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      autoCancel: false,
+      onlyAlertOnce: true,
+      color: const Color(0xFFE5484D),
+      colorized: true,
+    );
+    await plugin.show(
+      id: kCctvLiveNotifId,
+      title: '● CCTV 송출 중',
+      body: '시청자 $viewers명 · 카메라가 켜져 있습니다',
+      notificationDetails: NotificationDetails(android: details),
+    );
+  } catch (_) {}
+}
+
+Future<void> cancelCctvLiveNotification() async {
+  try {
+    await FlutterLocalNotificationsPlugin().cancel(id: kCctvLiveNotifId);
   } catch (_) {}
 }
 
