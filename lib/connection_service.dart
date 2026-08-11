@@ -49,16 +49,19 @@ class ConnectionService {
       'name': participantName,
       'identity': identity,
     };
-    if (pin != null && pin.isNotEmpty) params['pin'] = pin;
     if (create) params['create'] = 'true';
     // 앱 패키지명 전송(옛 앱 차단용 표식). 값이 없으면 생략.
     final appId = await _appId();
     if (appId.isNotEmpty) params['appId'] = appId;
     final uri = Uri.parse(tokenServerUrl).replace(queryParameters: params);
 
+    // 보안: 비밀번호는 URL 쿼리 대신 헤더로 전송(서버/프록시 로그 노출 방지).
+    final headers = <String, String>{};
+    if (pin != null && pin.isNotEmpty) headers['X-Room-Pin'] = pin;
+
     final http.Response resp;
     try {
-      resp = await http.get(uri);
+      resp = await http.get(uri, headers: headers);
     } catch (e) {
       throw Exception('${L.t('conn_fail')}: $tokenServerUrl\n$e');
     }

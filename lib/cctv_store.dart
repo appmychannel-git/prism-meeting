@@ -47,7 +47,8 @@ class CctvStore {
     var pin = sp.getString(_kMyPin);
     if (code == null || code.isEmpty) {
       code = AppConfig.generateRoomCode();
-      pin = (1000 + Random().nextInt(9000)).toString(); // 4자리
+      // 보안 강화: 6자리(1,000,000가지). 4자리는 무차별 대입에 취약.
+      pin = (100000 + Random().nextInt(900000)).toString();
       await sp.setString(_kMyCode, code);
       await sp.setString(_kMyPin, pin);
     }
