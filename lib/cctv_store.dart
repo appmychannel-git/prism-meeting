@@ -40,6 +40,26 @@ class CctvStore {
     await sp.setBool(_kIsCamera, v);
   }
 
+  // ── 원격 켜기 대기 플래그 ──
+  // 백그라운드 FCM 핸들러(다른 isolate)가 기록 → 앱이 앞으로 오면(resume/시작)
+  // 이 플래그를 보고 송출 화면으로 이동한다(onMessage 가 백그라운드에선 안 오므로).
+  static const _kWakePending = 'cctv_wake_pending_ms';
+
+  static Future<void> setPendingWake() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setInt(_kWakePending, DateTime.now().millisecondsSinceEpoch);
+  }
+
+  /// 최근(60초 내) 대기 플래그가 있으면 true 반환하고 즉시 소거.
+  static Future<bool> consumePendingWake() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.reload(); // 백그라운드 isolate 가 쓴 값 반영
+    final ms = sp.getInt(_kWakePending) ?? 0;
+    if (ms == 0) return false;
+    await sp.remove(_kWakePending);
+    return DateTime.now().millisecondsSinceEpoch - ms < 60000;
+  }
+
   /// 이 기기를 CCTV로 공유할 때 쓰는 **고정** 코드/비번(최초 1회 생성 후 유지).
   static Future<(String code, String pin)> myShareCredentials() async {
     final sp = await SharedPreferences.getInstance();

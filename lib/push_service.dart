@@ -12,6 +12,7 @@ import 'auth_service.dart';
 import 'block_store.dart';
 import 'call_signaling.dart';
 import 'cctv_share_screen.dart';
+import 'cctv_store.dart';
 import 'config.dart';
 import 'device_id.dart';
 import 'directory.dart';
@@ -103,7 +104,8 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       video: d['video'] == 'true' || d['video'] == true,
     );
   } else if (type == 'cctv_wake') {
-    // 대기모드에서 CCTV 송출을 시작하도록 풀스크린 알림으로 앱을 깨운다.
+    // 대기 플래그 기록(앱이 앞으로 오면 송출 화면으로 이동) + 풀스크린 알림으로 깨움.
+    await CctvStore.setPendingWake();
     await showCctvWakeNotification();
   }
 }
@@ -261,6 +263,10 @@ class PushService with WidgetsBindingObserver {
       // 싱글턴이라 앱 생명주기 동안 유지(별도 취소 없음).
       CallSignaling.incoming(_myUuid!).listen(_onIncomingDoc);
 
+      // 콜드 스타트가 CCTV 원격 켜기로 시작됐으면 송출 화면으로(Navigator 준비 후).
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _checkPendingWake());
+
       _started = true;
     } catch (e) {
       debugPrint('[PushService] init skipped: $e');
@@ -364,7 +370,15 @@ class PushService with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _touch();
+    if (state == AppLifecycleState.resumed) {
+      _touch();
+      _checkPendingWake(); // 백그라운드서 깨워졌으면 송출 화면으로 이동
+    }
+  }
+
+  /// 원격 켜기 대기 플래그가 있으면 송출 화면으로 이동(중복은 active 로 방지).
+  Future<void> _checkPendingWake() async {
+    if (await CctvStore.consumePendingWake()) _showCctvShare();
   }
 
   /// 통화 시작/종료 시 통화중 상태 갱신(친구 목록의 "통화중" 표시용).
