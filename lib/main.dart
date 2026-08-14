@@ -32,6 +32,12 @@ class PrismMeetingApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           // 수신 통화 등 백그라운드/알림에서 화면 전환에 사용.
           navigatorKey: appNavigatorKey,
+          // 키보드 아닌 영역을 탭하면 키보드(포커스) 닫기 — 전 화면 공통.
+          builder: (context, child) => GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: child,
+          ),
           theme: ThemeData(
             colorScheme: scheme,
             scaffoldBackgroundColor: const Color(0xFF0E1116),

@@ -18,13 +18,25 @@ class MyIdScreen extends StatefulWidget {
 
 class _MyIdScreenState extends State<MyIdScreen> {
   final _nameCtrl = TextEditingController();
+  final _nameFocus = FocusNode();
+  final _scroll = ScrollController();
   String? _uuid;
   String _code = '';
 
   @override
   void initState() {
     super.initState();
+    // 이름 입력을 마치면(포커스 해제) QR이 보이도록 맨 위로 스크롤.
+    _nameFocus.addListener(() {
+      if (!_nameFocus.hasFocus) _scrollToTop();
+    });
     _load();
+  }
+
+  void _scrollToTop() {
+    if (!_scroll.hasClients) return;
+    _scroll.animateTo(0,
+        duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
   }
 
   Future<void> _load() async {
@@ -45,6 +57,8 @@ class _MyIdScreenState extends State<MyIdScreen> {
     // 편집한 이름을 기기 등록(Firestore)에도 반영 → 친구에게 새 이름으로 표시.
     PushService.instance.refreshDevice();
     _nameCtrl.dispose();
+    _nameFocus.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -75,6 +89,7 @@ class _MyIdScreenState extends State<MyIdScreen> {
       body: uuid == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
+              controller: _scroll,
               padding: const EdgeInsets.all(24),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -131,8 +146,11 @@ class _MyIdScreenState extends State<MyIdScreen> {
                   const SizedBox(height: 20),
                   TextField(
                     controller: _nameCtrl,
+                    focusNode: _nameFocus,
                     textAlign: TextAlign.center,
                     maxLength: 20,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) => _nameFocus.unfocus(), // 확인 → 키보드 닫고 위로
                     decoration: InputDecoration(
                       labelText: L.t('display_name'),
                       hintText: L.t('my_id_name_hint'),
