@@ -61,6 +61,7 @@ dependencies:
   audioplayers: ^6.7.1
   firebase_auth: ^6.5.7
   vibration: ^3.2.0
+  screen_brightness: ^2.1.11
 
 dev_dependencies:
   flutter_test:

@@ -240,6 +240,10 @@ class L {
     'cctv_name': {'ko': '이름(선택)', 'en': 'Name (optional)'},
     'cctv_name_hint': {'ko': '예: 거실 TV', 'en': 'e.g. Living room TV'},
     'cctv_live_badge': {'ko': '송출 중', 'en': 'LIVE'},
+    'cctv_dim_hint': {
+      'ko': '송출 중 (화면 절전) · 탭하여 화면 켜기',
+      'en': 'Broadcasting (screen dimmed) · tap to wake',
+    },
     'weak_room_warn': {
       'ko': '방 이름이 짧아 추측되기 쉽습니다. 그래도 만들까요?\n(비워두면 안전한 랜덤 코드가 생성됩니다)',
       'en': 'This room name is short and easy to guess. Create anyway?\n(Leave blank for a safe random code)',

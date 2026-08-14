@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -33,6 +36,37 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   bool _connecting = true;
   String? _error;
   int _viewers = 0;
+
+  // 송출 절전: 일정 시간 미조작 시 미리보기 끄고 화면 어둡게(송출은 유지).
+  bool _dimmed = false;
+  Timer? _idleTimer;
+  static const _idleSeconds = 30;
+
+  void _onInteract() {
+    if (_dimmed) _wake();
+    _resetIdleTimer();
+  }
+
+  void _resetIdleTimer() {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: _idleSeconds), _dim);
+  }
+
+  Future<void> _dim() async {
+    if (!mounted || _dimmed) return;
+    setState(() => _dimmed = true); // 미리보기 렌더 중단(GPU 절감)
+    try {
+      await ScreenBrightness().setApplicationScreenBrightness(0.0); // 최소 밝기
+    } catch (_) {}
+  }
+
+  Future<void> _wake() async {
+    if (!mounted || !_dimmed) return;
+    setState(() => _dimmed = false);
+    try {
+      await ScreenBrightness().resetApplicationScreenBrightness(); // 밝기 복원
+    } catch (_) {}
+  }
 
   @override
   void initState() {
@@ -72,6 +106,10 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   @override
   void dispose() {
     CctvShareScreen.active = false;
+    _idleTimer?.cancel();
+    try {
+      ScreenBrightness().resetApplicationScreenBrightness(); // 밝기 원복
+    } catch (_) {}
     cancelCctvLiveNotification(); // 송출 종료 → 상시 알림 제거
     WakelockPlus.disable();
     if (_roomReady) {
@@ -106,6 +144,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       try {
         if (await Vibration.hasVibrator()) Vibration.vibrate(duration: 300);
       } catch (_) {}
+      _resetIdleTimer(); // 절전 카운트다운 시작
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -141,25 +180,31 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                     child: Text(_error!, textAlign: TextAlign.center),
                   ),
                 )
-              : Stack(
+              : Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: (_) => _onInteract(), // 조작 시 절전 해제/연장
+                  child: Stack(
                   fit: StackFit.expand, // Stack 이 화면 전체를 차지하도록
                   children: [
-                    // 송출 영상 전체화면
+                    // 송출 영상 전체화면 (절전 중엔 미리보기 렌더 안 함 = GPU 절감)
                     Positioned.fill(
-                      child: _localCam() != null
-                          ? VideoTrackRenderer(_localCam()!,
-                              fit: VideoViewFit.cover,
-                              mirrorMode: VideoViewMirrorMode.off)
-                          : Container(
-                              color: const Color(0xFF1A1F27),
-                              child: const Center(
-                                child: Icon(Icons.videocam_off,
-                                    color: Colors.white38, size: 48),
-                              ),
-                            ),
+                      child: _dimmed
+                          ? _dimView()
+                          : (_localCam() != null
+                              ? VideoTrackRenderer(_localCam()!,
+                                  fit: VideoViewFit.cover,
+                                  mirrorMode: VideoViewMirrorMode.off)
+                              : Container(
+                                  color: const Color(0xFF1A1F27),
+                                  child: const Center(
+                                    child: Icon(Icons.videocam_off,
+                                        color: Colors.white38, size: 48),
+                                  ),
+                                )),
                     ),
-                    // 상단 오버레이: 뒤로 · LIVE·시청자 · QR/비번 버튼 (상단 고정)
-                    Positioned(
+                    // 상단 오버레이: 뒤로 · LIVE·시청자 · QR/비번 버튼 (절전 중엔 숨김)
+                    if (!_dimmed)
+                      Positioned(
                       top: 0,
                       left: 0,
                       right: 0,
@@ -203,6 +248,26 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                     ),
                   ],
                 ),
+                ),
+    );
+  }
+
+  // 절전 화면: 검은 배경 + 안내(미리보기 안 그림 → GPU/화면 부담↓, 송출은 유지).
+  Widget _dimView() {
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.fiber_manual_record,
+              size: 16, color: Color(0xFFE5484D)),
+          const SizedBox(height: 10),
+          Text(L.t('cctv_dim_hint'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white38, fontSize: 13)),
+        ],
+      ),
     );
   }
 
