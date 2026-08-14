@@ -1,0 +1,42 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.co.mychannel.meeting",
+      "sha256_cert_fingerprints": [
+        "FD:12:B5:FE:8E:80:FC:7B:32:CD:51:14:91:17:EE:CF:43:0F:30:97:A8:73:BA:53:A7:18:50:5F:BA:EF:6D:60"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.co.mychannel.meeting.prism",
+      "sha256_cert_fingerprints": [
+        "FD:12:B5:FE:8E:80:FC:7B:32:CD:51:14:91:17:EE:CF:43:0F:30:97:A8:73:BA:53:A7:18:50:5F:BA:EF:6D:60"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.co.mychannel.meeting.gbled",
+      "sha256_cert_fingerprints": [
+        "FD:12:B5:FE:8E:80:FC:7B:32:CD:51:14:91:17:EE:CF:43:0F:30:97:A8:73:BA:53:A7:18:50:5F:BA:EF:6D:60"
+      ]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "kr.co.mychannel.meeting.viewplus",
+      "sha256_cert_fingerprints": [
+        "FD:12:B5:FE:8E:80:FC:7B:32:CD:51:14:91:17:EE:CF:43:0F:30:97:A8:73:BA:53:A7:18:50:5F:BA:EF:6D:60"
+      ]
+    }
+  }
+]
