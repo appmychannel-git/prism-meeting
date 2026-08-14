@@ -230,7 +230,7 @@ class L {
     },
     'cctv_view': {'ko': 'CCTV 시청', 'en': 'View CCTV'},
     'cctv_tab_view': {'ko': '시청', 'en': 'View'},
-    'cctv_tab_share': {'ko': '송출', 'en': 'Share'},
+    'cctv_tab_share': {'ko': '녹화', 'en': 'Record'},
     'cctv_code': {'ko': '코드', 'en': 'Code'},
     'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
     'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},
@@ -239,10 +239,10 @@ class L {
     'cctv_add_view': {'ko': '추가하고 시청', 'en': 'Add & view'},
     'cctv_name': {'ko': '이름(선택)', 'en': 'Name (optional)'},
     'cctv_name_hint': {'ko': '예: 거실 TV', 'en': 'e.g. Living room TV'},
-    'cctv_live_badge': {'ko': '송출 중', 'en': 'LIVE'},
+    'cctv_live_badge': {'ko': 'CCTV', 'en': 'CCTV'},
     'cctv_dim_hint': {
-      'ko': '송출 중 (화면 절전) · 탭하여 화면 켜기',
-      'en': 'Broadcasting (screen dimmed) · tap to wake',
+      'ko': 'CCTV (화면 절전) · 탭하여 화면 켜기',
+      'en': 'CCTV (screen dimmed) · tap to wake',
     },
     'weak_room_warn': {
       'ko': '방 이름이 짧아 추측되기 쉽습니다. 그래도 만들까요?\n(비워두면 안전한 랜덤 코드가 생성됩니다)',

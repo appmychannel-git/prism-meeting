@@ -139,6 +139,8 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       // 카메라만 송출(마이크는 끔).
       await _room.localParticipant?.setCameraEnabled(true);
       if (mounted) setState(() => _connecting = false);
+      // 접속 시점에 이미 방에 있던 시청자 수 반영(원격 켜기로 시청자가 먼저 들어온 경우).
+      _updateViewers();
       // 방송 중 인지: 상시 알림 + 시작 진동(원격으로 켜져도 알아채도록).
       showCctvLiveNotification(0);
       try {

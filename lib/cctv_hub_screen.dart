@@ -111,7 +111,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
             tabs: [
               Tab(icon: const Icon(Icons.play_circle_outline),
                   text: L.t('cctv_tab_view')),
-              Tab(icon: const Icon(Icons.cast),
+              Tab(icon: const Icon(Icons.videocam),
                   text: L.t('cctv_tab_share')),
             ],
           ),
