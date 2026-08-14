@@ -7,10 +7,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'call.dart';
 import 'call_history_screen.dart';
 import 'cctv_hub_screen.dart';
 import 'config.dart';
 import 'confirm_dialog.dart';
+import 'device_id.dart';
+import 'directory.dart';
+import 'friends.dart';
 import 'connection_service.dart';
 import 'friends_screen.dart';
 import 'fullscreen_perm.dart';
@@ -117,6 +121,19 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
   // 초대 링크(room/pin)로 열리면 폼을 거치지 않고 이름 팝업 → 입장한다.
   void _applyLinkUri(Uri uri, {bool rebuild = false}) {
+    // 친구 ID 링크(내 ID QR): ...?uid=...&name=... → 앱에서 바로 친구추가/통화.
+    final uid = uri.queryParameters['uid'];
+    if (uid != null && uid.trim().isNotEmpty) {
+      final key = uri.toString();
+      if (key == _lastProcessedLinkKey) return;
+      _lastProcessedLinkKey = key;
+      final name = (uri.queryParameters['name'] ?? '').trim();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handleIdLink(uid.trim(), name);
+      });
+      return;
+    }
+
     final room = uri.queryParameters['room'];
     final pin = uri.queryParameters['pin'];
     if (room == null || room.trim().isEmpty) return;
@@ -152,6 +169,59 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
         );
       }
     });
+  }
+
+  // 내 ID 링크(딥링크)로 앱이 열렸을 때: 친구추가 + 통화 옵션 시트.
+  Future<void> _handleIdLink(String uid, String name) async {
+    if (!AppConfig.friendsEnabled) return; // 친구 기능 없는 브랜드는 무시
+    final myUuid = await DeviceId.uuid();
+    if (uid == myUuid) return; // 내 QR
+    final myName = await DeviceId.name();
+    final f = Friend(uuid: uid, name: name);
+    final wasFriend = await FriendStore.isFriend(uid);
+    if (!wasFriend) {
+      await FriendStore.add(f);
+      await DirectoryService.addEdge(
+          from: myUuid, to: uid, fromName: myName, toName: name);
+    }
+    if (!mounted) return;
+    final who = name.isNotEmpty ? name : L.t('unnamed');
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                wasFriend ? who : '$who · ${L.t('friend_added')}',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.call),
+              title: Text(L.t('call_voice')),
+              onTap: () {
+                Navigator.pop(ctx);
+                startDmCall(context,
+                    myUuid: myUuid, myName: myName, friend: f, video: false);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.videocam),
+              title: Text(L.t('call_video')),
+              onTap: () {
+                Navigator.pop(ctx);
+                startDmCall(context,
+                    myUuid: myUuid, myName: myName, friend: f, video: true);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // 랜덤 게스트 이름 (예: 게스트-4823)
