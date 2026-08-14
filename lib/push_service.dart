@@ -446,6 +446,9 @@ class PushService with WidgetsBindingObserver {
     if (CctvShareScreen.active) return; // 이미 송출 중이면 무시
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
+    // 같은 프레임에 여러 경로(콜드스타트/알림/대기플래그)가 동시에 호출해도
+    // 두 번 열리지 않도록 push 직전에 즉시 플래그를 세운다(중복 연결 방지).
+    CctvShareScreen.active = true;
     nav.push(MaterialPageRoute(builder: (_) => const CctvShareScreen()));
   }
 
