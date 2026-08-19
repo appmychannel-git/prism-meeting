@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ecoglowkc flavor(한국어): main-ko 의 app_name 을 override 한다. -->
+<resources>
+    <string name="app_name">Ecoglow Market</string>
+</resources>

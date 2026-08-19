@@ -26,6 +26,25 @@
     },
     {
       "client_info": {
+        "mobilesdk_app_id": "1:181808704697:android:76fc5cb8aeab1f75aa3f68",
+        "android_client_info": {
+          "package_name": "kr.co.mychannel.meeting.ecoglowkc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVJKO_f4qcKtad_Ckfsl4eyVfiXDzuLLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:181808704697:android:47934b39ad07d7bfaa3f68",
         "android_client_info": {
           "package_name": "kr.co.mychannel.meeting.gbled"

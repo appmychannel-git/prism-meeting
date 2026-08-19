@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ecoglowkc 적응형 아이콘(안드로이드 8+). main(프리즘)의 동일 리소스를 덮어써,
+     이 브랜드의 전경(ic_launcher_fg = "ECO GLOW" 로고)과 배경색(흰색)을 쓰게 한다.
+     전경은 흰 배경에 중앙 텍스트라 풀블리드로 두어도 런처 마스크 안전영역에 들어온다. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <!-- 여백(inset)을 줘서 로고를 축소 → 마켓 앱들처럼 글씨가 작게 보이도록.
+         값을 키우면 더 작아진다(예: 26%면 더 작게). 배경도 흰색이라 여백은 자연스럽게 흰색. -->
+    <foreground>
+        <inset
+            android:drawable="@mipmap/ic_launcher_fg"
+            android:inset="18%" />
+    </foreground>
+</adaptive-icon>

@@ -73,6 +73,11 @@ android {
             applicationId = "kr.co.mychannel.meeting"
             manifestPlaceholders["appLabel"] = "Mychannel Meeting"
         }
+        create("ecoglow") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.meeting.ecoglowkc"
+            manifestPlaceholders["appLabel"] = "ECO GLOW Meeting"
+        }
     }
 
     signingConfigs {

@@ -26,7 +26,8 @@ brand_config() {
     gbled)     APP_BRAND="Gbled Meeting"    ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     viewplus)  APP_BRAND="Viewplus Meeting" ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     mychannel) APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    *) echo "알 수 없는 브랜드: $1  (prism|gbled|viewplus|mychannel|all)"; exit 1 ;;
+    ecoglow)   APP_BRAND="ECO GLOW Meeting" ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    *) echo "알 수 없는 브랜드: $1  (prism|gbled|viewplus|mychannel|ecoglow|all)"; exit 1 ;;
   esac
 }
 
@@ -71,7 +72,7 @@ run_brand() {
 }
 
 if [ "$BRAND" = "all" ]; then
-  for b in prism gbled viewplus mychannel; do run_brand "$b"; done
+  for b in prism gbled viewplus mychannel ecoglow; do run_brand "$b"; done
 else
   run_brand "$BRAND"
 fi

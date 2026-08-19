@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- ecoglowkc 적응형 아이콘 배경색 — ECO GLOW 로고(검정/흰 배경)에 맞춘 흰색. -->
+<resources>
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>
