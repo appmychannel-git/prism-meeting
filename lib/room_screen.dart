@@ -21,6 +21,7 @@ import 'stt_platform.dart';
 import 'chat_panel.dart';
 import 'config.dart';
 import 'connection_service.dart';
+import 'share_qr.dart';
 import 'translation_service.dart';
 
 /// 음성 자막 발언 방식.
@@ -1279,6 +1280,20 @@ class _RoomScreenState extends State<RoomScreen> {
           ],
         ),
         actions: [
+          // 카톡·문자로 공유: 옆의 휴대폰이 공유 QR을 찍어 멀리 있는 사람에게 회의
+          // 링크를 전송(TV는 카톡을 못 보내므로 휴대폰이 중계).
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              showShareLinkQrDialog(
+                context,
+                title: L.t('share_meeting_title'),
+                message: L.t('share_meeting_msg'),
+                targetUrl: link,
+              );
+            },
+            child: Text(L.t('share_meeting_btn')),
+          ),
           TextButton(
             onPressed: () {
               Clipboard.setData(ClipboardData(text: link));

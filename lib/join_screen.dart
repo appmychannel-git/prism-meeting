@@ -22,6 +22,7 @@ import 'l10n.dart';
 import 'my_id_screen.dart';
 import 'room_screen.dart';
 import 'settings_screen.dart';
+import 'share_qr.dart';
 
 class JoinScreen extends StatefulWidget {
   const JoinScreen({super.key});
@@ -499,6 +500,20 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
               onTap: () {
                 Navigator.pop(context);
                 showAppLanguagePicker(context);
+              },
+            ),
+            // 앱 공유: 공유 QR을 휴대폰이 찍으면 앱(APK) 다운로드 링크를 카톡·문자로 전송.
+            ListTile(
+              leading: const Icon(Icons.ios_share),
+              title: Text(L.t('menu_share_app')),
+              onTap: () {
+                Navigator.pop(context);
+                showShareLinkQrDialog(
+                  context,
+                  title: L.t('share_app_title'),
+                  message: L.t('share_app_msg', {'app': AppConfig.appBrand}),
+                  targetUrl: AppConfig.apkUrl,
+                );
               },
             ),
           ],

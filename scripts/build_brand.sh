@@ -35,7 +35,10 @@ build_one() {
   local brand="$1"
   brand_config "$brand"
   echo "== 빌드: $brand =="
+  # 앱 공유용 APK 다운로드 주소: 브랜드별 파일명(dist/Meeting-<brand>.apk 과 동일)
+  local apk_url="https://androidtv.mychannel.co.kr/meeting-cctv/download/Meeting-${brand}.apk"
   echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE"
+  echo "   apkUrl=$apk_url"
   flutter build apk --release --flavor "$brand" \
     --dart-define="APP_BRAND=$APP_BRAND" \
     --dart-define=ENABLE_FRIENDS=$FRIENDS \
@@ -43,7 +46,8 @@ build_one() {
     --dart-define=ENABLE_CCTV=$CCTV \
     --dart-define=SHOW_TRANSLATION=$TRANSLATION \
     --dart-define=START_CAMERA=$START_CAMERA \
-    --dart-define=ENABLE_E2EE=$E2EE_EFFECTIVE
+    --dart-define=ENABLE_E2EE=$E2EE_EFFECTIVE \
+    --dart-define=APK_URL=$apk_url
   mkdir -p dist
   cp "build/app/outputs/flutter-apk/app-${brand}-release.apk" "dist/Meeting-${brand}.apk"
   echo "   → dist/Meeting-${brand}.apk"

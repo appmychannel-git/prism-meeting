@@ -180,6 +180,41 @@ class AppConfig {
     return '$base$sep${Uri(queryParameters: params).query}';
   }
 
+  /// 공유 페이지 주소. TV가 띄운 "공유 QR"을 휴대폰으로 찍으면 이 페이지가 열리고,
+  /// 거기서 대상 링크(친구추가/회의/앱설치)를 카톡·문자로 재전송할 수 있다.
+  /// (TV는 카톡·문자를 못 보내므로, 옆의 휴대폰이 중계 역할)
+  /// --dart-define=SHARE_BASE_URL=... 로 덮어쓸 수 있음.
+  static const String shareBaseUrl = String.fromEnvironment(
+    'SHARE_BASE_URL',
+    defaultValue: 'https://androidtv.mychannel.co.kr/meeting-cctv/share/',
+  );
+
+  /// 앱 설치용 APK 다운로드 주소(구글스토어 미등록 → 직접 다운로드 유도).
+  /// 브랜드별로 다를 수 있어 빌드 시 --dart-define=APK_URL=... 로 지정.
+  static const String apkUrl = String.fromEnvironment(
+    'APK_URL',
+    defaultValue:
+        'https://androidtv.mychannel.co.kr/meeting-cctv/download/Meeting-mychannel.apk',
+  );
+
+  /// 공유 페이지 URL 생성: 제목(t)·메시지(m)·대상링크(u)를 쿼리로 실어 보낸다.
+  /// 이 URL을 QR로 만들어 두면, 휴대폰이 찍었을 때 공유 페이지가 열려
+  /// [targetUrl]을 카톡·문자로 보낼 수 있다.
+  static String sharePageUrl({
+    required String title,
+    required String message,
+    required String targetUrl,
+  }) {
+    final base = shareBaseUrl;
+    final sep = base.contains('?') ? '&' : '?';
+    final q = Uri(queryParameters: {
+      't': title,
+      'm': message,
+      'u': targetUrl,
+    }).query;
+    return '$base$sep$q';
+  }
+
   /// 짧고 타이핑 가능한 랜덤 방 코드 생성 (예: abc-def-hij).
   /// 헷갈리는 문자(0 o 1 l i) 제외 → 추측 불가하면서도 입력하기 쉬움.
   static String generateRoomCode() {

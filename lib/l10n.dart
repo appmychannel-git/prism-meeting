@@ -317,6 +317,43 @@ class L {
       'ko': '이미지에서 QR을 찾지 못했습니다.',
       'en': 'No QR code found in the image.',
     },
+    // 외장(탈착식) 카메라 기기: mobile_scanner(CameraX)가 카메라를 못 열 때 안내.
+    'scan_camera_unavailable': {
+      'ko': '이 기기에선 카메라 스캔을 사용할 수 없어요',
+      'en': "Camera scan isn't available on this device",
+    },
+    'scan_camera_unavailable_desc': {
+      'ko': '외장(탈착식) 카메라는 실시간 스캔을 지원하지 않습니다.\n아래 "갤러리에서 선택"으로 QR 사진을 고르거나, 뒤로 가서 "코드로 추가"를 이용하세요.',
+      'en': 'External (detachable) cameras don\'t support live scanning.\nUse "Choose from gallery" below, or go back and use "Add by code".',
+    },
+    'scan_black_hint': {
+      'ko': '화면이 검게 보이면 아래 "갤러리에서 선택" 또는 "코드로 추가"를 이용하세요.',
+      'en': 'If the screen is black, use "Choose from gallery" or "Add by code".',
+    },
+
+    // ── 공유 QR (휴대폰이 찍으면 공유 페이지 → 카톡·문자로 링크 전송) ──
+    'menu_share_app': {'ko': '앱 공유', 'en': 'Share app'},
+    'share_qr_caption': {
+      'ko': '이 QR을 휴대폰으로 찍으면 공유 페이지가 열려요.\n거기서 카카오톡·문자로 링크를 보낼 수 있어요.',
+      'en': 'Scan this QR with a phone to open the share page,\nthen send the link via messenger or SMS.',
+    },
+    'share_friend_btn': {'ko': '카톡·문자로 초대', 'en': 'Invite via message'},
+    'share_friend_title': {'ko': '친구 추가 초대', 'en': 'Add-friend invite'},
+    'share_friend_msg': {
+      'ko': '아래 링크로 저를 친구로 추가하고 통화하세요.',
+      'en': 'Add me as a friend and call using the link below.',
+    },
+    'share_meeting_btn': {'ko': '카톡·문자로 공유', 'en': 'Share via message'},
+    'share_meeting_title': {'ko': '회의 초대', 'en': 'Meeting invite'},
+    'share_meeting_msg': {
+      'ko': '아래 링크로 회의에 참여하세요.',
+      'en': 'Join the meeting using the link below.',
+    },
+    'share_app_title': {'ko': '앱 설치', 'en': 'Install app'},
+    'share_app_msg': {
+      'ko': '{app} 앱을 설치하세요 (APK 다운로드).',
+      'en': 'Install {app} (APK download).',
+    },
 
     // ── 회의 화면: 카메라/공유 ──
     'cam_switch_fail': {'ko': '카메라 전환 실패', 'en': 'Failed to switch camera'},

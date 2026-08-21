@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>링크 공유</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+      "Malgun Gothic", "Segoe UI", Roboto, sans-serif;
+    background: #0e1116;
+    color: #e9edf3;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: #171b22;
+    border: 1px solid #262c37;
+    border-radius: 16px;
+    padding: 24px 20px 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  }
+  h1 { font-size: 20px; margin: 0 0 6px; text-align: center; }
+  .msg { font-size: 14px; color: #aab3c0; text-align: center; margin: 0 0 18px; white-space: pre-line; }
+  .linkbox {
+    display: block;
+    font-size: 13px;
+    color: #9fb4ff;
+    background: #0e1116;
+    border: 1px solid #262c37;
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 18px;
+    word-break: break-all;
+    text-decoration: none;
+  }
+  button {
+    width: 100%;
+    border: 0;
+    border-radius: 12px;
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 10px;
+    font-family: inherit;
+  }
+  .primary { background: #3b6ef5; color: #fff; }
+  .primary:active { background: #315fda; }
+  .ghost { background: transparent; color: #cdd5e0; border: 1px solid #333b48; }
+  .hint { font-size: 12px; color: #7d8895; text-align: center; margin: 10px 0 0; }
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: #2a3140; color: #fff; padding: 10px 16px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  @media (prefers-color-scheme: light) {
+    body { background: #eef1f6; color: #1a2230; }
+    .card { background: #fff; border-color: #e2e7ef; box-shadow: 0 10px 30px rgba(20,30,60,.10); }
+    .msg { color: #55606f; }
+    .linkbox { background: #f5f7fb; border-color: #e2e7ef; color: #2f56c0; }
+    .ghost { color: #3a4657; border-color: #cfd6e2; }
+    .hint { color: #8a94a3; }
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1 id="title">링크 공유</h1>
+    <p class="msg" id="msg"></p>
+    <a class="linkbox" id="link" href="#" rel="noopener noreferrer" target="_blank"></a>
+    <button class="primary" id="shareBtn">카카오톡·문자로 공유하기</button>
+    <button class="ghost" id="copyBtn">링크 복사</button>
+    <p class="hint" id="hint">공유하기를 누르면 카카오톡·문자 등으로 이 링크를 보낼 수 있어요.</p>
+  </main>
+  <div class="toast" id="toast">복사했습니다</div>
+
+<script>
+(function () {
+  var p = new URLSearchParams(location.search);
+  var title = (p.get('t') || '링크 공유').slice(0, 80);
+  var msg = (p.get('m') || '아래 링크를 공유하세요.').slice(0, 300);
+  var url = (p.get('u') || '').trim();
+
+  // 안전: http/https 링크만 허용(javascript: 등 차단).
+  var safeUrl = /^https?:\/\//i.test(url) ? url : '';
+
+  document.title = title;
+  document.getElementById('title').textContent = title;
+  document.getElementById('msg').textContent = msg;
+
+  var linkEl = document.getElementById('link');
+  if (safeUrl) {
+    linkEl.textContent = safeUrl;
+    linkEl.href = safeUrl;
+  } else {
+    linkEl.style.display = 'none';
+  }
+
+  var toast = document.getElementById('toast');
+  function showToast(text) {
+    toast.textContent = text;
+    toast.classList.add('show');
+    setTimeout(function () { toast.classList.remove('show'); }, 1600);
+  }
+
+  var shareText = msg + (safeUrl ? ('\n' + safeUrl) : '');
+
+  document.getElementById('shareBtn').addEventListener('click', function () {
+    if (navigator.share) {
+      navigator.share({ title: title, text: msg, url: safeUrl || undefined })
+        .catch(function () {});
+    } else {
+      // Web Share 미지원(주로 PC): 복사로 대체.
+      copy();
+      showToast('이 기기는 공유가 안 돼요. 링크를 복사했어요.');
+    }
+  });
+
+  function copy() {
+    var text = safeUrl || shareText;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { showToast('복사했습니다'); },
+        function () { legacyCopy(text); }
+      );
+    } else {
+      legacyCopy(text);
+    }
+  }
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); showToast('복사했습니다'); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+  document.getElementById('copyBtn').addEventListener('click', copy);
+})();
+</script>
+</body>
+</html>

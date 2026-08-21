@@ -8,6 +8,7 @@ import 'directory.dart';
 import 'friends.dart';
 import 'l10n.dart';
 import 'push_service.dart';
+import 'share_qr.dart';
 
 /// 내 ID 화면. 상대가 QR 스캔 / 코드 입력 / 링크로 나를 친구추가·전화할 수 있다.
 class MyIdScreen extends StatefulWidget {
@@ -70,6 +71,17 @@ class _MyIdScreenState extends State<MyIdScreen> {
         .showSnackBar(SnackBar(content: Text(toast)));
   }
 
+  // 공유 QR: 옆의 휴대폰이 찍으면 내 친구추가 링크를 카톡·문자로 멀리 있는
+  // 사람에게 보낼 수 있다(TV는 카톡을 못 보내므로 휴대폰이 중계).
+  void _shareFriendInvite() {
+    showShareLinkQrDialog(
+      context,
+      title: L.t('share_friend_title'),
+      message: L.t('share_friend_msg'),
+      targetUrl: _link,
+    );
+  }
+
   Future<void> _shareLink() async {
     try {
       await SharePlus.instance.share(
@@ -85,7 +97,22 @@ class _MyIdScreenState extends State<MyIdScreen> {
     final uuid = _uuid;
     final hasName = _nameCtrl.text.trim().isNotEmpty;
     return Scaffold(
-      appBar: AppBar(title: Text(L.t('my_id_title'))),
+      appBar: AppBar(
+        title: Text(L.t('my_id_title')),
+        actions: [
+          // 자주 쓰는 "카톡·문자로 초대"를 상단에 배치(스크롤 없이 접근).
+          // 이름이 있어야 공유 링크가 유효하므로 이름 설정 후에만 노출.
+          if (hasName)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton.icon(
+                onPressed: _shareFriendInvite,
+                icon: const Icon(Icons.qr_code_2, size: 20),
+                label: Text(L.t('share_friend_btn')),
+              ),
+            ),
+        ],
+      ),
       body: uuid == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
