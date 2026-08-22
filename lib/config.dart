@@ -180,6 +180,14 @@ class AppConfig {
     return '$base$sep${Uri(queryParameters: params).query}';
   }
 
+  /// CCTV 딥링크. QR을 찍으면 앱이 열려 시청 화면으로 이동한다(다른 QR과 통일).
+  /// 보안상 **비밀번호(핀)는 링크에 담지 않는다** → 앱에서 별도 입력.
+  static String cctvLink(String code) {
+    final base = inviteBaseUrl;
+    final sep = base.contains('?') ? '&' : '?';
+    return '$base$sep${Uri(queryParameters: {'cctv': code}).query}';
+  }
+
   /// 공유 페이지 주소. TV가 띄운 "공유 QR"을 휴대폰으로 찍으면 이 페이지가 열리고,
   /// 거기서 대상 링크(친구추가/회의/앱설치)를 카톡·문자로 재전송할 수 있다.
   /// (TV는 카톡·문자를 못 보내므로, 옆의 휴대폰이 중계 역할)

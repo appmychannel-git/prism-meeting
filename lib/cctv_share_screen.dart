@@ -314,7 +314,8 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                       width: 170,
                       height: 170,
                       child: PrettyQrView.data(
-                        data: _roomId,
+                        // 딥링크: 찍으면 앱이 열려 시청화면으로(핀은 앱에서 별도 입력).
+                        data: AppConfig.cctvLink(_code),
                         decoration: const PrettyQrDecoration(
                           shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
                         ),

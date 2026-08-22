@@ -233,6 +233,7 @@ class L {
     'cctv_tab_share': {'ko': '녹화', 'en': 'Record'},
     'cctv_code': {'ko': '코드', 'en': 'Code'},
     'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
+    'cctv_enter_pin': {'ko': 'CCTV 비밀번호 입력', 'en': 'Enter CCTV password'},
     'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},
     'cctv_my_list': {'ko': '내 CCTV', 'en': 'My CCTV'},
     'cctv_add': {'ko': '새 CCTV 추가', 'en': 'Add CCTV'},
@@ -338,6 +339,14 @@ class L {
       'en': 'Scan this QR with a phone to open the share page,\nthen send the link via messenger or SMS.',
     },
     'share_friend_btn': {'ko': '카톡·문자로 초대', 'en': 'Invite via message'},
+    // 내 ID 화면 QR 모드 토글(태블릿/TV)
+    'share_seg_share': {'ko': '카톡·문자 공유', 'en': 'Share'},
+    'share_seg_direct': {'ko': '바로 스캔', 'en': 'Scan now'},
+    'share_seg_join': {'ko': '바로 입장', 'en': 'Join now'},
+    'myid_direct_caption': {
+      'ko': '앞에 있는 사람이 찍으면 바로 친구추가·통화돼요.',
+      'en': 'Someone in front scans to add & call instantly.',
+    },
     'share_friend_title': {'ko': '친구 추가 초대', 'en': 'Add-friend invite'},
     'share_friend_msg': {
       'ko': '아래 링크로 저를 친구로 추가하고 통화하세요.',

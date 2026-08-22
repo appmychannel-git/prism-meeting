@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'call.dart';
 import 'call_history_screen.dart';
 import 'cctv_hub_screen.dart';
+import 'cctv_view_screen.dart';
 import 'config.dart';
 import 'confirm_dialog.dart';
 import 'device_id.dart';
@@ -135,6 +136,20 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       return;
     }
 
+    // CCTV 딥링크(CCTV 공유 QR): ...?cctv=<코드> → 앱에서 시청화면으로 이동.
+    // 보안상 핀은 링크에 없으므로 앱에서 별도 입력받는다.
+    final cctv = uri.queryParameters['cctv'];
+    if (cctv != null && cctv.trim().isNotEmpty) {
+      final key = uri.toString();
+      if (key == _lastProcessedLinkKey) return;
+      _lastProcessedLinkKey = key;
+      final code = cctv.trim();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _handleCctvLink(code);
+      });
+      return;
+    }
+
     final room = uri.queryParameters['room'];
     final pin = uri.queryParameters['pin'];
     if (room == null || room.trim().isEmpty) return;
@@ -170,6 +185,53 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
         );
       }
     });
+  }
+
+  // CCTV 딥링크로 앱이 열렸을 때: 비밀번호(핀) 입력 → 시청화면.
+  Future<void> _handleCctvLink(String code) async {
+    if (!AppConfig.cctvEnabled) return; // CCTV 없는 브랜드는 무시
+    final pin = await _promptCctvPin();
+    if (pin == null || pin.trim().isEmpty || !mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CctvViewScreen(roomId: 'cctv-$code', pin: pin.trim()),
+      ),
+    );
+  }
+
+  // CCTV 시청용 비밀번호(6자리) 입력 다이얼로그.
+  Future<String?> _promptCctvPin() async {
+    final ctrl = TextEditingController();
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('cctv_enter_pin')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          obscureText: true,
+          decoration: InputDecoration(
+            hintText: L.t('cctv_password'),
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(L.t('cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: Text(L.t('ok')),
+          ),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    return pin;
   }
 
   // 내 ID 링크(딥링크)로 앱이 열렸을 때: 친구추가 + 통화 옵션 시트.

@@ -3,12 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'config.dart';
 import 'device_id.dart';
 import 'directory.dart';
+import 'form_factor.dart';
 import 'friends.dart';
 import 'l10n.dart';
 import 'push_service.dart';
-import 'share_qr.dart';
 
 /// 내 ID 화면. 상대가 QR 스캔 / 코드 입력 / 링크로 나를 친구추가·전화할 수 있다.
 class MyIdScreen extends StatefulWidget {
@@ -23,6 +24,9 @@ class _MyIdScreenState extends State<MyIdScreen> {
   final _scroll = ScrollController();
   String? _uuid;
   String _code = '';
+  // 태블릿/TV에서 메인 QR 모드: true=카톡·문자 공유 QR, false=바로 스캔 QR.
+  // (휴대폰에서는 토글 없이 항상 "바로 스캔"만 노출)
+  bool _shareMode = true;
 
   @override
   void initState() {
@@ -71,16 +75,14 @@ class _MyIdScreenState extends State<MyIdScreen> {
         .showSnackBar(SnackBar(content: Text(toast)));
   }
 
-  // 공유 QR: 옆의 휴대폰이 찍으면 내 친구추가 링크를 카톡·문자로 멀리 있는
-  // 사람에게 보낼 수 있다(TV는 카톡을 못 보내므로 휴대폰이 중계).
-  void _shareFriendInvite() {
-    showShareLinkQrDialog(
-      context,
-      title: L.t('share_friend_title'),
-      message: L.t('share_friend_msg'),
-      targetUrl: _link,
-    );
-  }
+  // 공유 QR(카톡·문자 중계)이 인코딩할 "공유 페이지" URL. 옆의 휴대폰이 이 QR을
+  // 찍으면 공유 페이지가 열려, 내 친구추가 링크를 카톡·문자로 멀리 있는 사람에게
+  // 보낼 수 있다(TV는 카톡을 못 보내므로 휴대폰이 중계).
+  String get _shareUrl => AppConfig.sharePageUrl(
+        title: L.t('share_friend_title'),
+        message: L.t('share_friend_msg'),
+        targetUrl: _link,
+      );
 
   Future<void> _shareLink() async {
     try {
@@ -96,23 +98,13 @@ class _MyIdScreenState extends State<MyIdScreen> {
   Widget build(BuildContext context) {
     final uuid = _uuid;
     final hasName = _nameCtrl.text.trim().isNotEmpty;
+    // 태블릿/스탠드TV에서만 "카톡·문자 공유 QR"을 제공한다.
+    // 휴대폰은 아래 OS "링크 공유"로 직접 보낼 수 있어 중복이므로 공유 QR 숨김.
+    final large = isBigScreen(context);
+    // 실제로 공유 QR을 보여줄지(=태블릿/TV + 공유모드 선택).
+    final showShareQr = large && _shareMode;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(L.t('my_id_title')),
-        actions: [
-          // 자주 쓰는 "카톡·문자로 초대"를 상단에 배치(스크롤 없이 접근).
-          // 이름이 있어야 공유 링크가 유효하므로 이름 설정 후에만 노출.
-          if (hasName)
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: TextButton.icon(
-                onPressed: _shareFriendInvite,
-                icon: const Icon(Icons.qr_code_2, size: 20),
-                label: Text(L.t('share_friend_btn')),
-              ),
-            ),
-        ],
-      ),
+      appBar: AppBar(title: Text(L.t('my_id_title'))),
       body: uuid == null
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -149,7 +141,30 @@ class _MyIdScreenState extends State<MyIdScreen> {
                         ),
                       ),
                     )
-                  else
+                  else ...[
+                    // 태블릿/TV: [카톡·문자 공유 | 바로 스캔] 토글로 메인 QR 전환.
+                    if (large) ...[
+                      Center(
+                        child: SegmentedButton<bool>(
+                          segments: [
+                            ButtonSegment(
+                              value: true,
+                              icon: const Icon(Icons.ios_share, size: 18),
+                              label: Text(L.t('share_seg_share')),
+                            ),
+                            ButtonSegment(
+                              value: false,
+                              icon: const Icon(Icons.qr_code_scanner, size: 18),
+                              label: Text(L.t('share_seg_direct')),
+                            ),
+                          ],
+                          selected: {_shareMode},
+                          onSelectionChanged: (s) =>
+                              setState(() => _shareMode = s.first),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Center(
                       child: Container(
                         padding: const EdgeInsets.all(14),
@@ -161,7 +176,8 @@ class _MyIdScreenState extends State<MyIdScreen> {
                           width: 240,
                           height: 240,
                           child: PrettyQrView.data(
-                            data: _link,
+                            // 공유모드면 "공유 페이지" URL, 아니면 바로 스캔용 내 링크.
+                            data: showShareQr ? _shareUrl : _link,
                             decoration: const PrettyQrDecoration(
                               shape:
                                   PrettyQrSmoothSymbol(color: Color(0xFF000000)),
@@ -170,6 +186,16 @@ class _MyIdScreenState extends State<MyIdScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 12),
+                    Text(
+                      showShareQr
+                          ? L.t('share_qr_caption')
+                          : L.t('myid_direct_caption'),
+                      textAlign: TextAlign.center,
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.white60),
+                    ),
+                  ],
                   const SizedBox(height: 20),
                   TextField(
                     controller: _nameCtrl,
@@ -204,11 +230,13 @@ class _MyIdScreenState extends State<MyIdScreen> {
                             _copy(_code, L.t('code_copied')),
                       ),
                     const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _shareLink,
-                      icon: const Icon(Icons.share),
-                      label: Text(L.t('share_my_link')),
-                    ),
+                    // OS 공유(카톡·문자 직접)는 휴대폰에서만. 태블릿/TV는 위 공유 QR 사용.
+                    if (!large)
+                      OutlinedButton.icon(
+                        onPressed: _shareLink,
+                        icon: const Icon(Icons.share),
+                        label: Text(L.t('share_my_link')),
+                      ),
                   ],
                 ],
               ),

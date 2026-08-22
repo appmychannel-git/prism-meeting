@@ -21,7 +21,7 @@ import 'stt_platform.dart';
 import 'chat_panel.dart';
 import 'config.dart';
 import 'connection_service.dart';
-import 'share_qr.dart';
+import 'form_factor.dart';
 import 'translation_service.dart';
 
 /// 음성 자막 발언 방식.
@@ -1217,102 +1217,117 @@ class _RoomScreenState extends State<RoomScreen> {
     _exitToJoin();
   }
 
-  // QR 초대: TV 등에서 QR을 띄우면 휴대폰으로 스캔해 바로 입장
+  // QR 초대: TV 등에서 QR을 띄우면 휴대폰으로 스캔해 바로 입장.
+  // 태블릿/TV는 [카톡·문자 공유 | 바로 입장] 토글로 QR 전환(내 ID 화면과 통일).
   void _showInviteQr() {
     final link = AppConfig.inviteLink(widget.roomName, pin: widget.pin);
+    final large = isBigScreen(context);
+    // 공유 QR: 옆 휴대폰이 찍으면 공유 페이지 → 카톡·문자로 회의 링크 전송.
+    final shareUrl = AppConfig.sharePageUrl(
+      title: L.t('share_meeting_title'),
+      message: L.t('share_meeting_msg'),
+      targetUrl: link,
+    );
+    bool shareMode = large; // 태블릿/TV는 공유 QR 기본, 휴대폰은 항상 직접(바로 입장)
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        // 화면(다이얼로그)이 작은 셋톱에서 내용이 넘쳐 오버플로우 줄무늬가 뜨는 것 방지.
-        scrollable: true,
-        title: Text(L.t('invite_qr')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SizedBox(
-                width: 220,
-                height: 220,
-                child: PrettyQrView.data(
-                  data: link,
-                  decoration: const PrettyQrDecoration(
-                    shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final showShareQr = large && shareMode;
+          return AlertDialog(
+            // 작은 셋톱에서 내용이 넘쳐 오버플로우 줄무늬가 뜨는 것 방지.
+            scrollable: true,
+            title: Text(L.t('invite_qr')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (large) ...[
+                  SegmentedButton<bool>(
+                    segments: [
+                      ButtonSegment(
+                        value: true,
+                        icon: const Icon(Icons.ios_share, size: 18),
+                        label: Text(L.t('share_seg_share')),
+                      ),
+                      ButtonSegment(
+                        value: false,
+                        icon: const Icon(Icons.qr_code_scanner, size: 18),
+                        label: Text(L.t('share_seg_join')),
+                      ),
+                    ],
+                    selected: {shareMode},
+                    onSelectionChanged: (s) =>
+                        setLocal(() => shareMode = s.first),
                   ),
-                  // QR 생성 실패 시에도 다이얼로그가 쓸모있도록 안내 대체
-                  errorBuilder: (_, _, _) => Center(
-                    child: Text(
-                      L.t('qr_fail'),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.black54,
-                        fontSize: 13,
+                  const SizedBox(height: 16),
+                ],
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SizedBox(
+                    width: 220,
+                    height: 220,
+                    child: PrettyQrView.data(
+                      data: showShareQr ? shareUrl : link,
+                      decoration: const PrettyQrDecoration(
+                        shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+                      ),
+                      errorBuilder: (_, _, _) => Center(
+                        child: Text(
+                          L.t('qr_fail'),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              color: Colors.black54, fontSize: 13),
+                        ),
                       ),
                     ),
                   ),
                 ),
+                const SizedBox(height: 16),
+                Text(
+                  L.t('room_code_val', {'room': widget.roomName}),
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                // 보안: 비밀번호는 QR/초대 화면에 노출하지 않는다.
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    L.t('invite_pw_note'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  showShareQr ? L.t('share_qr_caption') : L.t('qr_scan_hint'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: link));
+                  Navigator.pop(ctx);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(L.t('link_copied'))),
+                    );
+                  }
+                },
+                child: Text(L.t('copy_link')),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              L.t('room_code_val', {'room': widget.roomName}),
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            // 보안: 비밀번호는 QR/초대 화면에 노출하지 않는다(방장이 별도로 전달).
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                L.t('invite_pw_note'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: Colors.white60),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(L.t('close')),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              L.t('qr_scan_hint'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: Colors.white70),
-            ),
-          ],
-        ),
-        actions: [
-          // 카톡·문자로 공유: 옆의 휴대폰이 공유 QR을 찍어 멀리 있는 사람에게 회의
-          // 링크를 전송(TV는 카톡을 못 보내므로 휴대폰이 중계).
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              showShareLinkQrDialog(
-                context,
-                title: L.t('share_meeting_title'),
-                message: L.t('share_meeting_msg'),
-                targetUrl: link,
-              );
-            },
-            child: Text(L.t('share_meeting_btn')),
-          ),
-          TextButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: link));
-              Navigator.pop(ctx);
-              if (mounted) {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(
-                  SnackBar(content: Text(L.t('link_copied'))),
-                );
-              }
-            },
-            child: Text(L.t('copy_link')),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(L.t('close')),
-          ),
-        ],
+            ],
+          );
+        },
       ),
     );
   }
