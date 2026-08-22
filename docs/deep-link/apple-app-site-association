@@ -4,8 +4,7 @@
       {
         "appIDs": ["N7653V74T8.kr.co.mychannel.meeting.prism"],
         "components": [
-          { "/": "/meeting/*", "comment": "초대 링크(방 입장) 및 하위 경로" },
-          { "/": "/meeting", "comment": "초대 링크 루트" }
+          { "/": "/apps/meeting/prism/*", "comment": "prism 브랜드: 회의/친구(uid)/CCTV(cctv) 딥링크" }
         ]
       }
     ]
