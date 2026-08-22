@@ -17,11 +17,11 @@
 ## 현재 기본값
 | 브랜드 | FRIENDS | CALL | CCTV | TRANSLATION |
 |---|---|---|---|---|
-| prism | ✕ | ✕ | ✕ | ✕ |
-| gbled | ✕ | ✕ | ✕ | ✕ |
-| viewplus | ✕ | ✕ | ✕ | ✕ |
+| prism | ✔ | ✔ | ✔ | ✕ |
+| gbled | ✔ | ✔ | ✔ | ✕ |
+| viewplus | ✔ | ✔ | ✔ | ✕ |
 | mychannel | ✔ | ✔ | ✔ | ✕ |
-| ecoglow | ✕ | ✕ | ✕ | ✕ |
+| ecoglow | ✔ | ✔ | ✔ | ✕ |
 
 > 바꾸려면 `scripts/build_brand.sh` 의 해당 브랜드 줄에서 `true`/`false` 수정.
 

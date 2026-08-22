@@ -19,28 +19,18 @@
 # ============================================================================
 set -e
 
-brand_config() {
-  case "$1" in
-    #          APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
-    prism)     APP_BRAND="Prism Meeting"    ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    gbled)     APP_BRAND="Gbled Meeting"    ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    viewplus)  APP_BRAND="Viewplus Meeting" ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    mychannel) APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    ecoglow)   APP_BRAND="ECO GLOW Meeting" ; FRIENDS=false; CALL=false; CCTV=false; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    *) echo "알 수 없는 브랜드: $1  (prism|gbled|viewplus|mychannel|ecoglow|all)"; exit 1 ;;
-  esac
-}
+# 브랜드 설정은 공용 파일에서(APK/웹 빌드가 같은 설정 공유).
+source "$(dirname "$0")/brands.sh"
 
 build_one() {
   local brand="$1"
   brand_config "$brand"
   echo "== 빌드: $brand =="
-  # 브랜드별 배포 경로. 딥링크(App Links)가 브랜드마다 달라야 "그 브랜드 앱"으로만
-  # 열린다. 서버 구조: androidtv.mychannel.co.kr/apps/meeting/<brand>/
+  # 브랜드별 배포 경로(딥링크/공유/APK). 구조: /apps/meeting/<brand>/
   #   - <base>            : 회의 웹 + 딥링크 진입점(친구추가/회의 링크)
   #   - <base>share/      : 공유 페이지(카톡·문자 전송, 브라우저로 열림)
   #   - <base>download/…  : 앱(APK) 다운로드
-  local base_url="https://androidtv.mychannel.co.kr/apps/meeting/${brand}/"
+  local base_url; base_url="$(brand_base_url "$brand")"
   local invite_url="$base_url"
   local share_url="${base_url}share/"
   local apk_url="${base_url}download/Meeting-${brand}.apk"
@@ -85,7 +75,7 @@ run_brand() {
 }
 
 if [ "$BRAND" = "all" ]; then
-  for b in prism gbled viewplus mychannel ecoglow; do run_brand "$b"; done
+  for b in $BRAND_LIST; do run_brand "$b"; done
 else
   run_brand "$BRAND"
 fi
