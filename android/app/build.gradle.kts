@@ -44,6 +44,11 @@ android {
         versionName = flutter.versionName
         // 앱 표시 이름(매니페스트 android:label). flavor에서 브랜드별로 덮어씀.
         manifestPlaceholders["appLabel"] = "Prism Meeting"
+        // App Links 딥링크 진입 경로. 브랜드마다 달라야 "그 브랜드 앱"으로만 열린다
+        // (여러 브랜드가 같은 경로를 주장하면 어느 앱이 열릴지 불확정 → 선택창).
+        // host는 공통, path는 flavor에서 /apps/meeting/<brand>/ 로 덮어씀.
+        manifestPlaceholders["deepLinkHost"] = "androidtv.mychannel.co.kr"
+        manifestPlaceholders["deepLinkPath"] = "/apps/meeting/prism/"
         // Firestore/Firebase 등 메서드 수가 많아 64K DEX 한계 회피.
         multiDexEnabled = true
     }
@@ -57,26 +62,31 @@ android {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.prism"
             manifestPlaceholders["appLabel"] = "Prism Meeting"
+            manifestPlaceholders["deepLinkPath"] = "/apps/meeting/prism/"
         }
         create("gbled") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.gbled"
             manifestPlaceholders["appLabel"] = "Gbled Meeting"
+            manifestPlaceholders["deepLinkPath"] = "/apps/meeting/gbled/"
         }
         create("viewplus") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.viewplus"
             manifestPlaceholders["appLabel"] = " Viewplus Meeting"
+            manifestPlaceholders["deepLinkPath"] = "/apps/meeting/viewplus/"
         }
         create("mychannel") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting"
             manifestPlaceholders["appLabel"] = "Mychannel Meeting"
+            manifestPlaceholders["deepLinkPath"] = "/apps/meeting/mychannel/"
         }
         create("ecoglow") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.ecoglowkc"
             manifestPlaceholders["appLabel"] = "ECO GLOW Meeting"
+            manifestPlaceholders["deepLinkPath"] = "/apps/meeting/ecoglow/"
         }
     }
 

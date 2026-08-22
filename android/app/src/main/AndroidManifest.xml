@@ -55,19 +55,17 @@
             </intent-filter>
             <!-- App Links: 초대/친구추가 링크 클릭 시 이 앱으로 열기.
                  도메인의 /.well-known/assetlinks.json 로 소유권 검증(autoVerify).
-                 진입점(/meeting/, /meeting-cctv/)만 "정확히" 매칭한다. 하위 경로
-                 (/meeting-cctv/share/, /meeting-cctv/download/)는 앱이 아니라
-                 브라우저로 열려야 하므로 pathPrefix 대신 android:path(정확 일치)를 쓴다. -->
+                 브랜드별 진입 경로(예: /apps/meeting/gbled/)만 "정확히" 매칭한다
+                 (deepLinkPath = flavor에서 브랜드별로 지정). 그래야 여러 브랜드 앱이
+                 깔려 있어도 "그 브랜드 앱"으로만 열린다. 하위 경로(/share/, /download/)는
+                 정확 일치가 아니므로 앱이 아니라 브라우저로 열린다. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https"
-                      android:host="androidtv.mychannel.co.kr"
-                      android:path="/meeting/"/>
-                <data android:scheme="https"
-                      android:host="androidtv.mychannel.co.kr"
-                      android:path="/meeting-cctv/"/>
+                      android:host="${deepLinkHost}"
+                      android:path="${deepLinkPath}"/>
             </intent-filter>
         </activity>
         <meta-data

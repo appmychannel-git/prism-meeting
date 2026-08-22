@@ -161,7 +161,7 @@ class AppConfig {
   ///   --dart-define=INVITE_BASE_URL=... 로 덮어쓸 수 있음.
   static const String _inviteBaseNative = String.fromEnvironment(
     'INVITE_BASE_URL',
-    defaultValue: 'https://androidtv.mychannel.co.kr/meeting/',
+    defaultValue: 'https://androidtv.mychannel.co.kr/apps/meeting/mychannel/',
   );
   static String get inviteBaseUrl {
     if (kIsWeb) {
@@ -186,7 +186,7 @@ class AppConfig {
   /// --dart-define=SHARE_BASE_URL=... 로 덮어쓸 수 있음.
   static const String shareBaseUrl = String.fromEnvironment(
     'SHARE_BASE_URL',
-    defaultValue: 'https://androidtv.mychannel.co.kr/meeting-cctv/share/',
+    defaultValue: 'https://androidtv.mychannel.co.kr/apps/meeting/mychannel/share/',
   );
 
   /// 앱 설치용 APK 다운로드 주소(구글스토어 미등록 → 직접 다운로드 유도).
@@ -194,7 +194,7 @@ class AppConfig {
   static const String apkUrl = String.fromEnvironment(
     'APK_URL',
     defaultValue:
-        'https://androidtv.mychannel.co.kr/meeting-cctv/download/Meeting-mychannel.apk',
+        'https://androidtv.mychannel.co.kr/apps/meeting/mychannel/download/Meeting-mychannel.apk',
   );
 
   /// 공유 페이지 URL 생성: 제목(t)·메시지(m)·대상링크(u)를 쿼리로 실어 보낸다.
