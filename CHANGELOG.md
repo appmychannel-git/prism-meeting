@@ -9,18 +9,35 @@ Prism Meeting — Flutter + LiveKit(SFU) 기반 소규모 다자간 화상회의
 ### 공유(카톡·문자 초대) — 신규
 - **공유 QR**: 옆에 있는 휴대폰이 QR을 찍으면 **공유 페이지**가 열려, 친구추가/회의/앱설치
   링크를 카카오톡·문자로 **멀리 있는 사람에게 전송**(TV는 메신저를 못 보내므로 휴대폰이 중계).
-  - 내 ID 화면 상단 "카톡·문자로 초대", 회의 초대창 "카톡·문자로 공유", 좌측 메뉴 "앱 공유".
+- **태블릿/TV는 토글**: 내 ID·회의 초대 QR에서 `[카톡·문자 공유 | 바로 스캔/입장]` 토글로
+  QR 전환. **휴대폰은 기존(바로) QR + OS 링크 공유**만(공유 QR 숨김 — 중복 제거).
+  큰 화면 판정은 `form_factor.dart`(1080p 스탠드TV=짧은변 540 등도 포함).
 - **공유 페이지(정적)** `share_page/index.html`: 제목·메시지·대상링크(`t/m/u`)를 받아
-  Web Share(카톡·문자) + 복사 제공. 서버 `/meeting-cctv/share/` 에 배포.
-  앱 설치 링크는 `/meeting-cctv/download/Meeting-<brand>.apk`(브랜드별 자동 지정).
-- **App Links 경로 정리**: `pathPrefix "/meeting"` → 정확 경로 `/meeting/`,`/meeting-cctv/`만
-  앱으로. 하위 경로(`/share/`,`/download/`)는 앱이 아니라 브라우저로 열리게 함.
+  Web Share(카톡·문자) + 복사 제공. 좌측 메뉴 "앱 공유"는 APK 다운로드 링크 전송.
+
+### 브랜드별 딥링크 라우팅 + 배포 구조
+- **서버 구조 `/apps/meeting/<brand>/`** 로 통일(하위에 `share/`, `download/`).
+  `apps/` 아래 다른 프로젝트도 추가 가능.
+- **App Links를 브랜드별 정확 경로**(`/apps/meeting/<brand>/`)로 매칭 → 여러 브랜드 앱이
+  한 폰에 깔려도 **"그 브랜드 앱"으로만** 열림. 하위 경로(`/share/`,`/download/`)는 브라우저로.
+- `build_brand.sh`가 브랜드별 `INVITE_BASE_URL`/`SHARE_BASE_URL`/`APK_URL` 자동 주입.
 
 ### 브랜드
-- **ECO GLOW Meeting** 브랜드 추가(`kr.co.mychannel.meeting.ecoglowkc`, 기능 전부 off).
+- **ECO GLOW Meeting** 브랜드 추가(`kr.co.mychannel.meeting.ecoglowkc`).
+- **전 브랜드 풀기능 통일**: prism·gbled·viewplus·ecoglow 도 mychannel과 동일하게
+  친구·통화·CCTV=on. 브랜드 설정은 `scripts/brands.sh` 단일 소스로 분리.
+- **웹 빌드 스크립트** `scripts/build_web.sh`: 브랜드별 웹 → `dist/web/<brand>/`
+  (base-href=`/apps/meeting/<brand>/`, `share/` + `download/Meeting-<brand>.apk` 동봉).
+  ※ 웹은 회의·CCTV 시청만(친구·통화는 기기 UUID/FCM 필요 → 브라우저 자동 비활성).
+
+### CCTV
+- **CCTV 공유 QR을 딥링크로**(`?cctv=<code>`) → 찍으면 앱 열림 → 비밀번호(핀) 입력 →
+  시청화면. 다른 QR과 통일(핀은 보안상 링크에 담지 않고 별도 입력).
 
 ### 기기 호환
 - 외장(탈착식) 카메라 기기: QR 라이브 스캔이 안 될 때(검은 화면) 갤러리 선택/코드 입력 안내.
+- 27" 스탠드TV 카메라 열기 멈춤(ANR) 진단 — 저해상도 요청 시 회의 카메라는 동작
+  (해당 유닛 개체 이슈, 실물 입고 후 정밀 확인 예정).
 
 ## [1.0.5+5] - 2026-08
 
