@@ -62,6 +62,7 @@ dependencies:
   firebase_auth: ^6.5.7
   vibration: ^3.2.0
   screen_brightness: ^2.1.11
+  flutter_callkit_incoming: ^3.1.5
 
 dev_dependencies:
   flutter_test:

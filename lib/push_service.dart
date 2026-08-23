@@ -11,6 +11,7 @@ import 'app_settings.dart';
 import 'auth_service.dart';
 import 'block_store.dart';
 import 'call_signaling.dart';
+import 'callkit_service.dart';
 import 'cctv_share_screen.dart';
 import 'cctv_store.dart';
 import 'config.dart';
@@ -220,6 +221,8 @@ class PushService with WidgetsBindingObserver {
     try {
       await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+      // iOS: VoIP(PushKit)+CallKit 로 꺼진 앱에서도 수신 통화(안드로이드는 FCM 그대로).
+      await CallKitService.instance.init(appNavigatorKey);
       await _createCallChannel(); // 수신벨용 고importance 채널(백그라운드 헤드업+소리)
       await _setupLocalNotifRouting(); // 알림으로 앱 실행 시 라우팅(CCTV 원격 켜기)
 
@@ -231,6 +234,8 @@ class PushService with WidgetsBindingObserver {
       await AuthService.ensureSignedIn(_myUuid!);
       await _registerDevice();
       msg.onTokenRefresh.listen((_) => _registerDevice());
+      // iOS VoIP 토큰도 서버가 읽는 deviceTokens 에 저장.
+      await CallKitService.instance.registerVoipToken(_myUuid!);
 
       // presence: 앱이 떠 있는 동안 주기적으로 lastSeen 갱신 + 생명주기 관찰.
       WidgetsBinding.instance.addObserver(this);
@@ -486,6 +491,17 @@ class PushService with WidgetsBindingObserver {
         cancelIncomingCallNotification();
         return;
       }
+    }
+    // iOS: 시스템 통화 UI(CallKit)로 표시. 꺼진 앱은 VoIP 푸시가, 포그라운드는 이 폴백이 담당.
+    if (CallKitService.isSupported) {
+      await CallKitService.instance.showIncoming(
+        callId: callId,
+        fromName: fromName,
+        room: room,
+        video: video,
+        fromUuid: fromUuid,
+      );
+      return;
     }
     final nav = appNavigatorKey.currentState;
     if (nav == null) return;
