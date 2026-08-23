@@ -236,6 +236,9 @@ class PushService with WidgetsBindingObserver {
       msg.onTokenRefresh.listen((_) => _registerDevice());
       // iOS VoIP 토큰도 서버가 읽는 deviceTokens 에 저장.
       await CallKitService.instance.registerVoipToken(_myUuid!);
+      // 앱 시작 시엔 통화 중일 수 없다. 이전 세션이 강제종료/크래시로 통화중(inCall)
+      // 상태를 못 내린 경우가 있으므로 여기서 확실히 해제(친구목록 "통화중" 잔상 제거).
+      await setInCall(false);
 
       // presence: 앱이 떠 있는 동안 주기적으로 lastSeen 갱신 + 생명주기 관찰.
       WidgetsBinding.instance.addObserver(this);
