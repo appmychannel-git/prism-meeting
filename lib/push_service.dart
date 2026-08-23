@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -343,9 +344,16 @@ class PushService with WidgetsBindingObserver {
         'lastSeen': FieldValue.serverTimestamp(), // presence
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      // 번들 ID(=브랜드별로 다름). 서버가 iOS VoIP 토픽(<bundleId>.voip)을 이 값으로
+      // 만든다 → 브랜드가 5개여도 서버 환경변수 변경 없이 각 기기에 맞는 토픽으로 전송.
+      String? bundleId;
+      try {
+        bundleId = (await PackageInfo.fromPlatform()).packageName;
+      } catch (_) {}
       // FCM 토큰: 클라이언트는 못 읽는 별도 컬렉션(서버 Admin만 읽음) → 토큰 탈취 방지.
       await db.collection('deviceTokens').doc(uuid).set({
         'fcmToken': token,
+        if (bundleId != null && bundleId.isNotEmpty) 'bundleId': bundleId,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
     } catch (e) {
