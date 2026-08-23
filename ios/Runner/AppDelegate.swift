@@ -14,7 +14,17 @@ import flutter_callkit_incoming
     let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
     voipRegistry.delegate = self
     voipRegistry.desiredPushTypes = [PKPushType.voIP]
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
+
+    // 강제종료 후 VoIP 콜드 런치에서도 CallKit 을 띄우려면, 푸시 수신 시점에
+    // 플러그인 sharedInstance 가 준비돼 있어야 한다. implicit-engine 등록은 시점이
+    // 늦어 nil 일 수 있으므로 여기서 미리(멱등) 등록한다.
+    if SwiftFlutterCallkitIncomingPlugin.sharedInstance == nil,
+       let registrar = self.registrar(forPlugin: "SwiftFlutterCallkitIncomingPlugin") {
+      SwiftFlutterCallkitIncomingPlugin.register(with: registrar)
+    }
+    return result
   }
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {

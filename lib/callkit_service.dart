@@ -169,7 +169,8 @@ class CallKitService {
     final ctx = await _waitNavigatorContext();
     if (ctx == null) return;
     // ctx 는 위젯이 아닌 전역 NavigatorState 의 context 라 async 이후에도 유효.
-    // ignore: use_build_context_synchronously
+    // CallKit 경로는 대체할 Flutter 화면(수신 화면)이 없다. replace 로 홈을 교체하면
+    // 통화 종료 후 스택이 비어 검정화면이 되므로, 홈 위에 push 한다(종료 시 홈 복귀).
     await joinDmRoom(
       ctx,
       room: room,
@@ -177,7 +178,7 @@ class CallKitService {
       uuid: uuid,
       video: video,
       peerName: fromName,
-      replace: true,
+      replace: false,
     );
   }
 
