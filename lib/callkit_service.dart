@@ -36,6 +36,8 @@ class CallKitService {
   GlobalKey<NavigatorState>? _navKey;
   bool _started = false;
   final Set<String> _acceptedIds = <String>{}; // 수락 중복 처리 방지
+  // 통화별 취소 감시 구독. 발신자가 취소/종료하면 CallKit 벨을 내려야 한다.
+  final Map<String, StreamSubscription<CallDoc?>> _cancelWatchers = {};
 
   /// 앱 시작 시 1회 호출. CallKit 이벤트 리스너 등록.
   Future<void> init(GlobalKey<NavigatorState> navKey) async {
@@ -111,21 +113,56 @@ class CallKitService {
         final uuid = await DeviceId.uuid();
         await registerVoipToken(uuid);
         break;
+      case CallEventActionCallIncoming(:final callKitParams):
+        // 수신 표시됨 → 발신자가 취소/종료하면 벨을 내리도록 문서 감시 시작.
+        _watchForCancel(_callIdOf(callKitParams));
+        break;
       case CallEventActionCallAccept(:final callKitParams):
+        _stopWatch(_callIdOf(callKitParams));
         await _accept(callKitParams);
         break;
       case CallEventActionCallDecline(:final callKitParams):
-        final id = (callKitParams.extra?['callId'] ?? callKitParams.id ?? '')
-            .toString();
+        final id = _callIdOf(callKitParams);
+        _stopWatch(id);
         if (id.isNotEmpty) {
           try {
             await CallSignaling.setStatus(id, CallStatus.declined);
           } catch (_) {}
         }
         break;
+      case CallEventActionCallEnded(:final callKitParams):
+        _stopWatch(_callIdOf(callKitParams));
+        break;
+      case CallEventActionCallTimeout(:final id):
+        _stopWatch(id);
+        break;
       default:
         break;
     }
+  }
+
+  String _callIdOf(CallKitParams p) =>
+      (p.extra?['callId'] ?? p.id ?? '').toString();
+
+  /// 수신 통화 문서를 감시해, 발신자가 취소/종료(문서 삭제 포함)하면 CallKit 벨을 내린다.
+  void _watchForCancel(String callId) {
+    if (callId.isEmpty || _cancelWatchers.containsKey(callId)) return;
+    _cancelWatchers[callId] = CallSignaling.watch(callId).listen((c) async {
+      final callerEnded = c == null ||
+          c.status == CallStatus.canceled ||
+          c.status == CallStatus.ended ||
+          c.status == CallStatus.declined;
+      if (callerEnded) {
+        _stopWatch(callId);
+        try {
+          await FlutterCallkitIncoming.endCall(callId);
+        } catch (_) {}
+      }
+    }, onError: (_) {});
+  }
+
+  void _stopWatch(String callId) {
+    _cancelWatchers.remove(callId)?.cancel();
   }
 
   Future<void> _accept(CallKitParams p) async {
