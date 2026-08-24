@@ -67,6 +67,23 @@ build_web_one() {
 </IfModule>
 HT
 
+  # IIS용도 동일 목적으로 web.config 생성(서버가 IIS면 .htaccess 무시됨).
+  cat > "$out/web.config" <<'XML'
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- IIS: index.html·서비스워커·부트스트랩은 캐시하지 않음(수정이 바로 반영되게). -->
+<configuration>
+  <location path="index.html">
+    <system.webServer><staticContent><clientCache cacheControlMode="DisableCache" /></staticContent></system.webServer>
+  </location>
+  <location path="flutter_service_worker.js">
+    <system.webServer><staticContent><clientCache cacheControlMode="DisableCache" /></staticContent></system.webServer>
+  </location>
+  <location path="flutter_bootstrap.js">
+    <system.webServer><staticContent><clientCache cacheControlMode="DisableCache" /></staticContent></system.webServer>
+  </location>
+</configuration>
+XML
+
   # 공유 페이지 동봉(브라우저로 열림 — 앱이 아님)
   mkdir -p "$out/share"
   cp share_page/index.html "$out/share/index.html"
