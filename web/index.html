@@ -86,13 +86,44 @@
 </head>
 <body>
   <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
+    앱 미설치 상태에서 "친구추가 링크(?uid=)"가 브라우저로 열린 경우 안내 화면.
+    친구추가는 기기 식별/푸시가 필요해 웹에선 동작하지 않으므로, 앱 설치를 유도한다.
+    (회의 ?room= / CCTV ?cctv= 는 웹에서도 되므로 이 화면을 띄우지 않는다.)
+    __APK_URL__ 은 build_web.sh 가 브랜드별 APK 주소로 치환한다.
   -->
-  <script src="flutter_bootstrap.js" async></script>
+  <div id="install-landing" style="display:none; position:fixed; inset:0;
+       align-items:center; justify-content:center; padding:24px; box-sizing:border-box;
+       font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic','Segoe UI',Roboto,sans-serif;
+       background:#0e1116; color:#e9edf3;">
+    <div style="width:100%; max-width:420px; background:#171b22; border:1px solid #262c37;
+         border-radius:16px; padding:28px 22px; text-align:center; box-shadow:0 10px 30px rgba(0,0,0,.35);">
+      <div style="font-size:44px; line-height:1; margin-bottom:14px;">👥</div>
+      <h1 style="font-size:20px; margin:0 0 8px;"><span id="il-name">친구</span>이 친구추가를 요청했어요</h1>
+      <p style="font-size:14px; color:#aab3c0; margin:0 0 22px; line-height:1.5;">
+        친구추가·통화는 <b>앱에서만</b> 됩니다.<br>앱을 설치한 뒤 아래 안내대로 진행하세요.</p>
+      <a id="il-download" href="__APK_URL__"
+         style="display:block; background:#3b6ef5; color:#fff; text-decoration:none; font-weight:700;
+                font-size:16px; padding:15px; border-radius:12px; margin-bottom:14px;">앱 설치 (다운로드)</a>
+      <p style="font-size:12px; color:#7d8895; margin:0; line-height:1.6;">
+        설치가 끝나면 <b>이 링크를 다시 한 번 열어</b>주세요.<br>그러면 앱이 열리고 친구추가가 완료됩니다.</p>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var p = new URLSearchParams(window.location.search);
+      // 앱 미설치로 폴백된 "친구추가 링크"면: 플러터(웹) 대신 설치 안내를 띄운다.
+      if (p.get('uid') && p.get('noapp') === '1') {
+        var nm = (p.get('name') || '').slice(0, 40);
+        document.getElementById('il-name').textContent = nm ? (nm + '님') : '친구';
+        document.getElementById('install-landing').style.display = 'flex';
+        return; // 플러터 로드 안 함
+      }
+      // 그 외(회의/CCTV/일반)는 정상적으로 앱(웹)을 로드.
+      var s = document.createElement('script');
+      s.src = 'flutter_bootstrap.js';
+      s.async = true;
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>

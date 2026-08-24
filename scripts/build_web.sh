@@ -46,12 +46,13 @@ build_web_one() {
   rm -rf "$out"
   mkdir -p "$out"
   cp -r build/web/* "$out/"
-  # 카톡 인앱브라우저 intent:// 자동실행의 package/scheme 을 브랜드별로 치환.
-  local pkg scheme
+  # 카톡 인앱브라우저 intent:// 자동실행의 package/scheme + 설치안내 APK 주소를 치환.
+  local pkg scheme apk_url
   pkg="$(brand_package "$brand")"
   scheme="$(brand_scheme "$brand")"
-  sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g" "$out/index.html"
-  echo "   intent package=$pkg  scheme=$scheme"
+  apk_url="${base}download/Meeting-${brand}.apk"
+  sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g; s|__APK_URL__|${apk_url}|g" "$out/index.html"
+  echo "   intent package=$pkg  scheme=$scheme  apk=$apk_url"
   # 공유 페이지 동봉(브라우저로 열림 — 앱이 아님)
   mkdir -p "$out/share"
   cp share_page/index.html "$out/share/index.html"
