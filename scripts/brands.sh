@@ -28,3 +28,20 @@ brand_config() {
 # 브랜드별 서버 배포 base 경로. 딥링크(App Links)가 브랜드마다 달라야 "그 브랜드
 # 앱"으로만 열린다. 구조: androidtv.mychannel.co.kr/apps/meeting/<brand>/
 brand_base_url() { echo "https://androidtv.mychannel.co.kr/apps/meeting/$1/"; }
+
+# 브랜드별 안드로이드 패키지명(=applicationId). 웹의 카톡 인앱브라우저 intent://
+# 자동실행에서 "그 브랜드 앱"을 지정하는 데 쓴다.
+brand_package() {
+  case "$1" in
+    prism)     echo "kr.co.mychannel.meeting.prism" ;;
+    gbled)     echo "kr.co.mychannel.meeting.gbled" ;;
+    viewplus)  echo "kr.co.mychannel.meeting.viewplus" ;;
+    mychannel) echo "kr.co.mychannel.meeting" ;;
+    ecoglow)   echo "kr.co.mychannel.meeting.ecoglowkc" ;;
+    *) echo "kr.co.mychannel.meeting.$1" ;;
+  esac
+}
+
+# 브랜드별 iOS 커스텀 스킴(카톡 인앱웹뷰에서 Universal Link가 안 먹으므로 스킴으로 앱 실행).
+# iOS 앱이 이 스킴을 등록해야 한다(예: prism=prismmeeting).
+brand_scheme() { echo "${1}meeting"; }

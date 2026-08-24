@@ -46,6 +46,12 @@ build_web_one() {
   rm -rf "$out"
   mkdir -p "$out"
   cp -r build/web/* "$out/"
+  # 카톡 인앱브라우저 intent:// 자동실행의 package/scheme 을 브랜드별로 치환.
+  local pkg scheme
+  pkg="$(brand_package "$brand")"
+  scheme="$(brand_scheme "$brand")"
+  sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g" "$out/index.html"
+  echo "   intent package=$pkg  scheme=$scheme"
   # 공유 페이지 동봉(브라우저로 열림 — 앱이 아님)
   mkdir -p "$out/share"
   cp share_page/index.html "$out/share/index.html"
