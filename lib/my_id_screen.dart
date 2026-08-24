@@ -141,7 +141,12 @@ class _MyIdScreenState extends State<MyIdScreen> {
                         ),
                       ),
                     )
-                  else ...[
+                  else
+                    // 단일 위젯(Column)으로 감싼다: 이름 유무로 자식 개수가 바뀌면
+                    // 아래 TextField 위치가 밀려 재생성되고 첫 글자에서 키보드가 닫힌다.
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                     // 태블릿/TV: [카톡·문자 공유 | 바로 스캔] 토글로 메인 QR 전환.
                     if (large) ...[
                       Center(
@@ -195,7 +200,8 @@ class _MyIdScreenState extends State<MyIdScreen> {
                       style:
                           const TextStyle(fontSize: 12, color: Colors.white60),
                     ),
-                  ],
+                      ],
+                    ),
                   const SizedBox(height: 20),
                   TextField(
                     controller: _nameCtrl,
