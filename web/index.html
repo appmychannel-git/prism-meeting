@@ -100,12 +100,20 @@
       <div style="font-size:44px; line-height:1; margin-bottom:14px;">👥</div>
       <h1 style="font-size:20px; margin:0 0 8px;"><span id="il-name">친구</span>이 친구추가를 요청했어요</h1>
       <p style="font-size:14px; color:#aab3c0; margin:0 0 22px; line-height:1.5;">
-        친구추가·통화는 <b>앱에서만</b> 됩니다.<br>앱을 설치한 뒤 아래 안내대로 진행하세요.</p>
-      <a id="il-download" href="__APK_URL__"
-         style="display:block; background:#3b6ef5; color:#fff; text-decoration:none; font-weight:700;
-                font-size:16px; padding:15px; border-radius:12px; margin-bottom:14px;">앱 설치 (다운로드)</a>
-      <p style="font-size:12px; color:#7d8895; margin:0; line-height:1.6;">
-        설치가 끝나면 <b>이 링크를 다시 한 번 열어</b>주세요.<br>그러면 앱이 열리고 친구추가가 완료됩니다.</p>
+        친구추가·통화는 <b>앱에서만</b> 됩니다.</p>
+      <!-- 안드로이드: APK 다운로드 -->
+      <div id="il-android">
+        <a id="il-download" href="__APK_URL__"
+           style="display:block; background:#3b6ef5; color:#fff; text-decoration:none; font-weight:700;
+                  font-size:16px; padding:15px; border-radius:12px; margin-bottom:14px;">앱 설치 (다운로드)</a>
+        <p style="font-size:12px; color:#7d8895; margin:0; line-height:1.6;">
+          설치가 끝나면 <b>이 링크를 다시 한 번 열어</b>주세요.<br>그러면 앱이 열리고 친구추가가 완료됩니다.</p>
+      </div>
+      <!-- 아이폰: APK 설치 불가 → 준비 중 안내 -->
+      <div id="il-ios" style="display:none;">
+        <p style="font-size:15px; color:#e9edf3; margin:0 0 6px; font-weight:600;">아이폰 버전은 준비 중입니다.</p>
+        <p style="font-size:12px; color:#7d8895; margin:0;">App Store 출시 예정이에요.</p>
+      </div>
     </div>
   </div>
   <script>
@@ -115,6 +123,12 @@
       if (p.get('uid') && p.get('noapp') === '1') {
         var nm = (p.get('name') || '').slice(0, 40);
         document.getElementById('il-name').textContent = nm ? (nm + '님') : '친구';
+        // 아이폰은 APK 설치가 안 되므로 다운로드 대신 "준비 중" 안내를 보여준다.
+        var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+        if (isIOS) {
+          document.getElementById('il-android').style.display = 'none';
+          document.getElementById('il-ios').style.display = 'block';
+        }
         document.getElementById('install-landing').style.display = 'flex';
         return; // 플러터 로드 안 함
       }
