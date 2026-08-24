@@ -53,6 +53,20 @@ build_web_one() {
   apk_url="${base}download/Meeting-${brand}.apk"
   sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g; s|__APK_URL__|${apk_url}|g" "$out/index.html"
   echo "   intent package=$pkg  scheme=$scheme  apk=$apk_url"
+  # index.html·서비스워커는 캐시 안 함(Apache). 캐시로 옛 페이지가 뜨는 것 방지.
+  # (nginx면 .htaccess 무시 → 서버 설정 필요)
+  cat > "$out/.htaccess" <<'HT'
+# index.html·서비스워커·부트스트랩은 캐시하지 않음 → 웹 수정이 바로 반영되게.
+# (assets·main.dart.js·canvaskit 등 해시 붙은 파일은 캐시해도 됨)
+<IfModule mod_headers.c>
+  <FilesMatch "^(index\.html|flutter_service_worker\.js|flutter_bootstrap\.js)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+</IfModule>
+HT
+
   # 공유 페이지 동봉(브라우저로 열림 — 앱이 아님)
   mkdir -p "$out/share"
   cp share_page/index.html "$out/share/index.html"
