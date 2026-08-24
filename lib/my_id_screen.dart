@@ -21,6 +21,9 @@ class MyIdScreen extends StatefulWidget {
 class _MyIdScreenState extends State<MyIdScreen> {
   final _nameCtrl = TextEditingController();
   final _nameFocus = FocusNode();
+  // 이름 입력 첫 글자에서 QR 영역이 나타나며 위젯 트리가 바뀌어도 이 TextField의
+  // Element(입력 연결)를 보존해 키보드가 닫히지 않도록 GlobalKey를 고정한다.
+  final GlobalKey _nameFieldKey = GlobalKey();
   final _scroll = ScrollController();
   String? _uuid;
   String _code = '';
@@ -204,6 +207,7 @@ class _MyIdScreenState extends State<MyIdScreen> {
                     ),
                   const SizedBox(height: 20),
                   TextField(
+                    key: _nameFieldKey,
                     controller: _nameCtrl,
                     focusNode: _nameFocus,
                     textAlign: TextAlign.center,
