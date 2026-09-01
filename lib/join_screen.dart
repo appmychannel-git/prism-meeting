@@ -10,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'call.dart';
 import 'call_history_screen.dart';
 import 'cctv_hub_screen.dart';
+import 'cctv_store.dart';
 import 'cctv_view_screen.dart';
 import 'config.dart';
 import 'confirm_dialog.dart';
@@ -192,6 +193,9 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     if (!AppConfig.cctvEnabled) return; // CCTV 없는 브랜드는 무시
     final pin = await _promptCctvPin();
     if (pin == null || pin.trim().isEmpty || !mounted) return;
+    // QR로 본 CCTV를 목록에 자동 저장 → 시청화면에서 나와도 목록에 남아 원터치 재시청.
+    await CctvStore.add(CctvEntry(code: code, pin: pin.trim(), name: code));
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => CctvViewScreen(roomId: 'cctv-$code', pin: pin.trim()),

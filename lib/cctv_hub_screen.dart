@@ -68,8 +68,23 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       MaterialPageRoute(builder: (_) => const ScanScreen()),
     );
     if (raw == null || !mounted) return;
-    _codeCtrl.text = raw.startsWith('cctv-') ? raw.substring(5) : raw;
+    _codeCtrl.text = _extractCctvCode(raw);
     setState(() {});
+  }
+
+  /// 스캔값에서 CCTV 코드만 뽑아낸다.
+  /// - 딥링크 URL(.../apps/meeting/<brand>/?cctv=<코드>) → cctv 쿼리값
+  /// - 레거시 방 이름(cctv-<코드>) → 접두어 제거
+  /// - 그 외 → 그대로(순수 코드)
+  String _extractCctvCode(String raw) {
+    var v = raw.trim();
+    try {
+      final u = Uri.parse(v);
+      final c = u.queryParameters['cctv'];
+      if (c != null && c.trim().isNotEmpty) return c.trim();
+    } catch (_) {}
+    if (v.startsWith('cctv-')) v = v.substring(5);
+    return v;
   }
 
   void _open(CctvEntry e) {
