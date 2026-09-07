@@ -7,6 +7,44 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:181808704697:android:858d42752badf1a2aa3f68",
+        "android_client_info": {
+          "package_name": "kr.co.mychannel.cctv.gbled"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVJKO_f4qcKtad_Ckfsl4eyVfiXDzuLLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:181808704697:android:9eafad7292cba09faa3f68",
+        "android_client_info": {
+          "package_name": "kr.co.mychannel.cctv.viewplus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVJKO_f4qcKtad_Ckfsl4eyVfiXDzuLLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:181808704697:android:7656b5fd61254d3caa3f68",
         "android_client_info": {
           "package_name": "kr.co.mychannel.meeting"
