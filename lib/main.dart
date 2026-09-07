@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_settings.dart';
+import 'cctv_hub_screen.dart';
 import 'config.dart';
 import 'join_screen.dart';
 import 'l10n.dart';
@@ -44,7 +45,10 @@ class PrismMeetingApp extends StatelessWidget {
             useMaterial3: true,
             // 안드로이드TV: D-pad 포커스가 잘 보이도록 기본 포커스 하이라이트 유지
           ),
-          home: const JoinScreen(),
+          // CCTV 전용 모드면 홈을 CCTV 화면으로(회의 화면 대신).
+          home: AppConfig.cctvOnly
+              ? const CctvHubScreen()
+              : const JoinScreen(),
         );
       },
     );

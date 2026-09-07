@@ -87,6 +87,12 @@ class AppConfig {
   /// CCTV는 기기 UUID/FCM이 필요 없고(방+비밀번호 기반), 시청은 PC/웹도 대상이라
   /// supportsDeviceFeatures 를 요구하지 않는다(빌드 플래그만).
   static bool get cctvEnabled => _enableCctv;
+
+  /// CCTV 전용 모드(기본 off). 켜면 앱 홈이 회의 화면 대신 **CCTV 화면**이 되고
+  /// 회의/친구/번역 UI는 감춘다(CCTV 전용 제품용 빌드). --dart-define=CCTV_ONLY=true
+  /// (이 모드에선 ENABLE_CCTV=true 로 함께 빌드해야 한다)
+  static const bool cctvOnly =
+      bool.fromEnvironment('CCTV_ONLY', defaultValue: false);
   static bool get friendsEnabled => _enableFriends && supportsDeviceFeatures;
   static bool get callEnabled => _enableCall && supportsDeviceFeatures;
 

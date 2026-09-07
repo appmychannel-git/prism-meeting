@@ -9,6 +9,7 @@ import 'device_id.dart';
 import 'directory.dart';
 import 'l10n.dart';
 import 'scan_screen.dart';
+import 'share_qr.dart';
 
 /// CCTV 허브 — 내 CCTV(저장) 시청 / 새 CCTV 추가 / 이 기기 공유.
 class CctvHubScreen extends StatefulWidget {
@@ -73,8 +74,8 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   }
 
   /// 스캔값에서 CCTV 코드만 뽑아낸다.
-  /// - 딥링크 URL(.../apps/meeting/<brand>/?cctv=<코드>) → cctv 쿼리값
-  /// - 레거시 방 이름(cctv-<코드>) → 접두어 제거
+  /// - 딥링크 URL(`.../apps/meeting/<brand>/?cctv=<코드>`) → cctv 쿼리값
+  /// - 레거시 방 이름(`cctv-<코드>`) → 접두어 제거
   /// - 그 외 → 그대로(순수 코드)
   String _extractCctvCode(String raw) {
     var v = raw.trim();
@@ -122,6 +123,29 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: Text(L.t('menu_cctv')),
+          // CCTV 전용 모드(홈)에선 회의쪽 드로어가 없으므로, 앱 언어·앱 공유를 여기서 제공.
+          actions: [
+            if (AppConfig.cctvOnly)
+              PopupMenuButton<String>(
+                onSelected: (v) {
+                  if (v == 'lang') {
+                    showAppLanguagePicker(context);
+                  } else if (v == 'share') {
+                    showShareLinkQrDialog(
+                      context,
+                      title: L.t('share_app_title'),
+                      message: L.t('share_app_msg', {'app': AppConfig.appBrand}),
+                      targetUrl: AppConfig.apkUrl,
+                    );
+                  }
+                },
+                itemBuilder: (_) => [
+                  PopupMenuItem(value: 'lang', child: Text(L.t('app_language'))),
+                  PopupMenuItem(
+                      value: 'share', child: Text(L.t('menu_share_app'))),
+                ],
+              ),
+          ],
           bottom: TabBar(
             tabs: [
               Tab(icon: const Icon(Icons.play_circle_outline),
