@@ -67,7 +67,7 @@ android {
         create("gbled") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.gbled"
-            manifestPlaceholders["appLabel"] = "Gbled Meeting"
+            manifestPlaceholders["appLabel"] = "글로벌미팅"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/gbled/"
         }
         create("viewplus") {
@@ -87,6 +87,19 @@ android {
             applicationId = "kr.co.mychannel.meeting.ecoglowkc"
             manifestPlaceholders["appLabel"] = "ECO GLOW Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/ecoglow/"
+        }
+        // ── CCTV 전용 앱(회의앱과 다른 패키지 → 한 기기에 공존) ──
+        create("gbledcctv") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.cctv.gbled"
+            manifestPlaceholders["appLabel"] = "글로벌 CCTV"
+            manifestPlaceholders["deepLinkPath"] = "/apps/cctv/gbled/"
+        }
+        create("viewpluscctv") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.cctv.viewplus"
+            manifestPlaceholders["appLabel"] = "Viewplus CCTV"
+            manifestPlaceholders["deepLinkPath"] = "/apps/cctv/viewplus/"
         }
     }
 

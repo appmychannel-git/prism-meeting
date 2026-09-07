@@ -34,7 +34,7 @@ build_one() {
   local invite_url="$base_url"
   local share_url="${base_url}share/"
   local apk_url="${base_url}download/Meeting-${brand}.apk"
-  echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE"
+  echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE cctvOnly=${CCTV_ONLY:-false}"
   echo "   base=$base_url"
   flutter build apk --release --flavor "$brand" \
     --dart-define="APP_BRAND=$APP_BRAND" \
@@ -44,6 +44,7 @@ build_one() {
     --dart-define=SHOW_TRANSLATION=$TRANSLATION \
     --dart-define=START_CAMERA=$START_CAMERA \
     --dart-define=ENABLE_E2EE=$E2EE_EFFECTIVE \
+    --dart-define=CCTV_ONLY=${CCTV_ONLY:-false} \
     --dart-define=INVITE_BASE_URL=$invite_url \
     --dart-define=SHARE_BASE_URL=$share_url \
     --dart-define=APK_URL=$apk_url

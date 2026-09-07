@@ -8,40 +8,55 @@
 #   TRANSLATION : 채팅 번역 + 음성 자막
 #   START_CAMERA: 입장 시 카메라 자동 켜기(카메라 없는 TV박스는 false)
 #   E2EE        : 회의·CCTV 종단간 암호화(모든 참여자 동일 설정 필요, 기본 false)
+#   CCTV_ONLY   : CCTV 전용 앱(홈이 CCTV 화면, 회의/친구/번역 숨김)
 # ============================================================================
 
-# 전 브랜드 목록(all 빌드 순서)
-BRAND_LIST="prism gbled viewplus mychannel ecoglow"
+# 전 브랜드 목록(all 빌드 순서). *cctv = CCTV 전용 앱(패키지 kr.co.mychannel.cctv.<brand>).
+BRAND_LIST="prism gbled viewplus mychannel ecoglow gbledcctv viewpluscctv"
 
 brand_config() {
+  CCTV_ONLY=false
   case "$1" in
-    #          APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
-    prism)     APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    gbled)     APP_BRAND="Gbled Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    viewplus)  APP_BRAND="Viewplus Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    mychannel) APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    ecoglow)   APP_BRAND="ECO GLOW Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
+    prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    gbled)        APP_BRAND="글로벌미팅"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    viewplus)     APP_BRAND="Viewplus Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    mychannel)    APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    ecoglow)      APP_BRAND="ECO GLOW Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    # ── CCTV 전용 앱(회의/친구 없음, 홈=CCTV) ──
+    gbledcctv)    APP_BRAND="글로벌 CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
+    viewpluscctv) APP_BRAND="Viewplus CCTV"   ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
     *) echo "알 수 없는 브랜드: $1  ($BRAND_LIST|all)"; exit 1 ;;
   esac
 }
 
 # 브랜드별 서버 배포 base 경로. 딥링크(App Links)가 브랜드마다 달라야 "그 브랜드
-# 앱"으로만 열린다. 구조: androidtv.mychannel.co.kr/apps/meeting/<brand>/
-brand_base_url() { echo "https://androidtv.mychannel.co.kr/apps/meeting/$1/"; }
+# 앱"으로만 열린다. 회의=/apps/meeting/<brand>/, CCTV전용=/apps/cctv/<brand>/.
+brand_base_url() {
+  case "$1" in
+    *cctv) echo "https://androidtv.mychannel.co.kr/apps/cctv/${1%cctv}/" ;;
+    *)     echo "https://androidtv.mychannel.co.kr/apps/meeting/$1/" ;;
+  esac
+}
 
-# 브랜드별 안드로이드 패키지명(=applicationId). 웹의 카톡 인앱브라우저 intent://
-# 자동실행에서 "그 브랜드 앱"을 지정하는 데 쓴다.
+# 브랜드별 안드로이드 패키지명(=applicationId).
 brand_package() {
   case "$1" in
-    prism)     echo "kr.co.mychannel.meeting.prism" ;;
-    gbled)     echo "kr.co.mychannel.meeting.gbled" ;;
-    viewplus)  echo "kr.co.mychannel.meeting.viewplus" ;;
-    mychannel) echo "kr.co.mychannel.meeting" ;;
-    ecoglow)   echo "kr.co.mychannel.meeting.ecoglowkc" ;;
+    prism)        echo "kr.co.mychannel.meeting.prism" ;;
+    gbled)        echo "kr.co.mychannel.meeting.gbled" ;;
+    viewplus)     echo "kr.co.mychannel.meeting.viewplus" ;;
+    mychannel)    echo "kr.co.mychannel.meeting" ;;
+    ecoglow)      echo "kr.co.mychannel.meeting.ecoglowkc" ;;
+    gbledcctv)    echo "kr.co.mychannel.cctv.gbled" ;;
+    viewpluscctv) echo "kr.co.mychannel.cctv.viewplus" ;;
     *) echo "kr.co.mychannel.meeting.$1" ;;
   esac
 }
 
-# 브랜드별 iOS 커스텀 스킴(카톡 인앱웹뷰에서 Universal Link가 안 먹으므로 스킴으로 앱 실행).
-# iOS 앱이 이 스킴을 등록해야 한다(예: prism=prismmeeting).
-brand_scheme() { echo "${1}meeting"; }
+# 브랜드별 iOS 커스텀 스킴(카톡 인앱웹뷰용).
+brand_scheme() {
+  case "$1" in
+    *cctv) echo "${1%cctv}cctv" ;;   # 예: gbledcctv → gbledcctv
+    *)     echo "${1}meeting" ;;
+  esac
+}
