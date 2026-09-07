@@ -588,6 +588,101 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _push(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
+  }
+
+  // 홈 화면 "자주 쓰는 기능" 바로가기 버튼들. 브랜드 기능 플래그에 따라 노출.
+  Widget _quickActions(bool landscape) {
+    final tiles = <Widget>[];
+    if (AppConfig.friendsEnabled) {
+      tiles.add(_actionTile(Icons.people_outline, L.t('menu_friends'),
+          () => _push(const FriendsScreen())));
+    }
+    if (AppConfig.callEnabled) {
+      tiles.add(_actionTile(Icons.history, L.t('menu_history'),
+          () => _push(const CallHistoryScreen())));
+    }
+    if (AppConfig.friendsEnabled) {
+      tiles.add(_actionTile(Icons.qr_code_2, L.t('menu_my_id'),
+          () => _push(const MyIdScreen())));
+    }
+    tiles.add(_actionTile(Icons.ios_share, L.t('menu_share_app'), () {
+      showShareLinkQrDialog(
+        context,
+        title: L.t('share_app_title'),
+        message: L.t('share_app_msg', {'app': AppConfig.appBrand}),
+        targetUrl: AppConfig.apkUrl,
+      );
+    }));
+    if (tiles.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: landscape ? 8 : 16),
+        const Divider(height: 1),
+        SizedBox(height: landscape ? 8 : 12),
+        if (landscape)
+          // TV(가로): 한 줄에 나란히
+          Row(
+            children: [
+              for (final t in tiles)
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: t,
+                  ),
+                ),
+            ],
+          )
+        else
+          // 폰(세로): 2열 그리드
+          GridView.count(
+            crossAxisCount: 2,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.4,
+            children: tiles,
+          ),
+      ],
+    );
+  }
+
+  Widget _actionTile(IconData icon, String label, VoidCallback onTap) {
+    return Material(
+      color: const Color(0xFF171B22),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 6),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFF2A3140)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: const Color(0xFF5B8DEF), size: 22),
+              const SizedBox(height: 5),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 초대 링크로 자동 입장 중이면 폼 대신 로딩 화면(바로 회의 시작 느낌)
@@ -609,7 +704,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     final isJoin = _tab == _Tab.join;
     final size = MediaQuery.of(context).size;
     final landscape = size.width > size.height; // 가로모드(TV 등)
-    final gap = landscape ? 10.0 : 16.0; // 항목 간 세로 간격
+    final gap = landscape ? 7.0 : 14.0; // 항목 간 세로 간격
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -627,29 +722,38 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
           children: [
             Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 460),
-                  child: Column(
+                padding: EdgeInsets.all(landscape ? 12 : 24),
+                child: Theme(
+                  // 가로(TV)에선 인풋을 더 낮게(콤팩트) — 위아래 꽉 참 완화.
+                  data: Theme.of(context).copyWith(
+                    inputDecorationTheme:
+                        Theme.of(context).inputDecorationTheme.copyWith(
+                              isDense: landscape,
+                              contentPadding: landscape
+                                  ? const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 12)
+                                  : null,
+                            ),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Icon(
                         Icons.video_camera_front_rounded,
-                        size: landscape ? 40 : 60,
+                        size: landscape ? 30 : 54,
                         color: const Color(0xFF5B8DEF),
                       ),
-                      SizedBox(height: landscape ? 6 : 10),
+                      SizedBox(height: landscape ? 4 : 10),
                       Text(
                         AppConfig.appBrand,
                         textAlign: TextAlign.center,
-                        style:
-                            (landscape
-                                    ? Theme.of(context).textTheme.headlineSmall
-                                    : Theme.of(
-                                        context,
-                                      ).textTheme.headlineMedium)
-                                ?.copyWith(fontWeight: FontWeight.bold),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              fontSize: landscape ? 19 : 26,
+                            ),
                       ),
                       if (!landscape) ...[
                         const SizedBox(height: 4),
@@ -786,13 +890,13 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                         ),
                       ],
 
-                      SizedBox(height: landscape ? 14 : 24),
+                      SizedBox(height: landscape ? 10 : 22),
                       FilledButton.icon(
                         autofocus: true,
                         onPressed: _connecting ? null : _join,
                         style: FilledButton.styleFrom(
                           padding: EdgeInsets.symmetric(
-                            vertical: landscape ? 14 : 18,
+                            vertical: landscape ? 9 : 15,
                           ),
                         ),
                         icon: _connecting
@@ -812,8 +916,13 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                                     : L.t('create_enter')),
                         ),
                       ),
+
+                      // 자주 쓰는 기능 바로가기(고령 사용자용): 햄버거를 안 열어도 홈에서 바로.
+                      // 폰(세로)=2열, TV(가로)=한 줄. 햄버거 메뉴는 그대로 유지된다.
+                      _quickActions(landscape),
                     ],
                   ),
+                ),
                 ),
               ),
             ),
