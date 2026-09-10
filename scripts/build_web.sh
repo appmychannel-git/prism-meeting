@@ -26,8 +26,8 @@ export MSYS2_ARG_CONV_EXCL="*"
 build_web_one() {
   local brand="$1"
   brand_config "$brand"
-  local base; base="$(brand_base_url "$brand")"        # https://.../apps/meeting/<brand>/
-  local href="/apps/meeting/${brand}/"                  # base-href(경로만)
+  local base; base="$(brand_base_url "$brand")"        # 예: https://.../apps/cctv/gbled/
+  local href="${base#https://androidtv.mychannel.co.kr}" # base-href(경로만) = base에서 오리진 제거
   echo "== 웹 빌드: $brand  (base-href=$href) =="
 
   flutter build web --release \
@@ -95,7 +95,7 @@ XML
   else
     echo "   (안내) dist/Meeting-${brand}.apk 없음 → build_brand.sh 로 APK 먼저 빌드하면 자동 포함"
   fi
-  echo "   → $out  (서버 /apps/meeting/${brand}/ 에 업로드)"
+  echo "   → $out  (서버 ${href} 에 업로드)"
 }
 
 BRAND="${1:-}"

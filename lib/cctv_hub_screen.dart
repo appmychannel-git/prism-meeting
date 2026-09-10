@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 
 import 'cctv_share_screen.dart';
@@ -25,18 +28,88 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   List<CctvEntry> _saved = [];
   bool _isCamera = false;
 
+  // CCTV 전용 모드에서 홈이 이 화면이라, 들어오는 CCTV 딥링크(?cctv=)를 여기서 처리.
+  AppLinks? _appLinks;
+  StreamSubscription<Uri>? _linkSub;
+  String? _lastLink;
+
   @override
   void initState() {
     super.initState();
     _load();
+    if (AppConfig.cctvOnly) _initDeepLinks();
   }
 
   @override
   void dispose() {
+    _linkSub?.cancel();
     _nameCtrl.dispose();
     _codeCtrl.dispose();
     _pinCtrl.dispose();
     super.dispose();
+  }
+
+  // CCTV 전용 앱: QR(딥링크 ?cctv=<코드>)로 열리면 비번 입력 후 바로 시청.
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+    try {
+      final initial = await _appLinks!.getInitialLink();
+      if (initial != null) _onLink(initial);
+    } catch (_) {}
+    _linkSub = _appLinks!.uriLinkStream.listen(_onLink);
+  }
+
+  void _onLink(Uri uri) {
+    final code = uri.queryParameters['cctv'];
+    if (code == null || code.trim().isEmpty) return;
+    final key = uri.toString();
+    if (key == _lastLink) return; // 중복 처리 방지
+    _lastLink = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openByCode(code.trim());
+    });
+  }
+
+  // 딥링크 코드로 시청: 비번 입력 → 목록 저장(다음부터 원터치) → 시청.
+  Future<void> _openByCode(String code) async {
+    final pin = await _promptPin();
+    if (pin == null || pin.trim().isEmpty || !mounted) return;
+    final e = CctvEntry(code: code, pin: pin.trim(), name: code);
+    await CctvStore.add(e);
+    await _load();
+    if (!mounted) return;
+    _open(e);
+  }
+
+  Future<String?> _promptPin() async {
+    final ctrl = TextEditingController();
+    final pin = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('cctv_enter_pin')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          obscureText: true,
+          decoration: InputDecoration(
+            hintText: L.t('cctv_password'),
+            border: const OutlineInputBorder(),
+          ),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: Text(L.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text),
+              child: Text(L.t('ok'))),
+        ],
+      ),
+    );
+    ctrl.dispose();
+    return pin;
   }
 
   Future<void> _load() async {
