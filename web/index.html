@@ -120,8 +120,15 @@
       var p = new URLSearchParams(window.location.search);
       var isCctv = !!p.get('cctv');
       var isFriend = !!p.get('uid');
-      // 앱 미설치로 폴백된 딥링크(친구/CCTV)면: 플러터(웹) 대신 설치 안내를 띄운다.
-      if ((isFriend || isCctv) && p.get('noapp') === '1') {
+      // 앱 미설치 시 CCTV 링크 처리 모드: 'web' = 브라우저로 바로 시청,
+      // 'install' = 앱설치 안내. (지금은 임시로 'web'. 나중에 'install'로 되돌리면
+      // 다시 앱 다운로드 안내가 뜬다.) 친구(uid)는 웹에서 불가라 항상 설치 안내.
+      var CCTV_NOAPP_MODE = 'web';
+      // 앱 미설치로 폴백됨: 설치 안내를 띄울지 결정.
+      var showInstall =
+        (p.get('noapp') === '1') &&
+        (isFriend || (isCctv && CCTV_NOAPP_MODE === 'install'));
+      if (showInstall) {
         if (isCctv) {
           document.getElementById('il-emoji').textContent = '📹';
           document.getElementById('il-title').textContent = 'CCTV 시청';
@@ -142,7 +149,7 @@
         document.getElementById('install-landing').style.display = 'flex';
         return; // 플러터 로드 안 함
       }
-      // 그 외(회의/일반)는 정상적으로 앱(웹)을 로드.
+      // 그 외(회의/일반, 그리고 CCTV web모드)는 앱(웹)을 로드해 브라우저에서 진행.
       var s = document.createElement('script');
       s.src = 'flutter_bootstrap.js';
       s.async = true;
