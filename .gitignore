@@ -49,3 +49,6 @@ app.*.map.json
 
 # 토큰 서버는 자체 저장소(prism-token-server)로 관리 → 앱 저장소에서 제외
 /token-server/
+
+# 브랜드별 Firebase 설정(로컬만 유지)
+ios/firebase/*/GoogleService-Info.plist

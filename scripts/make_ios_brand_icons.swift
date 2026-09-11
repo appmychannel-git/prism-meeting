@@ -10,6 +10,9 @@ let brands = [
   Brand(name: "viewplus",  fg: "viewplus/res/drawable-xxxhdpi/ic_launcher_foreground.png",  bg: (0xFE/255.0, 0xCD/255.0, 0x06/255.0), inset: -0.10),
   Brand(name: "mychannel", fg: "mychannel/res/drawable-xxxhdpi/ic_launcher_foreground.png", bg: (0x5E/255.0, 0x86/255.0, 0xA6/255.0), inset: 0.0),
   Brand(name: "ecoglow",   fg: "ecoglow/res/mipmap-xxxhdpi/ic_launcher_fg.png",             bg: (1, 1, 1),                      inset: 0.02),
+  // CCTV 전용 앱(로고에 CCTV 뱃지). 회의 브랜드와 같은 배경색.
+  Brand(name: "gbledcctv",    fg: "gbledcctv/res/drawable-xxxhdpi/ic_launcher_foreground.png",    bg: (1, 1, 1),                            inset: 0.0),
+  Brand(name: "viewpluscctv", fg: "viewpluscctv/res/drawable-xxxhdpi/ic_launcher_foreground.png", bg: (0xFE/255.0, 0xCD/255.0, 0x06/255.0), inset: 0.0),
 ]
 let SIZE = 1024
 

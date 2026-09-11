@@ -35,17 +35,13 @@ restore() { git checkout -- ios/ 2>/dev/null || true; rm -f .brand_icon.yaml;
 build_one() {
   local BRAND="$1"
   brand_config "$BRAND"                 # → APP_BRAND, FRIENDS, CALL, CCTV, TRANSLATION, START_CAMERA, E2EE
-  local BASE; BASE="$(brand_base_url "$BRAND")"
-  local BUNDLE SCHEME WITHEXT
-  case "$BRAND" in
-    prism)     BUNDLE=kr.co.mychannel.meeting.prism;     SCHEME=prismmeeting;     WITHEXT=1 ;;
-    gbled)     BUNDLE=kr.co.mychannel.meeting.gbled;     SCHEME=gbledmeeting;     WITHEXT=0 ;;
-    viewplus)  BUNDLE=kr.co.mychannel.meeting.viewplus;  SCHEME=viewplusmeeting;  WITHEXT=0 ;;
-    mychannel) BUNDLE=kr.co.mychannel.meeting;           SCHEME=mychannelmeeting; WITHEXT=0 ;;
-    ecoglow)   BUNDLE=kr.co.mychannel.meeting.ecoglowkc; SCHEME=ecoglowmeeting;   WITHEXT=0 ;;
-    *) echo "알 수 없는 브랜드: $BRAND"; return 1 ;;
-  esac
-  echo "== iOS 빌드: $BRAND  (bundle=$BUNDLE  ext=$WITHEXT  name=$APP_BRAND) =="
+  # brands.sh 의 함수 재사용(DRY) — 회의/CCTV 브랜드 자동 지원.
+  local BASE BUNDLE SCHEME WITHEXT
+  BASE="$(brand_base_url "$BRAND")"
+  BUNDLE="$(brand_package "$BRAND")"   # iOS 번들 ID = 안드로이드 패키지명
+  SCHEME="$(brand_scheme "$BRAND")"
+  WITHEXT=0; [ "$BRAND" = "prism" ] && WITHEXT=1   # 화면공유 확장은 현재 prism 만
+  echo "== iOS 빌드: $BRAND  (bundle=$BUNDLE  ext=$WITHEXT  name=$APP_BRAND  cctvOnly=${CCTV_ONLY:-false}) =="
 
   trap 'restore' EXIT
 
@@ -76,6 +72,7 @@ build_one() {
     --dart-define="APP_BRAND=$APP_BRAND"
     --dart-define=ENABLE_FRIENDS=$FRIENDS --dart-define=ENABLE_CALL=$CALL --dart-define=ENABLE_CCTV=$CCTV
     --dart-define=SHOW_TRANSLATION=$TRANSLATION --dart-define=START_CAMERA=$START_CAMERA --dart-define=ENABLE_E2EE=$E2EE
+    --dart-define=CCTV_ONLY=${CCTV_ONLY:-false}
     --dart-define="INVITE_BASE_URL=$BASE" --dart-define="SHARE_BASE_URL=${BASE}share/"
   )
   if [ "$CODESIGN" = "1" ]; then
