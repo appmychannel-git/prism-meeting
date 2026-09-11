@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:181808704697:android:e6bad5729949e501aa3f68",
+        "android_client_info": {
+          "package_name": "kr.co.mychannel.cctv.freedom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVJKO_f4qcKtad_Ckfsl4eyVfiXDzuLLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:181808704697:android:858d42752badf1a2aa3f68",
         "android_client_info": {
           "package_name": "kr.co.mychannel.cctv.gbled"
@@ -67,6 +86,25 @@
         "mobilesdk_app_id": "1:181808704697:android:76fc5cb8aeab1f75aa3f68",
         "android_client_info": {
           "package_name": "kr.co.mychannel.meeting.ecoglowkc"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVJKO_f4qcKtad_Ckfsl4eyVfiXDzuLLc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:181808704697:android:eda36fe0db19485baa3f68",
+        "android_client_info": {
+          "package_name": "kr.co.mychannel.meeting.freedom"
         }
       },
       "oauth_client": [],

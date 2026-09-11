@@ -30,6 +30,14 @@ class AppConfig {
     defaultValue: 'Prism Meeting',
   );
 
+  /// 브랜드 기본 UI 언어(빈 값=기기 언어 따름). 예: Freedom 브랜드는 'en'.
+  /// 사용자가 앱에서 언어를 바꾸면 그 선택이 우선한다([L.load]가 저장값 복원).
+  /// --dart-define=DEFAULT_LANG=en
+  static const String defaultLang = String.fromEnvironment(
+    'DEFAULT_LANG',
+    defaultValue: '',
+  );
+
   /// 번역 엔진을 빌드별로 강제 지정. ''(기본)=서버 기본 엔진.
   /// 카자흐스탄 빌드는 --dart-define=LK_TRANSLATE_PROVIDER=azure 로 Azure 사용.
   static const String translateProvider = String.fromEnvironment(

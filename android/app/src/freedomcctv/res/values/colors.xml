@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Freedom 아이콘 배경(어두운 회흑색). 전경(ic_launcher_foreground)은
+         공식 마스커블 아이콘(어두운 배경 + 초록 F 방패)을 전면블리드로 쓴다. -->
+    <color name="ic_launcher_background">#161616</color>
+</resources>

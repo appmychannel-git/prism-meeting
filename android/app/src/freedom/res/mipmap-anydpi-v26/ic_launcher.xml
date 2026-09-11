@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Freedom 적응형 아이콘. 전경(ic_launcher_foreground)이 공식 마스커블 아이콘
+     (어두운 배경 + 초록 F 방패)이라 여백(inset) 없이 전면블리드로 둔다.
+     배경색도 동일한 #161616 이라 마스크로 잘리는 모서리가 자연스럽게 이어진다. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

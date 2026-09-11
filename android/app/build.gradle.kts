@@ -88,6 +88,12 @@ android {
             manifestPlaceholders["appLabel"] = "ECO GLOW Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/ecoglow/"
         }
+        create("freedom") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.meeting.freedom"
+            manifestPlaceholders["appLabel"] = "Freedom Meeting"
+            manifestPlaceholders["deepLinkPath"] = "/apps/meeting/freedom/"
+        }
         // ── CCTV 전용 앱(회의앱과 다른 패키지 → 한 기기에 공존) ──
         create("gbledcctv") {
             dimension = "brand"
@@ -100,6 +106,12 @@ android {
             applicationId = "kr.co.mychannel.cctv.viewplus"
             manifestPlaceholders["appLabel"] = "Viewplus CCTV"
             manifestPlaceholders["deepLinkPath"] = "/apps/cctv/viewplus/"
+        }
+        create("freedomcctv") {
+            dimension = "brand"
+            applicationId = "kr.co.mychannel.cctv.freedom"
+            manifestPlaceholders["appLabel"] = "Freedom CCTV"
+            manifestPlaceholders["deepLinkPath"] = "/apps/cctv/freedom/"
         }
     }
 

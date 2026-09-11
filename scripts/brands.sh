@@ -12,20 +12,24 @@
 # ============================================================================
 
 # 전 브랜드 목록(all 빌드 순서). *cctv = CCTV 전용 앱(패키지 kr.co.mychannel.cctv.<brand>).
-BRAND_LIST="prism gbled viewplus mychannel ecoglow gbledcctv viewpluscctv"
+BRAND_LIST="prism gbled viewplus mychannel ecoglow gbledcctv viewpluscctv freedom freedomcctv"
 
 brand_config() {
   CCTV_ONLY=false
+  DEFAULT_LANG=""   # 브랜드 기본 UI 언어(빈 값=기기 언어). 예: freedom="en"
   case "$1" in
     #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    gbled)        APP_BRAND="글로벌미팅"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    gbled)        APP_BRAND="글로벌미팅"    ; FRIENDS=true ; CALL=true ; CCTV=false ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     viewplus)     APP_BRAND="Viewplus Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     mychannel)    APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     ecoglow)      APP_BRAND="ECO GLOW Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    # ── 프리덤미디어(Freedom Media, 카자흐스탄) — 기본 언어 영어 ──
+    freedom)      APP_BRAND="Freedom Meeting"  ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=true ; START_CAMERA=true;  E2EE=false; DEFAULT_LANG="en" ;;
     # ── CCTV 전용 앱(회의/친구 없음, 홈=CCTV) ──
     gbledcctv)    APP_BRAND="글로벌 CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
     viewpluscctv) APP_BRAND="Viewplus CCTV"   ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
+    freedomcctv)  APP_BRAND="Freedom CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true; DEFAULT_LANG="en" ;;
     *) echo "알 수 없는 브랜드: $1  ($BRAND_LIST|all)"; exit 1 ;;
   esac
 }
@@ -47,8 +51,10 @@ brand_package() {
     viewplus)     echo "kr.co.mychannel.meeting.viewplus" ;;
     mychannel)    echo "kr.co.mychannel.meeting" ;;
     ecoglow)      echo "kr.co.mychannel.meeting.ecoglowkc" ;;
+    freedom)      echo "kr.co.mychannel.meeting.freedom" ;;
     gbledcctv)    echo "kr.co.mychannel.cctv.gbled" ;;
     viewpluscctv) echo "kr.co.mychannel.cctv.viewplus" ;;
+    freedomcctv)  echo "kr.co.mychannel.cctv.freedom" ;;
     *) echo "kr.co.mychannel.meeting.$1" ;;
   esac
 }

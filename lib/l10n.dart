@@ -1,5 +1,8 @@
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'config.dart';
 
 /// 앱 UI 다국어(로컬라이제이션).
 ///
@@ -24,11 +27,37 @@ class L {
 
   static String get lang => localeNotifier.value;
 
+  static const String _kLangPref = 'app_lang';
+
+  /// 저장된 언어 복원(앱 시작 시 1회). 없으면 기기 언어 기본값 유지.
+  static Future<void> load() async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      final saved = sp.getString(_kLangPref);
+      if (saved != null && uiLanguages.containsKey(saved)) {
+        localeNotifier.value = saved;
+      }
+    } catch (_) {}
+  }
+
   static void setLang(String code) {
-    if (uiLanguages.containsKey(code)) localeNotifier.value = code;
+    if (!uiLanguages.containsKey(code)) return;
+    localeNotifier.value = code;
+    _persist(code); // 다음 실행에도 유지되도록 저장(비동기, 실패해도 무시)
+  }
+
+  static Future<void> _persist(String code) async {
+    try {
+      final sp = await SharedPreferences.getInstance();
+      await sp.setString(_kLangPref, code);
+    } catch (_) {}
   }
 
   static String _defaultLang() {
+    // 1순위: 브랜드 기본 언어(빌드 설정 DEFAULT_LANG). Freedom 등은 'en'.
+    final brand = AppConfig.defaultLang.toLowerCase();
+    if (uiLanguages.containsKey(brand)) return brand;
+    // 2순위: 기기 언어. 지원 안 하면 한국어.
     final code = ui.PlatformDispatcher.instance.locale.languageCode
         .toLowerCase();
     return uiLanguages.containsKey(code) ? code : 'ko';
