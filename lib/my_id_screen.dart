@@ -284,7 +284,10 @@ class _MyIdScreenState extends State<MyIdScreen> {
 
   // ── 큰 화면(TV/태블릿) 레이아웃: 왼쪽 이름+앱키보드 / 오른쪽 QR ──
   Widget _largeBody(bool hasName, bool showShareQr) {
-    return Padding(
+    // SafeArea: 전체화면이 아니어서 하단 상태/네비게이션 바가 올라온 기기에서
+    // 오른쪽 '내 코드'가 바 아래로 잘리지 않도록 시스템 인셋만큼 여백을 준다.
+    return SafeArea(
+      child: Padding(
       padding: const EdgeInsets.all(16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -340,6 +343,7 @@ class _MyIdScreenState extends State<MyIdScreen> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -416,10 +420,10 @@ class _MyIdScreenState extends State<MyIdScreen> {
         if (!hasName)
           Center(
             child: Container(
-              width: 240,
-              height: 240,
+              width: 190,
+              height: 190,
               alignment: Alignment.center,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: const Color(0xFF1A1F27),
                 borderRadius: BorderRadius.circular(12),
@@ -449,8 +453,8 @@ class _MyIdScreenState extends State<MyIdScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: SizedBox(
-                width: 240,
-                height: 240,
+                width: 190,
+                height: 190,
                 child: PrettyQrView.data(
                   data: showShareQr ? _shareUrl : _link,
                   decoration: const PrettyQrDecoration(
@@ -467,11 +471,11 @@ class _MyIdScreenState extends State<MyIdScreen> {
             style: const TextStyle(fontSize: 12, color: Colors.white60),
           ),
           if (_code.isNotEmpty) ...[
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             _CodeCard(code: _code, onCopy: () => _copy(_code, L.t('code_copied'))),
           ],
         ],
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         Text(
           L.t('my_id_desc'),
           textAlign: TextAlign.center,
