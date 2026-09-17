@@ -21,7 +21,7 @@ brand_config() {
     #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     gbled)        APP_BRAND="글로벌미팅"    ; FRIENDS=true ; CALL=true ; CCTV=false ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    viewplus)     APP_BRAND="Viewplus Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    viewplus)     APP_BRAND="Viewplus Meeting" ; FRIENDS=true ; CALL=true ; CCTV=false ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     mychannel)    APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     ecoglow)      APP_BRAND="ECO GLOW Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     # ── 프리덤미디어(Freedom Media, 카자흐스탄) — 기본 언어 영어 ──
