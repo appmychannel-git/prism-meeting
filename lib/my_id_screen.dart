@@ -353,44 +353,6 @@ class _MyIdScreenState extends State<MyIdScreen> {
     );
   }
 
-  Widget _toggleHalf({
-    required bool sel,
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: onTap,
-        child: Container(
-          margin: const EdgeInsets.all(3),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: sel ? const Color(0xFF3B6EF5) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: Colors.white),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                maxLines: 1,
-                softWrap: false,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _qrPanelLarge(bool hasName, bool showShareQr) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -406,17 +368,21 @@ class _MyIdScreenState extends State<MyIdScreen> {
           ),
           child: Row(
             children: [
-              _toggleHalf(
-                sel: _shareMode,
-                icon: Icons.ios_share,
-                label: L.lang == 'ko' ? '공유' : 'Share',
-                onTap: () => setState(() => _shareMode = true),
+              Expanded(
+                child: _ToggleHalf(
+                  selected: _shareMode,
+                  icon: Icons.ios_share,
+                  label: L.lang == 'ko' ? '공유' : 'Share',
+                  onSelect: () => setState(() => _shareMode = true),
+                ),
               ),
-              _toggleHalf(
-                sel: !_shareMode,
-                icon: Icons.qr_code_scanner,
-                label: L.lang == 'ko' ? '스캔' : 'Scan',
-                onTap: () => setState(() => _shareMode = false),
+              Expanded(
+                child: _ToggleHalf(
+                  selected: !_shareMode,
+                  icon: Icons.qr_code_scanner,
+                  label: L.lang == 'ko' ? '스캔' : 'Scan',
+                  onSelect: () => setState(() => _shareMode = false),
+                ),
               ),
             ],
           ),
@@ -487,6 +453,85 @@ class _MyIdScreenState extends State<MyIdScreen> {
           style: const TextStyle(fontSize: 13, color: Colors.white70),
         ),
       ],
+    );
+  }
+}
+
+/// 공유/스캔 토글의 한 칸. TV 리모컨(D-pad)에서:
+///  - 포커스가 오면 테두리로 표시(보이도록)
+///  - 포커스 이동 = 선택 전환(공유→오른쪽=스캔, 스캔→왼쪽=공유), OK로도 선택
+class _ToggleHalf extends StatefulWidget {
+  final bool selected;
+  final IconData icon;
+  final String label;
+  final VoidCallback onSelect;
+  const _ToggleHalf({
+    required this.selected,
+    required this.icon,
+    required this.label,
+    required this.onSelect,
+  });
+  @override
+  State<_ToggleHalf> createState() => _ToggleHalfState();
+}
+
+class _ToggleHalfState extends State<_ToggleHalf> {
+  final FocusNode _fn = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _fn.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    // 포커스가 이 칸으로 오면 곧바로 선택(좌우 이동으로 전환되는 효과).
+    if (_fn.hasFocus && !widget.selected) widget.onSelect();
+    if (mounted) setState(() {}); // 포커스 테두리 갱신
+  }
+
+  @override
+  void dispose() {
+    _fn.removeListener(_onFocusChange);
+    _fn.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final focused = _fn.hasFocus;
+    return InkWell(
+      focusNode: _fn,
+      borderRadius: BorderRadius.circular(8),
+      onTap: widget.onSelect,
+      child: Container(
+        margin: const EdgeInsets.all(3),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: widget.selected ? const Color(0xFF3B6EF5) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          // 포커스 시 흰 테두리로 어디에 있는지 명확히 표시.
+          border: focused
+              ? Border.all(color: Colors.white, width: 2)
+              : Border.all(color: Colors.transparent, width: 2),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(widget.icon, size: 16, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              widget.label,
+              maxLines: 1,
+              softWrap: false,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
