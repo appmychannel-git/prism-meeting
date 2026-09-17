@@ -8,7 +8,9 @@ import 'device_id.dart';
 import 'directory.dart';
 import 'form_factor.dart';
 import 'friends.dart';
+import 'hangul.dart';
 import 'l10n.dart';
+import 'onscreen_keyboard.dart';
 import 'push_service.dart';
 
 /// 내 ID 화면. 상대가 QR 스캔 / 코드 입력 / 링크로 나를 친구추가·전화할 수 있다.
@@ -25,6 +27,8 @@ class _MyIdScreenState extends State<MyIdScreen> {
   // Element(입력 연결)를 보존해 키보드가 닫히지 않도록 GlobalKey를 고정한다.
   final GlobalKey _nameFieldKey = GlobalKey();
   final _scroll = ScrollController();
+  // 큰 화면(TV/태블릿) 전용 앱 내부 키보드의 한글 조합 상태.
+  final _composer = HangulComposer();
   String? _uuid;
   String _code = '';
   // 태블릿/TV에서 메인 QR 모드: true=카톡·문자 공유 QR, false=바로 스캔 QR.
@@ -54,6 +58,7 @@ class _MyIdScreenState extends State<MyIdScreen> {
     setState(() {
       _uuid = id;
       _nameCtrl.text = nm;
+      _composer.setText(nm); // 앱 내부 키보드 조합 상태도 기존 이름으로
     });
     // 짧은 코드(TV/태블릿용 수동 등록)를 생성·조회해 표시.
     final code = await DirectoryService.ensureCode(id);
@@ -97,6 +102,24 @@ class _MyIdScreenState extends State<MyIdScreen> {
     }
   }
 
+  // 앱 내부 키보드(큰 화면) → 조합 결과를 이름 필드/기기 등록에 반영.
+  void _applyComposer() {
+    var t = _composer.text;
+    if (t.runes.length > 20) {
+      // 최대 20자 유지(시스템 필드 maxLength와 동일).
+      t = String.fromCharCodes(t.runes.take(20));
+      _composer.setText(t);
+    }
+    _nameCtrl.text = t;
+    DeviceId.setName(t);
+    setState(() {}); // QR/링크에 이름 반영
+  }
+
+  void _kbInput(String ch) {
+    _composer.input(ch);
+    _applyComposer();
+  }
+
   @override
   Widget build(BuildContext context) {
     final uuid = _uuid;
@@ -110,7 +133,12 @@ class _MyIdScreenState extends State<MyIdScreen> {
       appBar: AppBar(title: Text(L.t('my_id_title'))),
       body: uuid == null
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
+          : large
+              // 큰 화면(TV/태블릿): 왼쪽 앱 키보드 + 오른쪽 QR (시스템 키보드가
+              // QR을 밀어내지 않도록 화면 안에서 직접 입력).
+              ? _largeBody(hasName, showShareQr)
+              // 휴대폰: 기존대로 시스템 키보드 사용.
+              : SingleChildScrollView(
               controller: _scroll,
               padding: const EdgeInsets.all(24),
               child: Column(
@@ -251,6 +279,205 @@ class _MyIdScreenState extends State<MyIdScreen> {
                 ],
               ),
             ),
+    );
+  }
+
+  // ── 큰 화면(TV/태블릿) 레이아웃: 왼쪽 이름+앱키보드 / 오른쪽 QR ──
+  Widget _largeBody(bool hasName, bool showShareQr) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 왼쪽: 이름 입력(읽기전용 필드) + 앱 내부 키보드
+          Expanded(
+            flex: 6,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _nameCtrl,
+                  readOnly: true, // 시스템 IME 안 뜸 — 아래 앱 키보드로 입력
+                  showCursor: true,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    labelText: L.t('display_name'),
+                    hintText: L.t('my_id_name_hint'),
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                OnScreenKeyboard(
+                  onInput: _kbInput,
+                  onBackspace: () {
+                    _composer.backspace();
+                    _applyComposer();
+                  },
+                  onSpace: () {
+                    _composer.insert(' ');
+                    _applyComposer();
+                  },
+                  onClear: () {
+                    _composer.clear();
+                    _applyComposer();
+                  },
+                  onDone: () {
+                    _composer.finish();
+                    _applyComposer();
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 24),
+          // 오른쪽: QR + 코드 + 설명
+          Expanded(
+            flex: 5,
+            child: SingleChildScrollView(
+              child: _qrPanelLarge(hasName, showShareQr),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _toggleHalf({
+    required bool sel,
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Container(
+          margin: const EdgeInsets.all(3),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: sel ? const Color(0xFF3B6EF5) : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: Colors.white),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _qrPanelLarge(bool hasName, bool showShareQr) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 공유/스캔 토글 — SegmentedButton은 좁은 열에서 글자가 줄바꿈되어
+        // 커스텀 토글(Row+Expanded, 줄바꿈 없음)로 만든다.
+        Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1F27),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white24),
+          ),
+          child: Row(
+            children: [
+              _toggleHalf(
+                sel: _shareMode,
+                icon: Icons.ios_share,
+                label: L.lang == 'ko' ? '공유' : 'Share',
+                onTap: () => setState(() => _shareMode = true),
+              ),
+              _toggleHalf(
+                sel: !_shareMode,
+                icon: Icons.qr_code_scanner,
+                label: L.lang == 'ko' ? '스캔' : 'Scan',
+                onTap: () => setState(() => _shareMode = false),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        if (!hasName)
+          Center(
+            child: Container(
+              width: 240,
+              height: 240,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1F27),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white24),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.badge_outlined,
+                      size: 40, color: Colors.white38),
+                  const SizedBox(height: 12),
+                  Text(
+                    L.t('my_id_need_name'),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white54),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else ...[
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SizedBox(
+                width: 240,
+                height: 240,
+                child: PrettyQrView.data(
+                  data: showShareQr ? _shareUrl : _link,
+                  decoration: const PrettyQrDecoration(
+                    shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            showShareQr ? L.t('share_qr_caption') : L.t('myid_direct_caption'),
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: Colors.white60),
+          ),
+          if (_code.isNotEmpty) ...[
+            const SizedBox(height: 20),
+            _CodeCard(code: _code, onCopy: () => _copy(_code, L.t('code_copied'))),
+          ],
+        ],
+        const SizedBox(height: 14),
+        Text(
+          L.t('my_id_desc'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontSize: 13, color: Colors.white70),
+        ),
+      ],
     );
   }
 }
