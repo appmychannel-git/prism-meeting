@@ -298,21 +298,26 @@ class _MyIdScreenState extends State<MyIdScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: _nameCtrl,
-                  readOnly: true, // 시스템 IME 안 뜸 — 아래 앱 키보드로 입력
-                  showCursor: true,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                      fontSize: 22, fontWeight: FontWeight.w600),
-                  decoration: InputDecoration(
-                    labelText: L.t('display_name'),
-                    hintText: L.t('my_id_name_hint'),
-                    border: const OutlineInputBorder(),
+                // ExcludeFocus: TV 리모컨(D-pad)에서 이 필드가 포커스를 가로채면
+                // (한 줄 필드라 아래 화살표가 커서 이동으로 소모돼) 키패드로 못 내려간다.
+                // 큰 화면에선 필드는 표시 전용(입력은 아래 앱 키보드)이라 포커스 제외.
+                ExcludeFocus(
+                  child: TextField(
+                    controller: _nameCtrl,
+                    readOnly: true, // 시스템 IME 안 뜸 — 아래 앱 키보드로 입력
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 22, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      labelText: L.t('display_name'),
+                      hintText: L.t('my_id_name_hint'),
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
                 OnScreenKeyboard(
+                  autofocus: true, // 진입 시 리모컨 포커스가 바로 키패드로
                   onInput: _kbInput,
                   onBackspace: () {
                     _composer.backspace();

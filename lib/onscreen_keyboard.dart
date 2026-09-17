@@ -13,6 +13,8 @@ class OnScreenKeyboard extends StatefulWidget {
   final VoidCallback onSpace;
   final VoidCallback onClear;
   final VoidCallback onDone;
+  // TV 리모컨(D-pad)용: 켜면 첫 키에 자동 포커스 → 진입 시 바로 키패드로.
+  final bool autofocus;
   const OnScreenKeyboard({
     super.key,
     required this.onInput,
@@ -20,6 +22,7 @@ class OnScreenKeyboard extends StatefulWidget {
     required this.onSpace,
     required this.onClear,
     required this.onDone,
+    this.autofocus = false,
   });
 
   @override
@@ -108,7 +111,9 @@ class _OnScreenKeyboardState extends State<OnScreenKeyboard> {
                   onTap: () => setState(() => _shift = !_shift),
                   flex: 3,
                 ),
-              for (final k in rows[r]) _char(_shifted(k)),
+              for (int c = 0; c < rows[r].length; c++)
+                _char(_shifted(rows[r][c]),
+                    autofocus: widget.autofocus && r == 0 && c == 0),
               if (r == rows.length - 1)
                 _special(
                   icon: Icons.backspace_outlined,
@@ -140,11 +145,12 @@ class _OnScreenKeyboardState extends State<OnScreenKeyboard> {
       );
 
   // 문자 키(자모/영문/숫자).
-  Widget _char(String display) => Expanded(
+  Widget _char(String display, {bool autofocus = false}) => Expanded(
         flex: 2,
         child: _KeyButton(
           label: display,
           onTap: () => _tap(display),
+          autofocus: autofocus,
         ),
       );
 
@@ -177,6 +183,7 @@ class _KeyButton extends StatelessWidget {
   final bool active;
   final bool primary;
   final bool small;
+  final bool autofocus;
   const _KeyButton({
     this.label,
     this.icon,
@@ -184,6 +191,7 @@ class _KeyButton extends StatelessWidget {
     this.active = false,
     this.primary = false,
     this.small = false,
+    this.autofocus = false,
   });
 
   @override
@@ -201,6 +209,7 @@ class _KeyButton extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: onTap,
+          autofocus: autofocus,
           child: Container(
             height: 46,
             alignment: Alignment.center,
