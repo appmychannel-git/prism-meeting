@@ -44,8 +44,10 @@ LIVEKIT_API_KEY = os.environ.get("LIVEKIT_API_KEY", "")
 LIVEKIT_API_SECRET = os.environ.get("LIVEKIT_API_SECRET", "")
 AZURE_SPEECH_KEY = os.environ.get("AZURE_SPEECH_KEY", "")
 AZURE_SPEECH_REGION = os.environ.get("AZURE_SPEECH_REGION", "")  # 예: koreacentral, eastus
-# 인식 후보 언어(자동 감지). 쉼표로 최대 4개. 예: "ko-KR,kk-KZ,ru-RU,en-US"
-STT_CANDIDATES = [s.strip() for s in os.environ.get("STT_CANDIDATES", "ko-KR").split(",") if s.strip()]
+# 인식 후보 언어(자동 감지). 쉼표로 최대 4개. 예: "en-US,ko-KR,ru-RU"
+STT_CANDIDATES = [s.strip() for s in os.environ.get("STT_CANDIDATES", "en-US,ko-KR,ru-RU").split(",") if s.strip()]
+# 자막봇을 숨김 참가자로(다른 참가자 목록/타일에 안 보이게). 데이터 발행은 그대로 됨.
+AGENT_HIDDEN = os.environ.get("AGENT_HIDDEN", "true").lower() != "false"
 
 CAPTION_TOPIC = "caption"      # 앱과 반드시 동일해야 함(room_screen.dart _captionTopic)
 BOT_IDENTITY = "captions-bot"
@@ -64,6 +66,7 @@ def build_token(room: str) -> str:
     grant = api.VideoGrants(
         room_join=True, room=room,
         can_subscribe=True, can_publish=True, can_publish_data=True,
+        hidden=AGENT_HIDDEN,  # 숨김: 참가자 목록/타일에 안 보임(데이터는 계속 발행)
     )
     return (
         api.AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
@@ -158,6 +161,7 @@ class TrackTranscriber:
         """앱과 동일한 형식으로 caption 토픽에 발행(스레드→루프 안전 전달)."""
         payload = json.dumps({
             "sender": self.sender_name,
+            "speaker": self.participant.identity,  # 실제 화자 식별자(클라 그룹핑용)
             "text": text,
             "lang": lang,
             "final": final,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'caption_overlay.dart'; // LiveCaption
+import 'config.dart';
 import 'l10n.dart';
 
 /// 자막 전체 기록 패널(왼쪽). 채팅 패널과 비슷하게, 말한 내역 전부를
@@ -8,11 +9,13 @@ import 'l10n.dart';
 class CaptionPanel extends StatefulWidget {
   final List<LiveCaption> lines;
   final String myLang;
+  final bool compareOn;
   final VoidCallback? onClose;
   const CaptionPanel({
     super.key,
     required this.lines,
     required this.myLang,
+    this.compareOn = false,
     this.onClose,
   });
 
@@ -115,7 +118,43 @@ class _CaptionPanelState extends State<CaptionPanel> {
               color: c.isFinal ? Colors.white : Colors.white70,
             ),
           ),
-          if (showTr)
+          if (widget.compareOn && !c.mine)
+            Padding(
+              padding: const EdgeInsets.only(top: 3),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final eng in AppConfig.compareEngines)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(AppConfig.engineLabels[eng] ?? eng,
+                              style: const TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.white38,
+                                  fontWeight: FontWeight.bold)),
+                          Text(
+                            c.compareTexts[eng] ??
+                                (c.compareErrs[eng] != null
+                                    ? '✕ ${c.compareErrs[eng]}'
+                                    : '…'),
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.2,
+                              color: c.compareTexts[eng] != null
+                                  ? const Color(0xFF9FE0A6)
+                                  : Colors.white38,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            )
+          else if (showTr)
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(

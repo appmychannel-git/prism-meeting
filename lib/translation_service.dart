@@ -18,8 +18,10 @@ class TranslationResult {
 class TranslationService {
   static final Map<String, TranslationResult> _cache = {};
 
-  static Future<TranslationResult> translate(String text, String target) async {
-    final provider = AppConfig.translateProvider;
+  static Future<TranslationResult> translate(String text, String target,
+      {String? provider}) async {
+    // provider 지정 시 그 엔진(비교 모드), 없으면 빌드 기본값.
+    provider ??= AppConfig.translateProvider;
     final key = '$provider|$target|$text';
     final cached = _cache[key];
     if (cached != null) return cached;

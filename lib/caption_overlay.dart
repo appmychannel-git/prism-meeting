@@ -8,7 +8,10 @@ class LiveCaption {
   String lang; // 발화 언어 코드(2-letter)
   bool isFinal; // 확정된 문장인지(중간 결과=false)
   String? translated; // 내 언어로 번역
-  String? translatedLang; // translated 의 언어 코드
+  String? translatedLang; // translated/compare 의 언어 코드
+  // 비교 모드: 엔진 -> 번역문 / 에러
+  final Map<String, String> compareTexts = {};
+  final Map<String, String> compareErrs = {};
   DateTime updatedAt; // 마지막 갱신 시각
   bool mine; // 내가 말한 자막인지(번역 안 함)
   LiveCaption({

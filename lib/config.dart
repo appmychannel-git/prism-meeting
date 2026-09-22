@@ -101,6 +101,12 @@ class AppConfig {
   /// (이 모드에선 ENABLE_CCTV=true 로 함께 빌드해야 한다)
   static const bool cctvOnly =
       bool.fromEnvironment('CCTV_ONLY', defaultValue: false);
+
+  /// 서버측 STT 모드(기본 off). 켜면 앱은 기기 음성인식을 쓰지 않고, 방에 들어온
+  /// STT 에이전트(서버)가 발행한 자막을 "받아서 표시만" 한다. 언어팩 없는 TV/셋톱에서도
+  /// 자막이 되게 하는 용도. --dart-define=SERVER_STT=true
+  static const bool serverStt =
+      bool.fromEnvironment('SERVER_STT', defaultValue: false);
   static bool get friendsEnabled => _enableFriends && supportsDeviceFeatures;
   static bool get callEnabled => _enableCall && supportsDeviceFeatures;
 
@@ -156,6 +162,17 @@ class AppConfig {
   static set targetLanguage(String code) {
     if (code.isEmpty || supportedLanguages.containsKey(code)) _targetLang = code;
   }
+
+  // ── 번역 엔진 비교 모드(품질 평가용) ──
+  // 켜면 받은 채팅/자막을 아래 [compareEngines] 3개 엔진으로 각각 번역해 나란히 표시.
+  // (엔진당 1회씩 호출 → 테스트용. 평상시 off.)
+  static bool compareTranslations = false;
+  static const List<String> compareEngines = ['google', 'azure', 'deepl'];
+  static const Map<String, String> engineLabels = {
+    'google': 'Google',
+    'azure': 'Azure',
+    'deepl': 'DeepL',
+  };
 
   /// 기본 방 이름 (입장 화면 기본값)
   static const String defaultRoomName = 'prism-demo';

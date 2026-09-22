@@ -12,9 +12,12 @@ class ChatMessage {
   final String text; // 원문
   final bool mine; // 내가 보낸 메시지인지
   String? translated; // 번역문(있으면 원문과 함께 표시)
-  String? translatedLang; // translated 가 어떤 언어로 된 것인지(대상 언어 코드)
+  String? translatedLang; // translated/compare 가 어떤 언어로 된 것인지(대상 언어 코드)
   bool translating; // 번역 요청 중
   String? translateError; // 번역 실패 메시지
+  // 비교 모드: 엔진(google/azure/deepl) -> 번역문 / 에러
+  final Map<String, String> compareTexts = {};
+  final Map<String, String> compareErrs = {};
   ChatMessage({
     required this.sender,
     required this.text,
@@ -40,12 +43,17 @@ class ChatPanel extends StatefulWidget {
   // 번역 대상(선호) 언어 코드. ''(빈 문자열)이면 "사용 안 함"(번역 표시 안 함).
   final String targetLanguage;
   final ValueChanged<String> onLanguageChange;
+  // 번역 엔진 비교 모드(품질 평가용) on/off + 토글 콜백.
+  final bool compareOn;
+  final VoidCallback onToggleCompare;
   const ChatPanel({
     super.key,
     required this.messages,
     required this.onSend,
     required this.targetLanguage,
     required this.onLanguageChange,
+    required this.compareOn,
+    required this.onToggleCompare,
     this.onClose,
   });
 
@@ -114,6 +122,16 @@ class _ChatPanelState extends State<ChatPanel> {
                     value: widget.targetLanguage,
                     onChanged: widget.onLanguageChange,
                   ),
+                // 엔진 비교 모드 토글(번역 언어 선택돼 있을 때만 의미 있음)
+                if (AppConfig.showTranslation && widget.targetLanguage.isNotEmpty)
+                  IconButton(
+                    icon: Icon(
+                      widget.compareOn ? Icons.compare : Icons.compare_arrows,
+                      color: widget.compareOn ? const Color(0xFF9FC0FF) : Colors.white38,
+                    ),
+                    tooltip: '엔진 비교(G/A/D)',
+                    onPressed: widget.onToggleCompare,
+                  ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: L.t('close'),
@@ -141,6 +159,7 @@ class _ChatPanelState extends State<ChatPanel> {
                     itemBuilder: (_, i) => _Bubble(
                       msg: widget.messages[i],
                       targetLang: widget.targetLanguage,
+                      compareOn: widget.compareOn,
                     ),
                   ),
           ),
@@ -235,7 +254,8 @@ class _LanguageSelector extends StatelessWidget {
 class _Bubble extends StatelessWidget {
   final ChatMessage msg;
   final String targetLang; // '' = 사용 안 함
-  const _Bubble({required this.msg, required this.targetLang});
+  final bool compareOn;
+  const _Bubble({required this.msg, required this.targetLang, this.compareOn = false});
 
   @override
   Widget build(BuildContext context) {
@@ -278,6 +298,47 @@ class _Bubble extends StatelessWidget {
   }
 
   Widget _translationArea() {
+    // 비교 모드: 엔진별 결과 나란히 표시
+    if (compareOn) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Divider(height: 1, color: Colors.white24),
+            const SizedBox(height: 4),
+            for (final eng in AppConfig.compareEngines)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      AppConfig.engineLabels[eng] ?? eng,
+                      style: const TextStyle(
+                          fontSize: 9,
+                          color: Colors.white38,
+                          fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      msg.compareTexts[eng] ??
+                          (msg.compareErrs[eng] != null
+                              ? '✕ ${msg.compareErrs[eng]}'
+                              : '…'),
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: msg.compareTexts[eng] != null
+                            ? const Color(0xFFBFE0C0)
+                            : Colors.white38,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     // 번역 진행 중
     if (msg.translating) {
       return Padding(

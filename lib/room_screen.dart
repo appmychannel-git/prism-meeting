@@ -187,7 +187,8 @@ class _RoomScreenState extends State<RoomScreen> {
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
       _loadCameras();
     });
-    if (AppConfig.showTranslation) _initSpeech();
+    // 서버측 STT 모드에선 기기 음성인식을 쓰지 않음(에이전트가 자막 발행).
+    if (AppConfig.showTranslation && !AppConfig.serverStt) _initSpeech();
     _initRoom();
   }
 
@@ -334,10 +335,44 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
+  // 번역 엔진 비교 모드 on/off. 켜면 기존 받은 메시지·자막을 3개 엔진으로 재번역.
+  void _toggleCompare() {
+    setState(() =>
+        AppConfig.compareTranslations = !AppConfig.compareTranslations);
+    if (_targetLang.isNotEmpty) {
+      for (final m in _messages) {
+        if (!m.mine) _translateMessage(m);
+      }
+    }
+    for (final c in _captionLog) {
+      if (!c.mine && c.lang != _myLang) _translateCaption(c);
+    }
+  }
+
   // 받은 메시지 한 건을 현재 대상 언어로 자동 번역.
   Future<void> _translateMessage(ChatMessage m) async {
     final target = _targetLang;
     if (target.isEmpty) return;
+    // 비교 모드: 3개 엔진으로 각각 번역.
+    if (AppConfig.compareTranslations) {
+      if (m.translatedLang == target && m.compareTexts.isNotEmpty) return;
+      m.compareTexts.clear();
+      m.compareErrs.clear();
+      setState(() => m.translatedLang = target);
+      for (final eng in AppConfig.compareEngines) {
+        try {
+          final r = await TranslationService.translate(m.text, target,
+              provider: eng);
+          if (!mounted || _targetLang != target) return;
+          setState(() => m.compareTexts[eng] = r.translatedText);
+        } catch (e) {
+          if (!mounted || _targetLang != target) return;
+          setState(() =>
+              m.compareErrs[eng] = e.toString().replaceFirst('Exception: ', ''));
+        }
+      }
+      return;
+    }
     if (m.translated != null && m.translatedLang == target) return; // 이미 됨
     setState(() {
       m.translating = true;
@@ -398,6 +433,11 @@ class _RoomScreenState extends State<RoomScreen> {
 
   // 자막 보기 on/off. 연속 모드면 내 발화도 계속 송출 시작/중지.
   Future<void> _toggleCaptions() async {
+    // 서버측 STT 모드: 기기 음성인식 없이 "표시"만 켜고 끈다(자막은 에이전트가 발행).
+    if (AppConfig.serverStt) {
+      setState(() => _captionsOn = !_captionsOn);
+      return;
+    }
     if (!_captionsOn) {
       if (!await _ensureSpeech()) return;
       setState(() => _captionsOn = true);
@@ -505,9 +545,15 @@ class _RoomScreenState extends State<RoomScreen> {
     if (!_captionsOn) return;
     try {
       final m = jsonDecode(utf8.decode(e.data)) as Map<String, dynamic>;
-      final id = e.participant?.identity ?? (m['sender'] ?? '').toString();
+      // 화자 식별: 서버 STT면 발행자(에이전트)가 아니라 payload의 speaker(실제 화자)를
+      // 써야 여러 명 동시 발화 시 '말하는 중' 라인이 섞이지 않는다.
+      final speaker = (m['speaker'] ?? e.participant?.identity ?? '').toString();
+      final id = speaker.isNotEmpty ? speaker : (m['sender'] ?? '').toString();
       final text = (m['text'] ?? '').toString();
       if (text.isEmpty) return;
+      // 서버 STT는 내 음성도 대신 인식해 돌려주므로, 내 자막은 번역하지 않도록 mine 판별.
+      final myId = _room.localParticipant?.identity;
+      final mine = myId != null && speaker == myId;
       _ingestCaption(
         identity: id,
         sender: (m['sender'] ?? e.participant?.identity ?? L.t('peer'))
@@ -515,7 +561,7 @@ class _RoomScreenState extends State<RoomScreen> {
         text: text,
         lang: (m['lang'] ?? '').toString(),
         isFinal: m['final'] == true,
-        mine: false,
+        mine: mine,
       );
     } catch (_) {}
   }
@@ -572,6 +618,25 @@ class _RoomScreenState extends State<RoomScreen> {
   Future<void> _translateCaption(LiveCaption c) async {
     final target = _myLang;
     final src = c.text;
+    // 비교 모드: 3개 엔진으로 각각 번역(자막 기록 패널에서 나란히 표시).
+    if (AppConfig.compareTranslations) {
+      if (c.translatedLang == target && c.compareTexts.isNotEmpty) return;
+      c.compareTexts.clear();
+      c.compareErrs.clear();
+      c.translatedLang = target;
+      for (final eng in AppConfig.compareEngines) {
+        try {
+          final r = await TranslationService.translate(src, target, provider: eng);
+          if (!mounted || c.text != src) return;
+          setState(() => c.compareTexts[eng] = r.translatedText);
+        } catch (e) {
+          if (!mounted || c.text != src) return;
+          setState(() =>
+              c.compareErrs[eng] = e.toString().replaceFirst('Exception: ', ''));
+        }
+      }
+      return;
+    }
     if (c.translated != null && c.translatedLang == target) return;
     try {
       final r = await TranslationService.translate(src, target);
@@ -1573,6 +1638,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 child: CaptionPanel(
                   lines: _transcriptLines(),
                   myLang: _myLang,
+                  compareOn: AppConfig.compareTranslations,
                 ),
               ),
         // 좁은 화면(모바일)만 드로어. 넓은 화면은 body 안에 인라인 패널로 표시.
@@ -1585,6 +1651,8 @@ class _RoomScreenState extends State<RoomScreen> {
                   onSend: _sendChat,
                   targetLanguage: _targetLang,
                   onLanguageChange: _changeTargetLang,
+                  compareOn: AppConfig.compareTranslations,
+                  onToggleCompare: _toggleCompare,
                 ),
               ),
         appBar: AppBar(
@@ -1799,6 +1867,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 child: CaptionPanel(
                   lines: _transcriptLines(),
                   myLang: _myLang,
+                  compareOn: AppConfig.compareTranslations,
                   onClose: () => setState(() => _transcriptOpen = false),
                 ),
               ),
@@ -1944,6 +2013,8 @@ class _RoomScreenState extends State<RoomScreen> {
                   onSend: _sendChat,
                   targetLanguage: _targetLang,
                   onLanguageChange: _changeTargetLang,
+                  compareOn: AppConfig.compareTranslations,
+                  onToggleCompare: _toggleCompare,
                   onClose: () => setState(() => _chatOpen = false),
                 ),
               ),
