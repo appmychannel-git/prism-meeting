@@ -191,7 +191,7 @@ class TrackTranscriber:
             pass
 
 
-async def run(room_name: str):
+def _check_env():
     for k, v in {
         "LIVEKIT_URL": LIVEKIT_URL, "LIVEKIT_API_KEY": LIVEKIT_API_KEY,
         "LIVEKIT_API_SECRET": LIVEKIT_API_SECRET, "AZURE_SPEECH_KEY": AZURE_SPEECH_KEY,
@@ -200,41 +200,114 @@ async def run(room_name: str):
         if not v:
             raise SystemExit(f"환경변수 {k} 가 없습니다. .env 또는 환경변수로 설정하세요.")
 
+
+class RoomSession:
+    """방 1개에 자막봇으로 접속해서, 참가자 오디오 트랙마다 Azure STT를 붙인다."""
+
+    def __init__(self, room_name: str, loop: asyncio.AbstractEventLoop):
+        self.room_name = room_name
+        self.loop = loop
+        self.room = rtc.Room()
+        self.transcribers: dict[str, TrackTranscriber] = {}
+
+        @self.room.on("track_subscribed")
+        def on_track_subscribed(track, publication, participant):
+            if track.kind == rtc.TrackKind.KIND_AUDIO and participant.identity != BOT_IDENTITY:
+                self.transcribers[publication.sid] = TrackTranscriber(
+                    self.room, self.loop, participant, track)
+
+        @self.room.on("track_unsubscribed")
+        def on_track_unsubscribed(track, publication, participant):
+            t = self.transcribers.pop(publication.sid, None)
+            if t:
+                asyncio.create_task(t.aclose())
+
+    async def connect(self):
+        token = build_token(self.room_name)
+        log.info("LiveKit 연결: %s (room=%s)", LIVEKIT_URL, self.room_name)
+        await self.room.connect(LIVEKIT_URL, token)
+
+    async def close(self):
+        for t in list(self.transcribers.values()):
+            await t.aclose()
+        self.transcribers.clear()
+        try:
+            await self.room.disconnect()
+        except Exception:
+            pass
+
+
+async def run_single(room_name: str):
+    """한 방에만 붙는 모드(--room). 방코드를 미리 알 때."""
+    _check_env()
     loop = asyncio.get_running_loop()
-    room = rtc.Room()
-    transcribers: dict[str, TrackTranscriber] = {}
-
-    @room.on("track_subscribed")
-    def on_track_subscribed(track, publication, participant):
-        if track.kind == rtc.TrackKind.KIND_AUDIO and participant.identity != BOT_IDENTITY:
-            transcribers[publication.sid] = TrackTranscriber(room, loop, participant, track)
-
-    @room.on("track_unsubscribed")
-    def on_track_unsubscribed(track, publication, participant):
-        t = transcribers.pop(publication.sid, None)
-        if t:
-            asyncio.create_task(t.aclose())
-
-    token = build_token(room_name)
-    log.info("LiveKit 연결: %s (room=%s)", LIVEKIT_URL, room_name)
-    await room.connect(LIVEKIT_URL, token)
+    session = RoomSession(room_name, loop)
+    await session.connect()
     log.info("연결됨. 언어 후보=%s. 참가자가 말하면 자막을 발행합니다. (Ctrl+C 종료)", STT_CANDIDATES)
-
     stop = asyncio.Event()
     try:
         await stop.wait()
     finally:
-        for t in list(transcribers.values()):
-            await t.aclose()
-        await room.disconnect()
+        await session.close()
+
+
+async def run_watch(poll_sec: float):
+    """감시 모드(--watch). 상시 켜두면 새 방이 생길 때마다 자동으로 자막을 시작하고,
+    방이 비면 자동으로 정리한다. 방코드를 몰라도 됨."""
+    _check_env()
+    loop = asyncio.get_running_loop()
+    http_url = LIVEKIT_URL.replace("wss://", "https://").replace("ws://", "http://")
+    lkapi = api.LiveKitAPI(url=http_url, api_key=LIVEKIT_API_KEY, api_secret=LIVEKIT_API_SECRET)
+    active: dict[str, RoomSession] = {}
+
+    log.info("감시 모드 시작: %ds 마다 방 확인. 참가자 있는 방에 자동으로 자막을 붙입니다. (Ctrl+C 종료)", poll_sec)
+    try:
+        while True:
+            try:
+                resp = await lkapi.room.list_rooms(api.ListRoomsRequest())
+                # 실제 사람이 있는 방만(봇은 hidden이라 num_participants에 안 잡힘)
+                live = {r.name for r in resp.rooms if r.num_participants > 0}
+            except Exception as e:
+                log.warning("방 목록 조회 실패(재시도): %s", e)
+                await asyncio.sleep(poll_sec)
+                continue
+
+            for name in live - set(active):
+                try:
+                    session = RoomSession(name, loop)
+                    await session.connect()
+                    active[name] = session
+                    log.info("＋ 새 방 감지 → 자막 시작: %s", name)
+                except Exception as e:
+                    log.warning("방 접속 실패(%s): %s", name, e)
+
+            for name in set(active) - live:
+                session = active.pop(name)
+                await session.close()
+                log.info("－ 방 종료 → 자막 중지: %s", name)
+
+            await asyncio.sleep(poll_sec)
+    finally:
+        for session in list(active.values()):
+            await session.close()
+        await lkapi.aclose()
 
 
 def main():
     ap = argparse.ArgumentParser(description="서버측 STT PoC (LiveKit + Azure Speech)")
-    ap.add_argument("--room", required=True, help="자막을 붙일 회의 방 코드(참가자와 동일한 방)")
+    ap.add_argument("--room", help="자막을 붙일 회의 방 코드(참가자와 동일한 방)")
+    ap.add_argument("--watch", action="store_true",
+                    help="상시 감시 모드: 새 방이 생기면 자동으로 자막 시작(방코드 불필요)")
+    ap.add_argument("--poll", type=float, default=5.0,
+                    help="감시 모드에서 방 확인 주기(초, 기본 5)")
     args = ap.parse_args()
+    if not args.watch and not args.room:
+        ap.error("--room <방코드> 또는 --watch 중 하나가 필요합니다.")
     try:
-        asyncio.run(run(args.room))
+        if args.watch:
+            asyncio.run(run_watch(args.poll))
+        else:
+            asyncio.run(run_single(args.room))
     except KeyboardInterrupt:
         pass
 
