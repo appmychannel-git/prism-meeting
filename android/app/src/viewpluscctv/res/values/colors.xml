@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FECD06</color>
+    <!-- Viewplus CCTV 브랜드 노랑(제공 아이콘 배경색). 어댑티브 배경 + 스플래시 베이스로 사용. -->
+    <color name="ic_launcher_background">#FDEF44</color>
 </resources>

@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- 글로벌 CCTV: 아이콘이 흰→파랑 그라데이션이라 전면블리드(어댑티브 배경은 거의 안 보임).
+         스플래시 베이스용 대표 파랑. -->
+    <color name="ic_launcher_background">#2AA7FD</color>
 </resources>
