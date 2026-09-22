@@ -1,5 +1,5 @@
-# 서버측 STT PoC 의존성. Python 3.9+ 권장.
-# 버전이 안 맞아 import 오류가 나면 아래 핀을 최신으로 올려보세요.
+# Server-side STT PoC dependencies. Python 3.9+ recommended.
+# If imports fail due to version mismatch, bump the pins below.
 livekit>=0.18.0
 livekit-api>=0.7.0
 azure-cognitiveservices-speech>=1.40.0
