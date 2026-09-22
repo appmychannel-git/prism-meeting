@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'config.dart';
+
 /// 실시간 자막 한 줄(확정 문장 또는 말하는 중인 문장).
 class LiveCaption {
   final String identity; // 발화자 고정 식별값
@@ -33,11 +35,13 @@ class CaptionOverlay extends StatefulWidget {
   final List<LiveCaption> lines;
   final String myLang; // 내가 읽을 언어(번역 대상)
   final int maxLines; // 표시 줄 수 참고값(높이 계산용)
+  final bool compareOn; // 엔진 비교 모드(Google/Azure … 나란히)
   const CaptionOverlay({
     super.key,
     required this.lines,
     required this.myLang,
     this.maxLines = 8,
+    this.compareOn = false,
   });
 
   @override
@@ -114,7 +118,35 @@ class _CaptionOverlayState extends State<CaptionOverlay> {
               color: c.isFinal ? Colors.white : Colors.white70,
             ),
           ),
-          if (showTr)
+          if (widget.compareOn && !c.mine)
+            for (final eng in AppConfig.compareEngines)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(AppConfig.engineLabels[eng] ?? eng,
+                        style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white38,
+                            fontWeight: FontWeight.bold)),
+                    Text(
+                      c.compareTexts[eng] ??
+                          (c.compareErrs[eng] != null
+                              ? '✕ ${c.compareErrs[eng]}'
+                              : '…'),
+                      style: TextStyle(
+                        fontSize: 15,
+                        height: 1.2,
+                        color: c.compareTexts[eng] != null
+                            ? const Color(0xFF9FE0A6)
+                            : Colors.white38,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+          else if (showTr)
             Text(
               c.translated!,
               style: const TextStyle(

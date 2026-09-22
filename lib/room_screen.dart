@@ -1980,6 +1980,7 @@ class _RoomScreenState extends State<RoomScreen> {
                             lines: _displayCaptions(),
                             myLang: _myLang,
                             maxLines: _maxCaptionLines,
+                            compareOn: AppConfig.compareTranslations,
                           ),
                   _ControlBar(
                     micOn: _micOn,
