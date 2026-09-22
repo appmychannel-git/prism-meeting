@@ -17,6 +17,7 @@ BRAND_LIST="prism gbled viewplus mychannel ecoglow gbledcctv viewpluscctv freedo
 brand_config() {
   CCTV_ONLY=false
   DEFAULT_LANG=""   # 브랜드 기본 UI 언어(빈 값=기기 언어). 예: freedom="en"
+  SERVER_STT=false  # 서버측 STT(자막봇) 사용. TV·셋톱 등 언어팩 없는 기기용. 예: freedom=true
   case "$1" in
     #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
@@ -25,7 +26,7 @@ brand_config() {
     mychannel)    APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     ecoglow)      APP_BRAND="ECO GLOW Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     # ── 프리덤미디어(Freedom Media, 카자흐스탄) — 기본 언어 영어 ──
-    freedom)      APP_BRAND="Freedom Meeting"  ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=true ; START_CAMERA=true;  E2EE=false; DEFAULT_LANG="en" ;;
+    freedom)      APP_BRAND="Freedom Meeting"  ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=true ; START_CAMERA=true;  E2EE=false; DEFAULT_LANG="en"; SERVER_STT=true ;;
     # ── CCTV 전용 앱(회의/친구 없음, 홈=CCTV) ──
     gbledcctv)    APP_BRAND="글로벌 CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
     viewpluscctv) APP_BRAND="Viewplus CCTV"   ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;

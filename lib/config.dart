@@ -164,10 +164,11 @@ class AppConfig {
   }
 
   // ── 번역 엔진 비교 모드(품질 평가용) ──
-  // 켜면 받은 채팅/자막을 아래 [compareEngines] 3개 엔진으로 각각 번역해 나란히 표시.
+  // 켜면 받은 채팅/자막을 아래 [compareEngines] 엔진으로 각각 번역해 나란히 표시.
   // (엔진당 1회씩 호출 → 테스트용. 평상시 off.)
+  // DeepL은 API 키 준비되면 'deepl' 추가(서버 token-server에 DEEPL_API_KEY 배포 필요).
   static bool compareTranslations = false;
-  static const List<String> compareEngines = ['google', 'azure', 'deepl'];
+  static const List<String> compareEngines = ['google', 'azure'];
   static const Map<String, String> engineLabels = {
     'google': 'Google',
     'azure': 'Azure',

@@ -40,6 +40,7 @@ build_web_one() {
     --dart-define=START_CAMERA=$START_CAMERA \
     --dart-define=ENABLE_E2EE=$E2EE \
     --dart-define=DEFAULT_LANG=${DEFAULT_LANG:-} \
+    --dart-define=SERVER_STT=${SERVER_STT:-false} \
     --dart-define=SHARE_BASE_URL="${base}share/" \
     --dart-define=APK_URL="${base}download/Meeting-${brand}.apk"
 
