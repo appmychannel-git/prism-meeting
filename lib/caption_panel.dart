@@ -78,7 +78,9 @@ class _CaptionPanelState extends State<CaptionPanel> {
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        L.t('caption_empty_hint'),
+                        L.t(AppConfig.serverStt
+                            ? 'caption_empty_hint_server'
+                            : 'caption_empty_hint'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: Colors.white38),
                       ),

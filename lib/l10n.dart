@@ -180,6 +180,19 @@ class L {
       'ko': '말하는 참가자도 자막을 켜야 자막이 표시됩니다.',
       'en': 'Captions appear only when the speaker also turns captions on.',
     },
+    // 서버측 STT(자막봇) 모드: 상대가 자막을 켤 필요가 없다.
+    'caption_empty_hint_server': {
+      'ko': '아직 자막이 없습니다. 참가자가 말하면 표시됩니다.',
+      'en': 'No captions yet. They appear when a participant speaks.',
+    },
+    'cap_compare_on': {
+      'ko': '자막 엔진 비교 켜기',
+      'en': 'Compare engines',
+    },
+    'cap_compare_off': {
+      'ko': '자막 엔진 비교 끄기',
+      'en': 'Turn off compare',
+    },
     'transcript': {'ko': '자막 기록', 'en': 'Transcript'},
 
     // ── 메뉴 / 친구 · 통화 ──

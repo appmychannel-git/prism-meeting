@@ -1744,6 +1744,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 if (v == 'caption') _toggleCaptions();
                 if (v == 'transcript') _toggleTranscript();
                 if (v == 'caplang') _showCaptionLangDialog();
+                if (v == 'capcompare') _toggleCompare();
                 if (v == 'applang') showAppLanguagePicker(context);
                 if (v == 'capmode') {
                   _setCaptionMode(
@@ -1812,6 +1813,27 @@ class _RoomScreenState extends State<RoomScreen> {
                             ? L.t('cap_to_ptt')
                             : L.t('cap_to_cont'),
                       ),
+                    ],
+                  ),
+                ),
+                // 번역 엔진 비교(Google/Azure…) 토글 — 자막/채팅 공통.
+                PopupMenuItem<String>(
+                  value: 'capcompare',
+                  child: Row(
+                    children: [
+                      Icon(
+                        AppConfig.compareTranslations
+                            ? Icons.compare
+                            : Icons.compare_arrows,
+                        size: 18,
+                        color: AppConfig.compareTranslations
+                            ? const Color(0xFF9FC0FF)
+                            : null,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(AppConfig.compareTranslations
+                          ? L.t('cap_compare_off')
+                          : L.t('cap_compare_on')),
                     ],
                   ),
                 ),
@@ -1966,7 +1988,9 @@ class _RoomScreenState extends State<RoomScreen> {
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
-                                    L.t('caption_empty_hint'),
+                                    L.t(AppConfig.serverStt
+                                        ? 'caption_empty_hint_server'
+                                        : 'caption_empty_hint'),
                                     style: const TextStyle(
                                       fontSize: 12,
                                       color: Colors.white70,
