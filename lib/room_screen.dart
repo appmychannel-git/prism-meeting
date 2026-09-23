@@ -359,17 +359,20 @@ class _RoomScreenState extends State<RoomScreen> {
       m.compareTexts.clear();
       m.compareErrs.clear();
       setState(() => m.translatedLang = target);
+      // 엔진들을 동시에 요청 → 먼저 응답한 것부터 채워짐(총 지연 = 가장 느린 하나).
       for (final eng in AppConfig.compareEngines) {
-        try {
-          final r = await TranslationService.translate(m.text, target,
-              provider: eng);
-          if (!mounted || _targetLang != target) return;
-          setState(() => m.compareTexts[eng] = r.translatedText);
-        } catch (e) {
-          if (!mounted || _targetLang != target) return;
-          setState(() =>
-              m.compareErrs[eng] = e.toString().replaceFirst('Exception: ', ''));
-        }
+        () async {
+          try {
+            final r = await TranslationService.translate(m.text, target,
+                provider: eng);
+            if (!mounted || _targetLang != target) return;
+            setState(() => m.compareTexts[eng] = r.translatedText);
+          } catch (e) {
+            if (!mounted || _targetLang != target) return;
+            setState(() => m.compareErrs[eng] =
+                e.toString().replaceFirst('Exception: ', ''));
+          }
+        }();
       }
       return;
     }
@@ -624,16 +627,21 @@ class _RoomScreenState extends State<RoomScreen> {
       c.compareTexts.clear();
       c.compareErrs.clear();
       c.translatedLang = target;
+      // 엔진들을 동시에 요청 → 먼저 응답한 것부터 채워짐(총 지연 = 가장 느린 하나).
+      // 표시 순서는 UI가 compareEngines 순서로 그리므로 값만 나중에 채워질 뿐 고정.
       for (final eng in AppConfig.compareEngines) {
-        try {
-          final r = await TranslationService.translate(src, target, provider: eng);
-          if (!mounted || c.text != src) return;
-          setState(() => c.compareTexts[eng] = r.translatedText);
-        } catch (e) {
-          if (!mounted || c.text != src) return;
-          setState(() =>
-              c.compareErrs[eng] = e.toString().replaceFirst('Exception: ', ''));
-        }
+        () async {
+          try {
+            final r =
+                await TranslationService.translate(src, target, provider: eng);
+            if (!mounted || c.text != src) return;
+            setState(() => c.compareTexts[eng] = r.translatedText);
+          } catch (e) {
+            if (!mounted || c.text != src) return;
+            setState(() => c.compareErrs[eng] =
+                e.toString().replaceFirst('Exception: ', ''));
+          }
+        }();
       }
       return;
     }
