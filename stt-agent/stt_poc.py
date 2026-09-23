@@ -27,6 +27,7 @@ import os
 import time
 from datetime import datetime
 
+import aiohttp
 from livekit import rtc, api
 import azure.cognitiveservices.speech as speechsdk
 
@@ -52,6 +53,11 @@ AGENT_HIDDEN = os.environ.get("AGENT_HIDDEN", "true").lower() != "false"
 # 회의록(자막 텍스트) 저장. 방마다 파일 1개, 확정 문장이 나올 때마다 즉시 append.
 SAVE_TRANSCRIPT = os.environ.get("SAVE_TRANSCRIPT", "true").lower() != "false"
 TRANSCRIPT_DIR = os.environ.get("TRANSCRIPT_DIR", "transcripts")
+# 회의록에 번역문도 함께 기록할 대상 언어(쉼표). 비우면 원문만. 예: "ko" 또는 "ko,en,ru"
+TRANSCRIPT_TRANSLATE_TO = [s.strip() for s in os.environ.get("TRANSCRIPT_TRANSLATE_TO", "").split(",") if s.strip()]
+# 번역 API(토큰 서버의 /translate). 앱과 동일 엔드포인트.
+TRANSLATE_URL = os.environ.get("TRANSLATE_URL", "https://prism-token-server.onrender.com/translate")
+TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "")  # 빈값=서버 기본 엔진
 
 CAPTION_TOPIC = "caption"      # 앱과 반드시 동일해야 함(room_screen.dart _captionTopic)
 BOT_IDENTITY = "captions-bot"
@@ -191,13 +197,44 @@ class TrackTranscriber:
         log.info("  %s[%s] %s: %s", "★" if final else "·", lang, self.sender_name, text)
 
         # 확정 문장만 회의록 파일에 즉시 기록(중간에 꺼져도 안전).
+        # 번역 대상이 있으면 번역까지 붙여야 해서 루프에서 비동기로 처리.
         if final and self.transcript_path:
+            asyncio.run_coroutine_threadsafe(
+                self._write_transcript(text, lang), self.loop)
+
+    async def _translate_one(self, session, text: str, target: str):
+        payload = {"text": text, "target": target}
+        if TRANSLATE_PROVIDER:
+            payload["provider"] = TRANSLATE_PROVIDER
+        try:
+            async with session.post(TRANSLATE_URL, json=payload,
+                                    timeout=aiohttp.ClientTimeout(total=15)) as r:
+                if r.status != 200:
+                    return None
+                data = await r.json()
+                return (data.get("translatedText") or "").strip() or None
+        except Exception:
+            return None
+
+    async def _write_transcript(self, text: str, lang: str):
+        """확정 문장 1줄(+번역)을 회의록 파일에 한 블록으로 기록."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        lines = [f"[{ts}] {self.sender_name} ({lang}): {text}"]
+        targets = [t for t in TRANSCRIPT_TRANSLATE_TO if t != lang]
+        if targets:
             try:
-                ts = datetime.now().strftime("%H:%M:%S")
-                with open(self.transcript_path, "a", encoding="utf-8") as f:
-                    f.write(f"[{ts}] {self.sender_name} ({lang}): {text}\n")
+                async with aiohttp.ClientSession() as session:
+                    for t in targets:
+                        tr = await self._translate_one(session, text, t)
+                        if tr:
+                            lines.append(f"        → ({t}) {tr}")
             except Exception as e:
-                log.warning("회의록 기록 실패: %s", e)
+                log.warning("회의록 번역 실패: %s", e)
+        try:
+            with open(self.transcript_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+        except Exception as e:
+            log.warning("회의록 기록 실패: %s", e)
 
     async def aclose(self):
         self._closed = True
