@@ -120,7 +120,7 @@ class _CaptionPanelState extends State<CaptionPanel> {
               color: c.isFinal ? Colors.white : Colors.white70,
             ),
           ),
-          if (widget.compareOn && !c.mine)
+          if (widget.compareOn && !c.mine && c.lang != widget.myLang)
             Padding(
               padding: const EdgeInsets.only(top: 3),
               child: Column(

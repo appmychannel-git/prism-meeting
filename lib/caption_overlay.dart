@@ -118,7 +118,7 @@ class _CaptionOverlayState extends State<CaptionOverlay> {
               color: c.isFinal ? Colors.white : Colors.white70,
             ),
           ),
-          if (widget.compareOn && !c.mine)
+          if (widget.compareOn && !c.mine && c.lang != widget.myLang)
             for (final eng in AppConfig.compareEngines)
               Padding(
                 padding: const EdgeInsets.only(top: 2),
