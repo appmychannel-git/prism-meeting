@@ -103,6 +103,11 @@ class TrackTranscriber:
         audio_config = speechsdk.audio.AudioConfig(stream=self._push)
 
         if len(STT_CANDIDATES) > 1:
+            # 연속 언어감지: 발화 도중 언어가 바뀌어도(영→한 등) 따라가게.
+            # (기본값은 '시작 시 1회'라 한 번 잡힌 언어로 고정됨)
+            speech_config.set_property(
+                property_id=speechsdk.PropertyId.SpeechServiceConnection_LanguageIdMode,
+                value="Continuous")
             # 다국어 자동 감지(최대 4개 후보)
             auto_cfg = speechsdk.languageconfig.AutoDetectSourceLanguageConfig(languages=STT_CANDIDATES)
             self._rec = speechsdk.SpeechRecognizer(
