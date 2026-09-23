@@ -194,6 +194,7 @@ class L {
       'en': 'Turn off compare',
     },
     'transcript': {'ko': '자막 기록', 'en': 'Transcript'},
+    'transcript_download': {'ko': '회의록 다운로드', 'en': 'Download transcript'},
 
     // ── 메뉴 / 친구 · 통화 ──
     'menu': {'ko': '메뉴', 'en': 'Menu'},

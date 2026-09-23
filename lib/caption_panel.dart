@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'caption_overlay.dart'; // LiveCaption
 import 'config.dart';
 import 'l10n.dart';
+import 'transcript_download_io.dart'
+    if (dart.library.html) 'transcript_download_web.dart';
 
 /// 자막 전체 기록 패널(왼쪽). 채팅 패널과 비슷하게, 말한 내역 전부를
 /// 원문+번역으로 스크롤해서 볼 수 있다(하단 8줄 오버레이와 별개).
@@ -44,6 +46,52 @@ class _CaptionPanelState extends State<CaptionPanel> {
     super.dispose();
   }
 
+  // 현재 화면에 보이는 그대로(원문 + 선택 언어 번역 / 비교 엔진) 텍스트로 만든다.
+  String _buildText() {
+    final buf = StringBuffer();
+    final now = DateTime.now();
+    buf.writeln('${L.t('transcript')} — '
+        '${now.year}-${_pad2(now.month)}-${_pad2(now.day)} '
+        '${_pad2(now.hour)}:${_pad2(now.minute)}');
+    buf.writeln('');
+    for (final c in widget.lines) {
+      buf.writeln('${c.sender}: ${c.text}');
+      final translatable = !c.mine && c.lang != widget.myLang;
+      if (widget.compareOn && translatable) {
+        for (final eng in AppConfig.compareEngines) {
+          final t = c.compareTexts[eng] ??
+              (c.compareErrs[eng] != null ? '✕ ${c.compareErrs[eng]}' : '');
+          if (t.isNotEmpty) {
+            buf.writeln('  [${AppConfig.engineLabels[eng] ?? eng}] $t');
+          }
+        }
+      } else if (translatable &&
+          c.translated != null &&
+          c.translated!.isNotEmpty &&
+          c.translatedLang == widget.myLang) {
+        buf.writeln('  → ${c.translated}');
+      }
+    }
+    return buf.toString();
+  }
+
+  static String _pad2(int n) => n.toString().padLeft(2, '0');
+
+  Future<void> _download() async {
+    final now = DateTime.now();
+    final name =
+        'caption_${now.year}${_pad2(now.month)}${_pad2(now.day)}_${_pad2(now.hour)}${_pad2(now.minute)}${_pad2(now.second)}.txt';
+    try {
+      await saveTranscript(name, _buildText());
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${L.t('transcript_download')}: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -62,6 +110,11 @@ class _CaptionPanelState extends State<CaptionPanel> {
                   ),
                 ),
                 const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.download),
+                  tooltip: L.t('transcript_download'),
+                  onPressed: widget.lines.isEmpty ? null : _download,
+                ),
                 IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: L.t('close'),
