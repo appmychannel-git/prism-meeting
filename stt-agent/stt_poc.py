@@ -25,6 +25,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime
 
 from livekit import rtc, api
 import azure.cognitiveservices.speech as speechsdk
@@ -48,6 +49,9 @@ AZURE_SPEECH_REGION = os.environ.get("AZURE_SPEECH_REGION", "")  # 예: koreacen
 STT_CANDIDATES = [s.strip() for s in os.environ.get("STT_CANDIDATES", "en-US,ko-KR,ru-RU").split(",") if s.strip()]
 # 자막봇을 숨김 참가자로(다른 참가자 목록/타일에 안 보이게). 데이터 발행은 그대로 됨.
 AGENT_HIDDEN = os.environ.get("AGENT_HIDDEN", "true").lower() != "false"
+# 회의록(자막 텍스트) 저장. 방마다 파일 1개, 확정 문장이 나올 때마다 즉시 append.
+SAVE_TRANSCRIPT = os.environ.get("SAVE_TRANSCRIPT", "true").lower() != "false"
+TRANSCRIPT_DIR = os.environ.get("TRANSCRIPT_DIR", "transcripts")
 
 CAPTION_TOPIC = "caption"      # 앱과 반드시 동일해야 함(room_screen.dart _captionTopic)
 BOT_IDENTITY = "captions-bot"
@@ -81,11 +85,13 @@ class TrackTranscriber:
     """원격 참가자 1명의 오디오 트랙 → Azure 연속 인식 → caption 발행."""
 
     def __init__(self, room: rtc.Room, loop: asyncio.AbstractEventLoop,
-                 participant: rtc.RemoteParticipant, track: rtc.Track):
+                 participant: rtc.RemoteParticipant, track: rtc.Track,
+                 transcript_path: str | None = None):
         self.room = room
         self.loop = loop
         self.participant = participant
         self.track = track
+        self.transcript_path = transcript_path
         self.sender_name = participant.name or participant.identity
         self._last_interim = 0.0
         self._closed = False
@@ -179,6 +185,15 @@ class TrackTranscriber:
         asyncio.run_coroutine_threadsafe(_send(), self.loop)
         log.info("  %s[%s] %s: %s", "★" if final else "·", lang, self.sender_name, text)
 
+        # 확정 문장만 회의록 파일에 즉시 기록(중간에 꺼져도 안전).
+        if final and self.transcript_path:
+            try:
+                ts = datetime.now().strftime("%H:%M:%S")
+                with open(self.transcript_path, "a", encoding="utf-8") as f:
+                    f.write(f"[{ts}] {self.sender_name} ({lang}): {text}\n")
+            except Exception as e:
+                log.warning("회의록 기록 실패: %s", e)
+
     async def aclose(self):
         self._closed = True
         try:
@@ -209,12 +224,14 @@ class RoomSession:
         self.loop = loop
         self.room = rtc.Room()
         self.transcribers: dict[str, TrackTranscriber] = {}
+        self.transcript_path: str | None = None
 
         @self.room.on("track_subscribed")
         def on_track_subscribed(track, publication, participant):
             if track.kind == rtc.TrackKind.KIND_AUDIO and participant.identity != BOT_IDENTITY:
                 self.transcribers[publication.sid] = TrackTranscriber(
-                    self.room, self.loop, participant, track)
+                    self.room, self.loop, participant, track,
+                    transcript_path=self.transcript_path)
 
         @self.room.on("track_unsubscribed")
         def on_track_unsubscribed(track, publication, participant):
@@ -222,7 +239,25 @@ class RoomSession:
             if t:
                 asyncio.create_task(t.aclose())
 
+    def _init_transcript(self):
+        """방 접속 시 회의록 파일 준비(파일명: <방>_<날짜시각>.txt). 헤더 한 줄 기록."""
+        if not SAVE_TRANSCRIPT:
+            return
+        try:
+            os.makedirs(TRANSCRIPT_DIR, exist_ok=True)
+            safe = "".join(ch if ch.isalnum() or ch in "-_" else "_"
+                           for ch in self.room_name)
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.transcript_path = os.path.join(TRANSCRIPT_DIR, f"{safe}_{stamp}.txt")
+            with open(self.transcript_path, "a", encoding="utf-8") as f:
+                f.write(f"# 회의록 room={self.room_name} 시작={datetime.now():%Y-%m-%d %H:%M:%S}\n")
+            log.info("회의록 저장 위치: %s", os.path.abspath(self.transcript_path))
+        except Exception as e:
+            log.warning("회의록 파일 준비 실패(저장 생략): %s", e)
+            self.transcript_path = None
+
     async def connect(self):
+        self._init_transcript()
         token = build_token(self.room_name)
         log.info("LiveKit 연결: %s (room=%s)", LIVEKIT_URL, self.room_name)
         await self.room.connect(LIVEKIT_URL, token)
