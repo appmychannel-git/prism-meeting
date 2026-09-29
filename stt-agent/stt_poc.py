@@ -21,6 +21,7 @@
 """
 import argparse
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -58,6 +59,15 @@ TRANSCRIPT_TRANSLATE_TO = [s.strip() for s in os.environ.get("TRANSCRIPT_TRANSLA
 # 번역 API(토큰 서버의 /translate). 앱과 동일 엔드포인트.
 TRANSLATE_URL = os.environ.get("TRANSLATE_URL", "https://prism-token-server.onrender.com/translate")
 TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "")  # 빈값=서버 기본 엔진
+
+# ---- STT 엔진 선택(관리자) ----
+# 'azure'(기본) 또는 'deepl'. .env STT_ENGINE 으로만 바꾼다(사용자 앱엔 노출 안 함).
+STT_ENGINE = os.environ.get("STT_ENGINE", "azure").lower()
+# DeepL Voice(실시간) — STT_ENGINE=deepl 일 때만 사용. Voice 되는 유료 API 키 필요.
+DEEPL_API_KEY = os.environ.get("DEEPL_API_KEY", "")
+_DEEPL_BASE = ("https://api-free.deepl.com" if DEEPL_API_KEY.endswith(":fx")
+               else "https://api.deepl.com")
+DEEPL_VOICE_URL = os.environ.get("DEEPL_VOICE_URL", f"{_DEEPL_BASE}/v3/voice/realtime")
 
 CAPTION_TOPIC = "caption"      # 앱과 반드시 동일해야 함(room_screen.dart _captionTopic)
 BOT_IDENTITY = "captions-bot"
@@ -109,8 +119,8 @@ def build_token(room: str) -> str:
     )
 
 
-class TrackTranscriber:
-    """원격 참가자 1명의 오디오 트랙 → Azure 연속 인식 → caption 발행."""
+class _Transcriber:
+    """엔진 공통: caption 발행 + 회의록 기록(Azure/DeepL 공용)."""
 
     def __init__(self, room: rtc.Room, loop: asyncio.AbstractEventLoop,
                  participant: rtc.RemoteParticipant, track: rtc.Track,
@@ -121,10 +131,81 @@ class TrackTranscriber:
         self.participant = participant
         self.track = track
         self.transcript_path = transcript_path
-        self.fixed_lang = fixed_lang   # 지정 시 그 언어로 고정 인식(자동감지 off)
+        self.fixed_lang = fixed_lang   # 지정 시 그 언어로 고정 인식(자동감지 off). 2글자 코드.
         self.sender_name = participant.name or participant.identity
         self._last_interim = 0.0
         self._closed = False
+
+    def _publish(self, text: str, lang: str, final: bool):
+        """앱과 동일한 형식으로 caption 토픽에 발행(스레드→루프 안전 전달)."""
+        payload = json.dumps({
+            "sender": self.sender_name,
+            "speaker": self.participant.identity,  # 실제 화자 식별자(클라 그룹핑용)
+            "text": text,
+            "lang": lang,
+            "final": final,
+        }).encode("utf-8")
+
+        async def _send():
+            try:
+                await self.room.local_participant.publish_data(
+                    payload, reliable=final, topic=CAPTION_TOPIC,
+                )
+            except Exception as e:
+                log.warning("publish 실패: %s", e)
+
+        # Azure 콜백은 SDK 스레드에서 실행되므로 메인 asyncio 루프로 넘긴다.
+        asyncio.run_coroutine_threadsafe(_send(), self.loop)
+        log.info("  %s[%s] %s: %s", "★" if final else "·", lang, self.sender_name, text)
+
+        # 확정 문장만 회의록 파일에 즉시 기록(중간에 꺼져도 안전).
+        if final and self.transcript_path:
+            asyncio.run_coroutine_threadsafe(
+                self._write_transcript(text, lang), self.loop)
+
+    async def _translate_one(self, session, text: str, target: str):
+        payload = {"text": text, "target": target}
+        if TRANSLATE_PROVIDER:
+            payload["provider"] = TRANSLATE_PROVIDER
+        try:
+            async with session.post(TRANSLATE_URL, json=payload,
+                                    timeout=aiohttp.ClientTimeout(total=15)) as r:
+                if r.status != 200:
+                    return None
+                data = await r.json()
+                return (data.get("translatedText") or "").strip() or None
+        except Exception:
+            return None
+
+    async def _write_transcript(self, text: str, lang: str):
+        """확정 문장 1줄(+번역)을 회의록 파일에 한 블록으로 기록."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        lines = [f"[{ts}] {self.sender_name} ({lang}): {text}"]
+        targets = [t for t in TRANSCRIPT_TRANSLATE_TO if t != lang]
+        if targets:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    for t in targets:
+                        tr = await self._translate_one(session, text, t)
+                        if tr:
+                            lines.append(f"        → ({t}) {tr}")
+            except Exception as e:
+                log.warning("회의록 번역 실패: %s", e)
+        try:
+            with open(self.transcript_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(lines) + "\n")
+        except Exception as e:
+            log.warning("회의록 기록 실패: %s", e)
+
+
+class TrackTranscriber(_Transcriber):
+    """원격 참가자 1명의 오디오 트랙 → Azure 연속 인식 → caption 발행."""
+
+    def __init__(self, room: rtc.Room, loop: asyncio.AbstractEventLoop,
+                 participant: rtc.RemoteParticipant, track: rtc.Track,
+                 transcript_path: str | None = None,
+                 fixed_lang: str | None = None):
+        super().__init__(room, loop, participant, track, transcript_path, fixed_lang)
 
         # Azure 인식기 구성(푸시 스트림 입력).
         speech_config = speechsdk.SpeechConfig(subscription=AZURE_SPEECH_KEY, region=AZURE_SPEECH_REGION)
@@ -134,7 +215,7 @@ class TrackTranscriber:
 
         if fixed_lang:
             # 참가자가 "말하는 언어"를 지정 → 그 언어로 고정(자동감지 off, 첫 단어부터 정확).
-            speech_config.speech_recognition_language = fixed_lang
+            speech_config.speech_recognition_language = _locale_for(fixed_lang) or fixed_lang
             self._rec = speechsdk.SpeechRecognizer(
                 speech_config=speech_config, audio_config=audio_config)
         elif len(STT_CANDIDATES) > 1:
@@ -206,68 +287,6 @@ class TrackTranscriber:
             return
         self._publish(text, self._detected_lang(evt.result), final=True)
 
-    def _publish(self, text: str, lang: str, final: bool):
-        """앱과 동일한 형식으로 caption 토픽에 발행(스레드→루프 안전 전달)."""
-        payload = json.dumps({
-            "sender": self.sender_name,
-            "speaker": self.participant.identity,  # 실제 화자 식별자(클라 그룹핑용)
-            "text": text,
-            "lang": lang,
-            "final": final,
-        }).encode("utf-8")
-
-        async def _send():
-            try:
-                await self.room.local_participant.publish_data(
-                    payload, reliable=final, topic=CAPTION_TOPIC,
-                )
-            except Exception as e:
-                log.warning("publish 실패: %s", e)
-
-        # Azure 콜백은 SDK 스레드에서 실행되므로 메인 asyncio 루프로 넘긴다.
-        asyncio.run_coroutine_threadsafe(_send(), self.loop)
-        log.info("  %s[%s] %s: %s", "★" if final else "·", lang, self.sender_name, text)
-
-        # 확정 문장만 회의록 파일에 즉시 기록(중간에 꺼져도 안전).
-        # 번역 대상이 있으면 번역까지 붙여야 해서 루프에서 비동기로 처리.
-        if final and self.transcript_path:
-            asyncio.run_coroutine_threadsafe(
-                self._write_transcript(text, lang), self.loop)
-
-    async def _translate_one(self, session, text: str, target: str):
-        payload = {"text": text, "target": target}
-        if TRANSLATE_PROVIDER:
-            payload["provider"] = TRANSLATE_PROVIDER
-        try:
-            async with session.post(TRANSLATE_URL, json=payload,
-                                    timeout=aiohttp.ClientTimeout(total=15)) as r:
-                if r.status != 200:
-                    return None
-                data = await r.json()
-                return (data.get("translatedText") or "").strip() or None
-        except Exception:
-            return None
-
-    async def _write_transcript(self, text: str, lang: str):
-        """확정 문장 1줄(+번역)을 회의록 파일에 한 블록으로 기록."""
-        ts = datetime.now().strftime("%H:%M:%S")
-        lines = [f"[{ts}] {self.sender_name} ({lang}): {text}"]
-        targets = [t for t in TRANSCRIPT_TRANSLATE_TO if t != lang]
-        if targets:
-            try:
-                async with aiohttp.ClientSession() as session:
-                    for t in targets:
-                        tr = await self._translate_one(session, text, t)
-                        if tr:
-                            lines.append(f"        → ({t}) {tr}")
-            except Exception as e:
-                log.warning("회의록 번역 실패: %s", e)
-        try:
-            with open(self.transcript_path, "a", encoding="utf-8") as f:
-                f.write("\n".join(lines) + "\n")
-        except Exception as e:
-            log.warning("회의록 기록 실패: %s", e)
-
     async def aclose(self):
         self._closed = True
         try:
@@ -280,14 +299,139 @@ class TrackTranscriber:
             pass
 
 
+class DeepLTranscriber(_Transcriber):
+    """원격 참가자 오디오 → DeepL Voice 실시간 API(WebSocket) → caption 발행.
+
+    흐름: (1) 세션 POST → streaming_url+token (2) WS 연결 (3) s16le 16kHz PCM을
+    base64 청크로 전송 (4) source_transcript_update 수신 → 확정/중간 자막 발행.
+    번역은 클라이언트(수신자별)가 하므로 target_languages 는 요청하지 않는다.
+    """
+
+    def __init__(self, room, loop, participant, track,
+                 transcript_path=None, fixed_lang=None):
+        super().__init__(room, loop, participant, track, transcript_path, fixed_lang)
+        self._ws = None
+        self._http = None
+        self._task = asyncio.create_task(self._run())
+
+    async def _run(self):
+        if not DEEPL_API_KEY:
+            log.warning("DEEPL_API_KEY 없음 — DeepL STT 불가(%s)", self.sender_name)
+            return
+        headers = {"Authorization": f"DeepL-Auth-Key {DEEPL_API_KEY}"}
+        body = {"source_media_content_type": "audio/pcm;encoding=s16le;rate=16000"}
+        if self.fixed_lang:
+            body["source_language"] = self.fixed_lang     # 2글자(ko/en/ru)
+            body["source_language_mode"] = "fixed"
+        try:
+            self._http = aiohttp.ClientSession()
+            async with self._http.post(DEEPL_VOICE_URL, headers=headers, json=body,
+                                       timeout=aiohttp.ClientTimeout(total=20)) as r:
+                if r.status // 100 != 2:
+                    log.warning("DeepL 세션 실패 %s: %s", r.status, (await r.text())[:200])
+                    return
+                sess = await r.json()
+            streaming_url = sess.get("streaming_url")
+            token = sess.get("token")
+            if not streaming_url or not token:
+                log.warning("DeepL 세션 응답 이상: %s", sess)
+                return
+            self._ws = await self._http.ws_connect(f"{streaming_url}?token={token}")
+            log.info("▶ DeepL transcriber 시작: %s (%s) lang=%s",
+                     self.sender_name, self.participant.identity, self.fixed_lang or 'auto')
+            await asyncio.gather(self._pump_audio(), self._recv_loop())
+        except Exception as e:
+            log.warning("DeepL 실행 오류(%s): %s", self.sender_name, e)
+        finally:
+            await self._cleanup()
+
+    async def _pump_audio(self):
+        """LiveKit 오디오(16kHz s16le)를 base64 JSON 청크로 WS에 전송."""
+        stream = rtc.AudioStream(self.track, sample_rate=TARGET_SR, num_channels=1)
+        try:
+            async for ev in stream:
+                if self._closed or self._ws is None or self._ws.closed:
+                    break
+                b64 = base64.b64encode(bytes(ev.frame.data)).decode("ascii")
+                await self._ws.send_json({"source_media_chunk": {"data": b64}})
+        except Exception as e:
+            log.warning("DeepL audio pump 종료(%s): %s", self.sender_name, e)
+        finally:
+            try:
+                if self._ws and not self._ws.closed:
+                    await self._ws.send_json({"end_of_source_media": {}})
+            except Exception:
+                pass
+            await stream.aclose()
+
+    async def _recv_loop(self):
+        lang = self.fixed_lang or _lang2(STT_CANDIDATES[0] if STT_CANDIDATES else "en")
+        try:
+            async for msg in self._ws:
+                if msg.type == aiohttp.WSMsgType.TEXT:
+                    try:
+                        self._handle(json.loads(msg.data), lang)
+                    except Exception as e:
+                        log.warning("DeepL 메시지 파싱 오류: %s", e)
+                elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
+                    break
+        except Exception as e:
+            log.warning("DeepL recv 종료(%s): %s", self.sender_name, e)
+
+    def _handle(self, data, lang):
+        upd = data.get("source_transcript_update")
+        if not upd:
+            return  # end_of_stream 등은 무시
+        # concluded=확정(1회), tentative=중간(계속 갱신)
+        for seg in (upd.get("concluded") or []):
+            txt = (seg.get("text") or "").strip()
+            if txt:
+                self._publish(txt, lang, True)
+        tent = upd.get("tentative") or []
+        if tent:
+            txt = " ".join((s.get("text") or "") for s in tent).strip()
+            if txt:
+                now = time.monotonic() * 1000
+                if now - self._last_interim >= INTERIM_THROTTLE_MS:
+                    self._last_interim = now
+                    self._publish(txt, lang, False)
+
+    async def _cleanup(self):
+        try:
+            if self._ws and not self._ws.closed:
+                await self._ws.close()
+        except Exception:
+            pass
+        try:
+            if self._http and not self._http.closed:
+                await self._http.close()
+        except Exception:
+            pass
+
+    async def aclose(self):
+        self._closed = True
+        await self._cleanup()
+
+
+def _transcriber_class():
+    """STT_ENGINE(관리자 선택)에 따라 전사기 클래스 반환."""
+    return DeepLTranscriber if STT_ENGINE == "deepl" else TrackTranscriber
+
+
 def _check_env():
-    for k, v in {
+    req = {
         "LIVEKIT_URL": LIVEKIT_URL, "LIVEKIT_API_KEY": LIVEKIT_API_KEY,
-        "LIVEKIT_API_SECRET": LIVEKIT_API_SECRET, "AZURE_SPEECH_KEY": AZURE_SPEECH_KEY,
-        "AZURE_SPEECH_REGION": AZURE_SPEECH_REGION,
-    }.items():
+        "LIVEKIT_API_SECRET": LIVEKIT_API_SECRET,
+    }
+    if STT_ENGINE == "deepl":
+        req["DEEPL_API_KEY"] = DEEPL_API_KEY
+    else:
+        req["AZURE_SPEECH_KEY"] = AZURE_SPEECH_KEY
+        req["AZURE_SPEECH_REGION"] = AZURE_SPEECH_REGION
+    for k, v in req.items():
         if not v:
             raise SystemExit(f"환경변수 {k} 가 없습니다. .env 또는 환경변수로 설정하세요.")
+    log.info("STT 엔진 = %s", STT_ENGINE)
 
 
 class RoomSession:
@@ -297,17 +441,18 @@ class RoomSession:
         self.room_name = room_name
         self.loop = loop
         self.room = rtc.Room()
-        self.transcribers: dict[str, TrackTranscriber] = {}
+        self.transcribers: dict = {}
         self.transcript_path: str | None = None
+        self._Tr = _transcriber_class()  # 엔진(azure/deepl)에 맞는 전사기 클래스
 
         @self.room.on("track_subscribed")
         def on_track_subscribed(track, publication, participant):
             if track.kind == rtc.TrackKind.KIND_AUDIO and participant.identity != BOT_IDENTITY:
-                # 참가자가 "말하는 언어"를 지정했으면 그 언어로 고정, 아니면 자동감지.
-                fixed = _locale_for(self._spoken_lang(participant))
-                self.transcribers[publication.sid] = TrackTranscriber(
+                # 참가자가 "말하는 언어"(2글자)를 지정했으면 그 언어로 고정, 아니면 자동감지.
+                spoken = self._spoken_lang(participant) or None
+                self.transcribers[publication.sid] = self._Tr(
                     self.room, self.loop, participant, track,
-                    transcript_path=self.transcript_path, fixed_lang=fixed)
+                    transcript_path=self.transcript_path, fixed_lang=spoken)
 
         @self.room.on("track_unsubscribed")
         def on_track_unsubscribed(track, publication, participant):
@@ -323,13 +468,13 @@ class RoomSession:
                     return
             except Exception:
                 return
-            new_locale = _locale_for(changed.get('spokenLang'))
+            new_spoken = (changed.get('spokenLang') or '') or None
             for sid, t in list(self.transcribers.items()):
                 if t.participant.identity == participant.identity:
-                    if t.fixed_lang == new_locale:
+                    if t.fixed_lang == new_spoken:
                         continue
                     asyncio.create_task(
-                        self._recreate(sid, participant, t.track, new_locale))
+                        self._recreate(sid, participant, t.track, new_spoken))
 
     def _spoken_lang(self, participant):
         try:
@@ -337,15 +482,15 @@ class RoomSession:
         except Exception:
             return ''
 
-    async def _recreate(self, sid, participant, track, fixed_locale):
+    async def _recreate(self, sid, participant, track, spoken):
         old = self.transcribers.pop(sid, None)
         if old:
             await old.aclose()
-        self.transcribers[sid] = TrackTranscriber(
+        self.transcribers[sid] = self._Tr(
             self.room, self.loop, participant, track,
-            transcript_path=self.transcript_path, fixed_lang=fixed_locale)
+            transcript_path=self.transcript_path, fixed_lang=spoken)
         log.info("↻ 언어 변경 반영: %s → %s",
-                 participant.name or participant.identity, fixed_locale or 'auto')
+                 participant.name or participant.identity, spoken or 'auto')
 
     def _init_transcript(self):
         """방 접속 시 회의록 파일 준비(파일명: <방>_<날짜시각>.txt). 헤더 한 줄 기록."""
