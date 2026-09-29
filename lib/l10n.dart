@@ -150,6 +150,45 @@ class L {
       'en': "Can't reach the token server",
     },
     'http_fail': {'ko': '접속 실패', 'en': 'Connection failed'},
+    // 회의 서버(LiveKit) 접속이 막힌 이유. 그냥 돌아가 버리면 "깜빡했다"로만 보여
+    // 원인을 못 찾는다 — 무엇이 막았는지 화면에 남긴다.
+    'err_quota': {
+      'ko': '회의 서버의 사용 한도를 넘었습니다. 관리자에게 문의하세요.',
+      'en': 'The meeting server usage limit was exceeded. Please contact the administrator.',
+    },
+    'err_token_invalid': {
+      'ko': '입장 권한이 확인되지 않았습니다. 잠시 뒤 다시 시도하세요.',
+      'en': 'Your access could not be verified. Please try again in a moment.',
+    },
+    'err_timeout': {
+      'ko': '회의 서버가 응답하지 않습니다. 인터넷 연결을 확인하세요.',
+      'en': 'The meeting server did not respond. Please check your internet connection.',
+    },
+    'err_connect': {
+      'ko': '회의 서버에 연결하지 못했습니다.',
+      'en': 'Could not connect to the meeting server.',
+    },
+    'err_detail': {'ko': '자세히: {detail}', 'en': 'Details: {detail}'},
+    'left_reason': {
+      'ko': '회의에서 나왔습니다 — {reason}',
+      'en': 'You left the meeting — {reason}',
+    },
+    'reason_duplicate': {
+      'ko': '같은 계정이 다른 기기에서 입장했습니다.',
+      'en': 'The same account joined from another device.',
+    },
+    'reason_removed': {
+      'ko': '방장이 내보냈습니다.',
+      'en': 'The host removed you.',
+    },
+    'reason_server': {
+      'ko': '서버가 연결을 끊었습니다.',
+      'en': 'The server closed the connection.',
+    },
+    'reason_network': {
+      'ko': '네트워크가 끊겼습니다.',
+      'en': 'The network connection was lost.',
+    },
     'resp_invalid': {'ko': '서버 응답이 올바르지 않습니다', 'en': 'Invalid server response'},
 
     // ── 회의 화면: 이름/공통 ──

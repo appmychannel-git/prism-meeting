@@ -236,10 +236,31 @@ class _RoomScreenState extends State<RoomScreen> {
   void _setupListeners() {
     _listener
       ..on<RoomDisconnectedEvent>((e) {
-        // 방장(host)이 회의를 종료해 튕긴 경우 안내 (본인이 나간 게 아닐 때만)
+        /*
+         * 들어가는 도중에 끊긴 것은 <b>돌아가지 않고 이유를 화면에 남긴다.</b>
+         *
+         * 서버 한도 초과(429)처럼 접속이 거부되면 이 이벤트가 먼저 와서 입장 화면으로
+         * 튕겨 버렸다 — 사용자 눈에는 "뭔가 깜빡이고 말았다"로만 보여 원인을 찾을 수
+         * 없었다(실제로 그 한도 때문에 반나절을 썼다).
+         */
+        if (_connecting || _error != null) {
+          if (mounted) {
+            setState(() {
+              _connecting = false;
+              _error ??= _disconnectMessage(e.reason);
+            });
+          }
+          return;
+        }
+        // 회의 중에 끊긴 경우: 방장이 끝냈거나, 서버·네트워크가 끊었거나.
         final endedByHost =
             !widget.isHost && e.reason == DisconnectReason.roomDeleted;
-        _exitToJoin(notice: endedByHost ? L.t('host_ended') : null);
+        final String? why = endedByHost
+            ? L.t('host_ended')
+            : (_isUserExit(e.reason)
+                ? null
+                : L.t('left_reason', {'reason': _disconnectMessage(e.reason)}));
+        _exitToJoin(notice: why);
       })
       ..on<RoomReconnectingEvent>((_) {
         if (mounted) setState(() => _reconnecting = true);
@@ -745,6 +766,60 @@ class _RoomScreenState extends State<RoomScreen> {
     }
   }
 
+  /// 본인이 나간 것(나가기 단추·앱 종료)인가 — 그때는 이유를 알릴 필요가 없다.
+  bool _isUserExit(DisconnectReason? reason) =>
+      reason == null || reason == DisconnectReason.clientInitiated;
+
+  /// 끊긴 이유를 사람이 읽는 말로. 모르는 이유는 있는 그대로 덧붙여 문의에 쓰게 한다.
+  String _disconnectMessage(DisconnectReason? reason) {
+    switch (reason) {
+      case DisconnectReason.duplicateIdentity:
+        return L.t('reason_duplicate');
+      case DisconnectReason.participantRemoved:
+        return L.t('reason_removed');
+      case DisconnectReason.roomDeleted:
+        return L.t('host_ended');
+      case DisconnectReason.serverShutdown:
+      case DisconnectReason.stateMismatch:
+        return L.t('reason_server');
+      case DisconnectReason.signalingConnectionFailure:
+      case DisconnectReason.joinFailure:
+      case DisconnectReason.disconnected:
+      case DisconnectReason.reconnectAttemptsExceeded:
+        return L.t('reason_network');
+      default:
+        return reason == null
+            ? L.t('err_connect')
+            : [
+                L.t('err_connect'),
+                L.t('err_detail', {'detail': reason.name}),
+              ].join('\n');
+    }
+  }
+
+  /// 접속 실패를 사람이 읽는 말 + 기술 원문으로. 원문을 지우면 문의를 받아도 알 수가 없다.
+  String _connectErrorMessage(Object e) {
+    final raw = e.toString().replaceFirst('Exception: ', '');
+    final low = raw.toLowerCase();
+    final String head;
+    if (low.contains('429') ||
+        low.contains('limit exceeded') ||
+        low.contains('quota')) {
+      head = L.t('err_quota');
+    } else if (low.contains('401') ||
+        low.contains('403') ||
+        low.contains('unauthorized') ||
+        low.contains('permission') ||
+        low.contains('invalid token')) {
+      head = L.t('err_token_invalid');
+    } else if (e is TimeoutException || low.contains('timeout')) {
+      head = L.t('err_timeout');
+    } else {
+      head = L.t('err_connect');
+    }
+    return [head, L.t('err_detail', {'detail': raw})].join('\n');
+  }
+
   Future<void> _connect() async {
     try {
       await _room
@@ -758,7 +833,7 @@ class _RoomScreenState extends State<RoomScreen> {
       if (mounted) {
         setState(() {
           _connecting = false;
-          _error = e.toString().replaceFirst('Exception: ', '');
+          _error = _connectErrorMessage(e);
         });
       }
       return;
