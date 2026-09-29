@@ -139,6 +139,9 @@ class _RoomScreenState extends State<RoomScreen> {
   bool _captionsOn = false; // 자막 켬(내 발화 송출 + 오버레이 표시)
   // 내 언어: STT 인식 언어(내 발화) + 자막 번역 대상(내가 읽을 언어)로 동시 사용.
   late String _myLang = _defaultMyLang();
+  // 내가 "말하는" 언어(서버 STT 고정 인식용). 자막 언어(_myLang=읽는 언어)와 별개.
+  // 기기 언어로 기본. 서버 STT(freedom)에서만 참가자 속성으로 전송해 봇이 그 언어로 인식.
+  late String _spokenLang = _defaultMyLang();
   final List<LiveCaption> _captionLog = []; // 확정된 자막 줄 누적(최근 N줄 표시)
   final Map<String, LiveCaption> _liveCaptions = {}; // identity -> 말하는 중(중간)
   DateTime? _lastInterimSentAt; // 중간 결과 송출 throttle
@@ -754,6 +757,48 @@ class _RoomScreenState extends State<RoomScreen> {
     if (picked != null) _changeMyLang(picked);
   }
 
+  // 서버 STT에 내가 "말하는 언어"를 참가자 속성으로 전송(봇이 그 언어로 고정 인식).
+  Future<void> _publishSpokenLang() async {
+    try {
+      await _room.localParticipant?.setAttributes({'spokenLang': _spokenLang});
+    } catch (_) {}
+  }
+
+  // "말하는 언어" 선택 다이얼로그 — 서버 STT에서 첫 단어부터 정확히 인식되게.
+  Future<void> _showSpokenLangDialog() async {
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: Text(L.t('spoken_lang_title')),
+        children: [
+          for (final e in AppConfig.supportedLanguages.entries)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, e.key),
+              child: Row(
+                children: [
+                  Icon(
+                    e.key == _spokenLang
+                        ? Icons.check_circle
+                        : Icons.circle_outlined,
+                    size: 18,
+                    color: e.key == _spokenLang
+                        ? const Color(0xFF4ADE80)
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(e.value),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked != null && picked != _spokenLang) {
+      setState(() => _spokenLang = picked);
+      _publishSpokenLang(); // 회의 중 변경 → 봇이 해당 트랙을 새 언어로 재시작
+    }
+  }
+
   // 내 언어 변경(자막 언어 = STT 인식 언어 + 번역 대상).
   void _changeMyLang(String code) {
     if (!AppConfig.supportedLanguages.containsKey(code)) return;
@@ -841,6 +886,9 @@ class _RoomScreenState extends State<RoomScreen> {
 
     // 방 접속 성공 → 즉시 회의 화면 표시.
     if (mounted) setState(() => _connecting = false);
+
+    // 서버 STT: 내가 "말하는 언어"를 참가자 속성으로 알림 → 자막봇이 그 언어로 고정 인식.
+    if (AppConfig.serverStt) _publishSpokenLang();
 
     // 링크로 바로 입장한 경우: 입장 직후 이름 설정 팝업.
     if (widget.promptNameOnEnter) {
@@ -1827,6 +1875,7 @@ class _RoomScreenState extends State<RoomScreen> {
                 if (v == 'caption') _toggleCaptions();
                 if (v == 'transcript') _toggleTranscript();
                 if (v == 'caplang') _showCaptionLangDialog();
+                if (v == 'spokenlang') _showSpokenLangDialog();
                 if (v == 'capcompare') _toggleCompare();
                 if (v == 'applang') showAppLanguagePicker(context);
                 if (v == 'capmode') {
@@ -1880,6 +1929,23 @@ class _RoomScreenState extends State<RoomScreen> {
                     ],
                   ),
                 ),
+                // 서버 STT에서만: 내가 말하는 언어 지정(첫 단어부터 정확 인식).
+                if (AppConfig.serverStt)
+                  PopupMenuItem<String>(
+                    value: 'spokenlang',
+                    child: Row(
+                      children: [
+                        const Icon(Icons.record_voice_over_outlined, size: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          L.t('spoken_lang_menu', {
+                            'lang': AppConfig.supportedLanguages[_spokenLang] ??
+                                _spokenLang,
+                          }),
+                        ),
+                      ],
+                    ),
+                  ),
                 PopupMenuItem<String>(
                   value: 'capmode',
                   child: Row(

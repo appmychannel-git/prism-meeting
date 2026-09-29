@@ -71,6 +71,28 @@ def _lang2(locale: str) -> str:
     return (locale or "").split("-")[0].lower()
 
 
+# 참가자가 지정한 "말하는 언어"(앱 2글자 코드) → Azure 로케일.
+_LANG_LOCALE = {
+    "ko": "ko-KR", "en": "en-US", "ru": "ru-RU", "kk": "kk-KZ",
+    "ja": "ja-JP", "zh": "zh-CN", "es": "es-ES", "fr": "fr-FR", "de": "de-DE",
+}
+
+
+def _locale_for(code: str):
+    """'ko' → 'ko-KR'. 지정 없으면 None(자동감지 폴백). 이미 지역코드면 그대로."""
+    code = (code or "").strip()
+    if not code:
+        return None
+    if "-" in code:
+        return code
+    low = code.lower()
+    # 설정된 후보 중 같은 언어가 있으면 그 로케일을 우선 사용.
+    for c in STT_CANDIDATES:
+        if c.split("-")[0].lower() == low:
+            return c
+    return _LANG_LOCALE.get(low, code)
+
+
 def build_token(room: str) -> str:
     """이 봇의 방 참가 토큰을 직접 발급(구독+데이터발행 권한)."""
     grant = api.VideoGrants(
@@ -92,12 +114,14 @@ class TrackTranscriber:
 
     def __init__(self, room: rtc.Room, loop: asyncio.AbstractEventLoop,
                  participant: rtc.RemoteParticipant, track: rtc.Track,
-                 transcript_path: str | None = None):
+                 transcript_path: str | None = None,
+                 fixed_lang: str | None = None):
         self.room = room
         self.loop = loop
         self.participant = participant
         self.track = track
         self.transcript_path = transcript_path
+        self.fixed_lang = fixed_lang   # 지정 시 그 언어로 고정 인식(자동감지 off)
         self.sender_name = participant.name or participant.identity
         self._last_interim = 0.0
         self._closed = False
@@ -108,7 +132,12 @@ class TrackTranscriber:
         self._push = speechsdk.audio.PushAudioInputStream(stream_format=fmt)
         audio_config = speechsdk.audio.AudioConfig(stream=self._push)
 
-        if len(STT_CANDIDATES) > 1:
+        if fixed_lang:
+            # 참가자가 "말하는 언어"를 지정 → 그 언어로 고정(자동감지 off, 첫 단어부터 정확).
+            speech_config.speech_recognition_language = fixed_lang
+            self._rec = speechsdk.SpeechRecognizer(
+                speech_config=speech_config, audio_config=audio_config)
+        elif len(STT_CANDIDATES) > 1:
             # 연속 언어감지: 발화 도중 언어가 바뀌어도(영→한 등) 따라가게.
             # (기본값은 '시작 시 1회'라 한 번 잡힌 언어로 고정됨)
             speech_config.set_property(
@@ -129,7 +158,8 @@ class TrackTranscriber:
         self._rec.recognized.connect(self._on_recognized)     # 확정 결과(문장)
         self._rec.canceled.connect(lambda evt: log.warning("Azure canceled: %s", evt))
         self._rec.start_continuous_recognition_async()
-        log.info("▶ transcriber 시작: %s (%s)", self.sender_name, self.participant.identity)
+        log.info("▶ transcriber 시작: %s (%s) lang=%s",
+                 self.sender_name, self.participant.identity, fixed_lang or 'auto')
 
         self._task = asyncio.create_task(self._pump_audio())
 
@@ -148,6 +178,8 @@ class TrackTranscriber:
             await stream.aclose()
 
     def _detected_lang(self, result) -> str:
+        if self.fixed_lang:
+            return _lang2(self.fixed_lang)
         try:
             if len(STT_CANDIDATES) > 1:
                 auto = speechsdk.AutoDetectSourceLanguageResult(result)
@@ -271,15 +303,49 @@ class RoomSession:
         @self.room.on("track_subscribed")
         def on_track_subscribed(track, publication, participant):
             if track.kind == rtc.TrackKind.KIND_AUDIO and participant.identity != BOT_IDENTITY:
+                # 참가자가 "말하는 언어"를 지정했으면 그 언어로 고정, 아니면 자동감지.
+                fixed = _locale_for(self._spoken_lang(participant))
                 self.transcribers[publication.sid] = TrackTranscriber(
                     self.room, self.loop, participant, track,
-                    transcript_path=self.transcript_path)
+                    transcript_path=self.transcript_path, fixed_lang=fixed)
 
         @self.room.on("track_unsubscribed")
         def on_track_unsubscribed(track, publication, participant):
             t = self.transcribers.pop(publication.sid, None)
             if t:
                 asyncio.create_task(t.aclose())
+
+        # 참가자가 회의 중 "말하는 언어"를 바꾸면 그 사람 인식기를 새 언어로 재시작.
+        @self.room.on("participant_attributes_changed")
+        def on_attrs_changed(changed, participant):
+            try:
+                if not isinstance(changed, dict) or 'spokenLang' not in changed:
+                    return
+            except Exception:
+                return
+            new_locale = _locale_for(changed.get('spokenLang'))
+            for sid, t in list(self.transcribers.items()):
+                if t.participant.identity == participant.identity:
+                    if t.fixed_lang == new_locale:
+                        continue
+                    asyncio.create_task(
+                        self._recreate(sid, participant, t.track, new_locale))
+
+    def _spoken_lang(self, participant):
+        try:
+            return (participant.attributes or {}).get('spokenLang', '')
+        except Exception:
+            return ''
+
+    async def _recreate(self, sid, participant, track, fixed_locale):
+        old = self.transcribers.pop(sid, None)
+        if old:
+            await old.aclose()
+        self.transcribers[sid] = TrackTranscriber(
+            self.room, self.loop, participant, track,
+            transcript_path=self.transcript_path, fixed_lang=fixed_locale)
+        log.info("↻ 언어 변경 반영: %s → %s",
+                 participant.name or participant.identity, fixed_locale or 'auto')
 
     def _init_transcript(self):
         """방 접속 시 회의록 파일 준비(파일명: <방>_<날짜시각>.txt). 헤더 한 줄 기록."""
