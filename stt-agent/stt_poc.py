@@ -346,22 +346,36 @@ class DeepLTranscriber(_Transcriber):
             await self._cleanup()
 
     async def _pump_audio(self):
-        """LiveKit 오디오(16kHz s16le)를 base64 JSON 청크로 WS에 전송."""
+        """LiveKit 오디오(16kHz s16le)를 ~200ms 청크로 묶어 base64 JSON 으로 WS 전송.
+        DeepL 권장 50~250ms. 프레임(10~20ms)을 그대로 보내면 초반만 처리되고 멈추는
+        문제가 있어 버퍼링한다."""
         stream = rtc.AudioStream(self.track, sample_rate=TARGET_SR, num_channels=1)
+        CHUNK = TARGET_SR * 2 // 5  # 200ms of s16le mono = 6400 bytes
+        buf = bytearray()
+        sent = 0
         try:
             async for ev in stream:
                 if self._closed or self._ws is None or self._ws.closed:
                     break
-                b64 = base64.b64encode(bytes(ev.frame.data)).decode("ascii")
-                await self._ws.send_json({"source_media_chunk": {"data": b64}})
+                buf += bytes(ev.frame.data)
+                while len(buf) >= CHUNK:
+                    chunk = bytes(buf[:CHUNK])
+                    del buf[:CHUNK]
+                    b64 = base64.b64encode(chunk).decode("ascii")
+                    await self._ws.send_json({"source_media_chunk": {"data": b64}})
+                    sent += 1
         except Exception as e:
             log.warning("DeepL audio pump 종료(%s): %s", self.sender_name, e)
         finally:
             try:
+                if buf and self._ws and not self._ws.closed:
+                    await self._ws.send_json({"source_media_chunk": {
+                        "data": base64.b64encode(bytes(buf)).decode("ascii")}})
                 if self._ws and not self._ws.closed:
                     await self._ws.send_json({"end_of_source_media": {}})
             except Exception:
                 pass
+            log.info("DeepL audio pump 끝(%s): 청크 %d개 전송", self.sender_name, sent)
             await stream.aclose()
 
     async def _recv_loop(self):
@@ -372,16 +386,21 @@ class DeepLTranscriber(_Transcriber):
                     try:
                         self._handle(json.loads(msg.data), lang)
                     except Exception as e:
-                        log.warning("DeepL 메시지 파싱 오류: %s", e)
+                        log.warning("DeepL 메시지 파싱 오류: %s (%s)", e, msg.data[:200])
                 elif msg.type in (aiohttp.WSMsgType.CLOSED, aiohttp.WSMsgType.ERROR):
                     break
         except Exception as e:
             log.warning("DeepL recv 종료(%s): %s", self.sender_name, e)
+        log.info("DeepL recv 루프 종료(%s): ws close_code=%s",
+                 self.sender_name, getattr(self._ws, "close_code", None))
 
     def _handle(self, data, lang):
-        upd = data.get("source_transcript_update")
+        # 진단: 어떤 종류의 메시지가 오는지 키를 남긴다(원인 파악 후 낮출 예정).
+        keys = ",".join(data.keys()) if isinstance(data, dict) else str(type(data))
+        upd = data.get("source_transcript_update") if isinstance(data, dict) else None
         if not upd:
-            return  # end_of_stream 등은 무시
+            log.info("DeepL msg(%s): %s", self.sender_name, keys)
+            return  # end_of_stream / error 등
         # concluded=확정(1회), tentative=중간(계속 갱신)
         for seg in (upd.get("concluded") or []):
             txt = (seg.get("text") or "").strip()
