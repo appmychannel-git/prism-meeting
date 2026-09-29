@@ -211,6 +211,7 @@ class L {
     'caption_lang_menu': {'ko': '자막 언어: {lang}', 'en': 'Caption language: {lang}'},
     'spoken_lang_menu': {'ko': '말하는 언어: {lang}', 'en': 'Spoken language: {lang}'},
     'spoken_lang_title': {'ko': '내가 말하는 언어', 'en': 'Language I speak'},
+    'auto_detect': {'ko': '자동 감지', 'en': 'Auto-detect'},
     'cap_to_ptt': {'ko': '자막: 눌러 말하기로', 'en': 'Captions: push-to-talk'},
     'cap_to_cont': {'ko': '자막: 연속으로', 'en': 'Captions: continuous'},
     'caption_hint_on': {

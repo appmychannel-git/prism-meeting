@@ -140,8 +140,13 @@ class _RoomScreenState extends State<RoomScreen> {
   // 내 언어: STT 인식 언어(내 발화) + 자막 번역 대상(내가 읽을 언어)로 동시 사용.
   late String _myLang = _defaultMyLang();
   // 내가 "말하는" 언어(서버 STT 고정 인식용). 자막 언어(_myLang=읽는 언어)와 별개.
-  // 기기 언어로 기본. 서버 STT(freedom)에서만 참가자 속성으로 전송해 봇이 그 언어로 인식.
-  late String _spokenLang = _defaultMyLang();
+  // ''(빈값) = 자동 감지. 기본은 기기 언어(지원 목록에 있으면), 없으면 영어.
+  late String _spokenLang = _defaultSpokenLang();
+
+  String _defaultSpokenLang() {
+    final d = _defaultMyLang();
+    return AppConfig.spokenLangCodes.contains(d) ? d : 'en';
+  }
   final List<LiveCaption> _captionLog = []; // 확정된 자막 줄 누적(최근 N줄 표시)
   final Map<String, LiveCaption> _liveCaptions = {}; // identity -> 말하는 중(중간)
   DateTime? _lastInterimSentAt; // 중간 결과 송출 throttle
@@ -765,37 +770,45 @@ class _RoomScreenState extends State<RoomScreen> {
   }
 
   // "말하는 언어" 선택 다이얼로그 — 서버 STT에서 첫 단어부터 정확히 인식되게.
+  // 맨 위 '자동 감지'(빈값) + STT 지원 언어만 표시.
   Future<void> _showSpokenLangDialog() async {
+    // 자동감지는 sentinel '__auto__' 로 받아 ''로 변환(null=취소와 구분).
     final picked = await showDialog<String>(
       context: context,
       builder: (ctx) => SimpleDialog(
         title: Text(L.t('spoken_lang_title')),
         children: [
-          for (final e in AppConfig.supportedLanguages.entries)
+          // 자동 감지(Azure 전용 — DeepL은 고정 권장)
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(ctx, '__auto__'),
+            child: Row(children: [
+              Icon(_spokenLang.isEmpty ? Icons.check_circle : Icons.circle_outlined,
+                  size: 18,
+                  color: _spokenLang.isEmpty ? const Color(0xFF4ADE80) : null),
+              const SizedBox(width: 10),
+              Text(L.t('auto_detect')),
+            ]),
+          ),
+          const Divider(height: 1),
+          for (final code in AppConfig.spokenLangCodes)
             SimpleDialogOption(
-              onPressed: () => Navigator.pop(ctx, e.key),
-              child: Row(
-                children: [
-                  Icon(
-                    e.key == _spokenLang
-                        ? Icons.check_circle
-                        : Icons.circle_outlined,
+              onPressed: () => Navigator.pop(ctx, code),
+              child: Row(children: [
+                Icon(code == _spokenLang ? Icons.check_circle : Icons.circle_outlined,
                     size: 18,
-                    color: e.key == _spokenLang
-                        ? const Color(0xFF4ADE80)
-                        : null,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(e.value),
-                ],
-              ),
+                    color: code == _spokenLang ? const Color(0xFF4ADE80) : null),
+                const SizedBox(width: 10),
+                Text(AppConfig.supportedLanguages[code] ?? code),
+              ]),
             ),
         ],
       ),
     );
-    if (picked != null && picked != _spokenLang) {
-      setState(() => _spokenLang = picked);
-      _publishSpokenLang(); // 회의 중 변경 → 봇이 해당 트랙을 새 언어로 재시작
+    if (picked == null) return;
+    final val = picked == '__auto__' ? '' : picked;
+    if (val != _spokenLang) {
+      setState(() => _spokenLang = val);
+      _publishSpokenLang(); // 회의 중 변경 → 봇이 해당 트랙을 새 언어로 재시작(또는 자동감지)
     }
   }
 
@@ -1939,8 +1952,10 @@ class _RoomScreenState extends State<RoomScreen> {
                         const SizedBox(width: 8),
                         Text(
                           L.t('spoken_lang_menu', {
-                            'lang': AppConfig.supportedLanguages[_spokenLang] ??
-                                _spokenLang,
+                            'lang': _spokenLang.isEmpty
+                                ? L.t('auto_detect')
+                                : (AppConfig.supportedLanguages[_spokenLang] ??
+                                    _spokenLang),
                           }),
                         ),
                       ],
