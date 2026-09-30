@@ -60,6 +60,10 @@ TRANSCRIPT_TRANSLATE_TO = [s.strip() for s in os.environ.get("TRANSCRIPT_TRANSLA
 TRANSLATE_URL = os.environ.get("TRANSLATE_URL", "https://prism-token-server.onrender.com/translate")
 TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "")  # 빈값=서버 기본 엔진
 
+# 감시 모드에서 제외할 방 이름 접두사(쉼표). CCTV 방은 자막 대상이 아니라 기본 제외.
+WATCH_SKIP_PREFIXES = tuple(
+    s.strip() for s in os.environ.get("WATCH_SKIP_PREFIXES", "cctv-").split(",") if s.strip())
+
 # ---- STT 엔진 선택(관리자) ----
 # 'azure'(기본) 또는 'deepl'. .env STT_ENGINE 으로만 바꾼다(사용자 앱엔 노출 안 함).
 STT_ENGINE = os.environ.get("STT_ENGINE", "azure").lower()
@@ -572,8 +576,11 @@ async def run_watch(poll_sec: float):
         while True:
             try:
                 resp = await lkapi.room.list_rooms(api.ListRoomsRequest())
-                # 실제 사람이 있는 방만(봇은 hidden이라 num_participants에 안 잡힘)
-                live = {r.name for r in resp.rooms if r.num_participants > 0}
+                # 실제 사람이 있는 방만(봇은 hidden이라 num_participants에 안 잡힘).
+                # CCTV 등 제외 접두사 방은 자막 대상이 아니라 건너뛴다.
+                live = {r.name for r in resp.rooms
+                        if r.num_participants > 0
+                        and not r.name.startswith(WATCH_SKIP_PREFIXES)}
             except Exception as e:
                 log.warning("방 목록 조회 실패(재시도): %s", e)
                 await asyncio.sleep(poll_sec)
