@@ -325,32 +325,66 @@ class DeepLTranscriber(_Transcriber):
         if not DEEPL_API_KEY:
             log.warning("DEEPL_API_KEY 없음 — DeepL STT 불가(%s)", self.sender_name)
             return
+        # DeepL Voice 세션은 중간에 끊길 수 있다(세션 제한/네트워크, close 1006 등).
+        # 참가자가 방에 있는 동안(self._closed=False)에는 끊기면 자동 재연결한다.
+        first = True
+        while not self._closed:
+            ok = await self._session_once(first)
+            first = False
+            if self._closed:
+                break
+            # 끊김 → 잠깐 쉬고 재연결(실패면 조금 더 대기)
+            await asyncio.sleep(1.0 if ok else 3.0)
+
+    async def _session_once(self, first):
+        """DeepL 세션 1회: 발급→WS 연결→오디오/수신. WS가 닫히면 반환."""
         headers = {"Authorization": f"DeepL-Auth-Key {DEEPL_API_KEY}"}
         body = {"source_media_content_type": "audio/pcm;encoding=s16le;rate=16000"}
         if self.fixed_lang:
             body["source_language"] = self.fixed_lang     # 2글자(ko/en/ru)
             body["source_language_mode"] = "fixed"
+        http = None
+        ok = False
         try:
-            self._http = aiohttp.ClientSession()
-            async with self._http.post(DEEPL_VOICE_URL, headers=headers, json=body,
-                                       timeout=aiohttp.ClientTimeout(total=20)) as r:
+            http = aiohttp.ClientSession()
+            self._http = http
+            async with http.post(DEEPL_VOICE_URL, headers=headers, json=body,
+                                 timeout=aiohttp.ClientTimeout(total=20)) as r:
                 if r.status // 100 != 2:
                     log.warning("DeepL 세션 실패 %s: %s", r.status, (await r.text())[:200])
-                    return
+                    return False
                 sess = await r.json()
             streaming_url = sess.get("streaming_url")
             token = sess.get("token")
             if not streaming_url or not token:
                 log.warning("DeepL 세션 응답 이상: %s", sess)
-                return
-            self._ws = await self._http.ws_connect(f"{streaming_url}?token={token}")
-            log.info("▶ DeepL transcriber 시작: %s (%s) lang=%s",
+                return False
+            self._ws = await http.ws_connect(f"{streaming_url}?token={token}")
+            log.info("%s DeepL transcriber: %s (%s) lang=%s",
+                     "▶ 시작" if first else "↻ 재연결",
                      self.sender_name, self.participant.identity, self.fixed_lang or 'auto')
+            self._buf = ""  # 재연결 시 이전 문장 버퍼 초기화
             await asyncio.gather(self._pump_audio(), self._recv_loop())
+            ok = True
         except Exception as e:
-            log.warning("DeepL 실행 오류(%s): %s", self.sender_name, e)
+            log.warning("DeepL 세션 오류(%s): %s", self.sender_name, e)
         finally:
-            await self._cleanup()
+            try:
+                self._flush(self._lang)  # 남은 문장 마무리
+            except Exception:
+                pass
+            try:
+                if self._ws and not self._ws.closed:
+                    await self._ws.close()
+            except Exception:
+                pass
+            try:
+                if http and not http.closed:
+                    await http.close()
+            except Exception:
+                pass
+            self._ws = None
+        return ok
 
     async def _pump_audio(self):
         """LiveKit 오디오(16kHz s16le)를 ~200ms 청크로 묶어 base64 JSON 으로 WS 전송.
