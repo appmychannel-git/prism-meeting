@@ -25,6 +25,7 @@ import base64
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime
 
@@ -316,6 +317,8 @@ class DeepLTranscriber(_Transcriber):
         super().__init__(room, loop, participant, track, transcript_path, fixed_lang)
         self._ws = None
         self._http = None
+        self._buf = ""   # 확정(concluded) 조각을 한 문장으로 모으는 버퍼
+        self._lang = fixed_lang or _lang2(STT_CANDIDATES[0] if STT_CANDIDATES else "en")
         self._task = asyncio.create_task(self._run())
 
     async def _run(self):
@@ -383,7 +386,7 @@ class DeepLTranscriber(_Transcriber):
             await stream.aclose()
 
     async def _recv_loop(self):
-        lang = self.fixed_lang or _lang2(STT_CANDIDATES[0] if STT_CANDIDATES else "en")
+        lang = self._lang
         try:
             async for msg in self._ws:
                 if msg.type == aiohttp.WSMsgType.TEXT:
@@ -398,26 +401,40 @@ class DeepLTranscriber(_Transcriber):
         log.info("DeepL recv 루프 종료(%s): ws close_code=%s",
                  self.sender_name, getattr(self._ws, "close_code", None))
 
+    @staticmethod
+    def _norm(s):
+        return re.sub(r"\s+", " ", s or "").strip()
+
+    def _flush(self, lang):
+        """모아둔 확정 문장을 최종 자막으로 1회 발행하고 버퍼 비움."""
+        b = self._norm(self._buf)
+        if b:
+            self._publish(b, lang, True)
+        self._buf = ""
+
     def _handle(self, data, lang):
-        # 진단: 어떤 종류의 메시지가 오는지 키를 남긴다(원인 파악 후 낮출 예정).
-        keys = ",".join(data.keys()) if isinstance(data, dict) else str(type(data))
         upd = data.get("source_transcript_update") if isinstance(data, dict) else None
         if not upd:
-            log.info("DeepL msg(%s): %s", self.sender_name, keys)
-            return  # end_of_stream / error 등
-        # concluded=확정(1회), tentative=중간(계속 갱신)
+            # end_of_stream 등: 남은 확정 버퍼가 있으면 문장으로 마무리.
+            if isinstance(data, dict) and self._norm(self._buf):
+                self._flush(lang)
+            return
+        # DeepL은 확정(concluded)을 단어/구 조각으로 나눠 보낸다 → 버퍼에 모아
+        # 문장 단위로 1회만 최종 발행(안 그러면 "오늘/회의에/..."로 쪼개져 보임).
         for seg in (upd.get("concluded") or []):
-            txt = (seg.get("text") or "").strip()
-            if txt:
-                self._publish(txt, lang, True)
-        tent = upd.get("tentative") or []
-        if tent:
-            txt = " ".join((s.get("text") or "") for s in tent).strip()
-            if txt:
-                now = time.monotonic() * 1000
-                if now - self._last_interim >= INTERIM_THROTTLE_MS:
-                    self._last_interim = now
-                    self._publish(txt, lang, False)
+            self._buf += (seg.get("text") or "")
+        tent = "".join((s.get("text") or "") for s in (upd.get("tentative") or []))
+        display = self._norm(self._buf + tent)
+        # 진행 중 문장(확정 버퍼 + 중간)을 한 줄로 계속 보여준다(throttle).
+        if display:
+            now = time.monotonic() * 1000
+            if now - self._last_interim >= INTERIM_THROTTLE_MS:
+                self._last_interim = now
+                self._publish(display, lang, False)
+        # 문장 끝(마침표류)에 도달하면 그 문장을 최종 발행.
+        b = self._norm(self._buf)
+        if b and b[-1] in ".?!。？！…":
+            self._flush(lang)
 
     async def _cleanup(self):
         try:
@@ -433,6 +450,10 @@ class DeepLTranscriber(_Transcriber):
 
     async def aclose(self):
         self._closed = True
+        try:
+            self._flush(self._lang)  # 마침표 없이 끝난 마지막 문장도 마무리
+        except Exception:
+            pass
         await self._cleanup()
 
 
