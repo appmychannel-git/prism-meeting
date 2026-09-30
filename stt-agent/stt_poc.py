@@ -576,11 +576,17 @@ async def run_watch(poll_sec: float):
         while True:
             try:
                 resp = await lkapi.room.list_rooms(api.ListRoomsRequest())
-                # 실제 사람이 있는 방만(봇은 hidden이라 num_participants에 안 잡힘).
-                # CCTV 등 제외 접두사 방은 자막 대상이 아니라 건너뛴다.
-                live = {r.name for r in resp.rooms
-                        if r.num_participants > 0
-                        and not r.name.startswith(WATCH_SKIP_PREFIXES)}
+                # 자막봇도 참가자로 카운트되므로(hidden이어도 num_participants에 잡힘),
+                # "이미 들어가 있는 방"은 봇 1명을 빼고 실제 참가자가 있어야 유지한다.
+                # (안 그러면 봇만 남은 빈 방을 계속 붙잡아 방이 안 닫히고 비용이 샌다)
+                # CCTV 등 제외 접두사 방은 자막 대상이 아니라 아예 건너뛴다.
+                live = set()
+                for r in resp.rooms:
+                    if r.name.startswith(WATCH_SKIP_PREFIXES):
+                        continue
+                    threshold = 1 if r.name in active else 0  # 내가 있으면 봇 1명 제외
+                    if r.num_participants > threshold:
+                        live.add(r.name)
             except Exception as e:
                 log.warning("방 목록 조회 실패(재시도): %s", e)
                 await asyncio.sleep(poll_sec)
