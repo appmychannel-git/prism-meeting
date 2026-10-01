@@ -28,6 +28,9 @@ build_web_one() {
   brand_config "$brand"
   local base; base="$(brand_base_url "$brand")"        # 예: https://.../apps/cctv/gbled/
   local href="${base#https://androidtv.mychannel.co.kr}" # base-href(경로만) = base에서 오리진 제거
+  # 산출물 이름: 미팅=Meeting-<brand>.apk, CCTV전용=CCTV-<브랜드명>.apk
+  local apk_name
+  if [ "${CCTV_ONLY:-false}" = "true" ]; then apk_name="CCTV-${brand%cctv}.apk"; else apk_name="Meeting-${brand}.apk"; fi
   echo "== 웹 빌드: $brand  (base-href=$href) =="
 
   flutter build web --release \
@@ -42,7 +45,7 @@ build_web_one() {
     --dart-define=DEFAULT_LANG=${DEFAULT_LANG:-} \
     --dart-define=SERVER_STT=${SERVER_STT:-false} \
     --dart-define=SHARE_BASE_URL="${base}share/" \
-    --dart-define=APK_URL="${base}download/Meeting-${brand}.apk"
+    --dart-define=APK_URL="${base}download/${apk_name}"
 
   local out="dist/web/${brand}"
   rm -rf "$out"
@@ -52,7 +55,7 @@ build_web_one() {
   local pkg scheme apk_url
   pkg="$(brand_package "$brand")"
   scheme="$(brand_scheme "$brand")"
-  apk_url="${base}download/Meeting-${brand}.apk"
+  apk_url="${base}download/${apk_name}"
   sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g; s|__APK_URL__|${apk_url}|g" "$out/index.html"
   echo "   intent package=$pkg  scheme=$scheme  apk=$apk_url"
   # index.html·서비스워커는 캐시 안 함(Apache). 캐시로 옛 페이지가 뜨는 것 방지.
@@ -91,11 +94,11 @@ XML
   cp share_page/index.html "$out/share/index.html"
   # APK 배포 폴더 자리(여기에 dist/Meeting-<brand>.apk 를 복사해 올린다)
   mkdir -p "$out/download"
-  if [ -f "dist/Meeting-${brand}.apk" ]; then
-    cp "dist/Meeting-${brand}.apk" "$out/download/Meeting-${brand}.apk"
-    echo "   + download/Meeting-${brand}.apk 포함"
+  if [ -f "dist/${apk_name}" ]; then
+    cp "dist/${apk_name}" "$out/download/${apk_name}"
+    echo "   + download/${apk_name} 포함"
   else
-    echo "   (안내) dist/Meeting-${brand}.apk 없음 → build_brand.sh 로 APK 먼저 빌드하면 자동 포함"
+    echo "   (안내) dist/${apk_name} 없음 → build_brand.sh 로 APK 먼저 빌드하면 자동 포함"
   fi
   echo "   → $out  (서버 ${href} 에 업로드)"
 }

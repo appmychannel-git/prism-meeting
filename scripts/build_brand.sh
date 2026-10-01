@@ -33,7 +33,10 @@ build_one() {
   local base_url; base_url="$(brand_base_url "$brand")"
   local invite_url="$base_url"
   local share_url="${base_url}share/"
-  local apk_url="${base_url}download/Meeting-${brand}.apk"
+  # 산출물 이름: 미팅=Meeting-<brand>.apk, CCTV전용=CCTV-<브랜드명>.apk (예: gbledcctv→CCTV-gbled.apk)
+  local apk_name
+  if [ "${CCTV_ONLY:-false}" = "true" ]; then apk_name="CCTV-${brand%cctv}.apk"; else apk_name="Meeting-${brand}.apk"; fi
+  local apk_url="${base_url}download/${apk_name}"
   echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE cctvOnly=${CCTV_ONLY:-false}"
   echo "   base=$base_url"
   flutter build apk --release --flavor "$brand" \
@@ -51,10 +54,10 @@ build_one() {
     --dart-define=SHARE_BASE_URL=$share_url \
     --dart-define=APK_URL=$apk_url
   mkdir -p dist
-  cp "build/app/outputs/flutter-apk/app-${brand}-release.apk" "dist/Meeting-${brand}.apk"
-  echo "   → dist/Meeting-${brand}.apk"
+  cp "build/app/outputs/flutter-apk/app-${brand}-release.apk" "dist/${apk_name}"
+  echo "   → dist/${apk_name}"
   if [ "$DO_INSTALL" = "1" ]; then
-    adb install -r "dist/Meeting-${brand}.apk" || echo "   (install 실패: 기기 연결 확인)"
+    adb install -r "dist/${apk_name}" || echo "   (install 실패: 기기 연결 확인)"
   fi
 }
 
