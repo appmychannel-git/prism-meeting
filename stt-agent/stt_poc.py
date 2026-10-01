@@ -68,6 +68,9 @@ WATCH_SKIP_PREFIXES = tuple(
 # ---- STT 엔진 선택(관리자) ----
 # 'azure'(기본) 또는 'deepl'. .env STT_ENGINE 으로만 바꾼다(사용자 앱엔 노출 안 함).
 STT_ENGINE = os.environ.get("STT_ENGINE", "azure").lower()
+# 참가자 "말하는 언어" 설정을 무시하고 전부 자동감지(관리자 강제). 잘못 설정한 사람 때문에
+# 깨지는 걸 방지. 단 지연과는 무관(지연은 Azure S0 전환으로 해결). DeepL은 자동감지 제약 있음.
+STT_FORCE_AUTODETECT = os.environ.get("STT_FORCE_AUTODETECT", "false").lower() == "true"
 # DeepL Voice(실시간) — STT_ENGINE=deepl 일 때만 사용. Voice 되는 유료 API 키 필요.
 DEEPL_API_KEY = os.environ.get("DEEPL_API_KEY", "")
 _DEEPL_BASE = ("https://api-free.deepl.com" if DEEPL_API_KEY.endswith(":fx")
@@ -509,7 +512,8 @@ def _check_env():
     for k, v in req.items():
         if not v:
             raise SystemExit(f"환경변수 {k} 가 없습니다. .env 또는 환경변수로 설정하세요.")
-    log.info("STT 엔진 = %s", STT_ENGINE)
+    log.info("STT 엔진 = %s%s", STT_ENGINE,
+             " (전체 자동감지 강제)" if STT_FORCE_AUTODETECT else "")
 
 
 class RoomSession:
@@ -527,7 +531,8 @@ class RoomSession:
         def on_track_subscribed(track, publication, participant):
             if track.kind == rtc.TrackKind.KIND_AUDIO and participant.identity != BOT_IDENTITY:
                 # 참가자가 "말하는 언어"(2글자)를 지정했으면 그 언어로 고정, 아니면 자동감지.
-                spoken = self._spoken_lang(participant) or None
+                # 관리자 강제(STT_FORCE_AUTODETECT)면 설정 무시하고 전부 자동감지.
+                spoken = None if STT_FORCE_AUTODETECT else (self._spoken_lang(participant) or None)
                 self.transcribers[publication.sid] = self._Tr(
                     self.room, self.loop, participant, track,
                     transcript_path=self.transcript_path, fixed_lang=spoken)
@@ -541,6 +546,8 @@ class RoomSession:
         # 참가자가 회의 중 "말하는 언어"를 바꾸면 그 사람 인식기를 새 언어로 재시작.
         @self.room.on("participant_attributes_changed")
         def on_attrs_changed(changed, participant):
+            if STT_FORCE_AUTODETECT:
+                return  # 강제 자동감지 모드에선 개별 언어 변경 무시
             try:
                 if not isinstance(changed, dict) or 'spokenLang' not in changed:
                     return
