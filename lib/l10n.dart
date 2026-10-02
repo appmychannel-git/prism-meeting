@@ -366,6 +366,17 @@ class L {
       'ko': '켜면 내 친구가 아닌 사람의 전화는 자동 거절됩니다. (기본 꺼짐)',
       'en': 'When on, calls from non-friends are auto-declined. (Default off)',
     },
+    'start_camera_on_join': {
+      'ko': '입장 시 카메라 자동 켜기',
+      'en': 'Turn on camera when joining',
+    },
+    'start_camera_on_join_sub': {
+      'ko': '카메라가 없거나 고장난 기기(USB캠만 있는 TV 등)에서 입장이 멈추면 꺼 주세요. '
+          '입장 후 카메라 버튼으로 수동으로 켤 수 있습니다.',
+      'en': 'Turn off if joining freezes on devices with no working camera '
+          '(e.g., a TV with only a USB camera). You can still turn the camera '
+          'on manually after joining.',
+    },
     'my_id_need_name': {
       'ko': '먼저 아래에서 표시 이름을 입력하면\nQR이 생성됩니다.',
       'en': 'Enter a display name below\nto generate your QR.',

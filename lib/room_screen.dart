@@ -19,6 +19,7 @@ import 'caption_panel.dart';
 import 'l10n.dart';
 import 'stt_platform.dart';
 import 'chat_panel.dart';
+import 'app_settings.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'form_factor.dart';
@@ -186,9 +187,11 @@ class _RoomScreenState extends State<RoomScreen> {
     super.initState();
     // 회의 중에는 화면이 꺼지지 않게 유지 (입장 화면에서는 적용 안 됨 → 정상 화면보호기)
     WakelockPlus.enable();
-    // USB 카메라 연결/해제(핫플러그) 시 카메라 목록 갱신
+    // USB 카메라 연결/해제(핫플러그) 시 카메라 목록 갱신.
+    // 단, 카메라 자동 켜기 OFF(카메라 고장난 기기)이고 현재 카메라도 꺼져 있으면
+    // 열거하지 않는다 — churning 카메라 서비스에서 videoInputs가 멈출 수 있어서.
     _deviceSub = Hardware.instance.onDeviceChange.stream.listen((_) {
-      _loadCameras();
+      if (AppSettings.startCameraOnJoin || _camOn) _loadCameras();
     });
     // 서버측 STT 모드에선 기기 음성인식을 쓰지 않음(에이전트가 자막 발행).
     if (AppConfig.showTranslation && !AppConfig.serverStt) _initSpeech();
@@ -930,17 +933,16 @@ class _RoomScreenState extends State<RoomScreen> {
     }
 
     // 카메라 자동 켜기 여부: 통화 진입 시 startVideo(영상=true/음성=false)가 우선,
-    // 없으면 빌드 정책(START_CAMERA). 끄면 카메라 시도 자체를 안 한다(고장난
-    // 카메라 기기 UI 멈춤 회피 + 음성통화).
-    final wantCamera = widget.startVideo ?? AppConfig.startCamera;
+    // 없으면 사용자 설정(AppSettings.startCameraOnJoin, 기본=빌드 START_CAMERA).
+    // 끄면 카메라 시도 자체를 안 한다(고장난 카메라 기기 UI 멈춤 회피 + 음성통화).
+    final autoStart = widget.startVideo == null; // 통화가 아닌 일반 입장 자동켜기
+    final wantCamera = widget.startVideo ?? AppSettings.startCameraOnJoin;
     if (!wantCamera) {
+      // 카메라 자동 켜기 OFF. 카메라 없는/고장난 기기(스탠드TV 등)에서 이 설정을
+      // 끄는 것이므로, 여기서는 카메라 열거(videoInputs)조차 하지 않는다 —
+      // 열거 자체가 wedged 카메라 서비스로의 네이티브 바인더 호출에서 멈춰(ANR)
+      // 앱을 굳힐 수 있기 때문. 목록은 사용자가 카메라를 수동으로 켤 때 채운다.
       if (mounted) setState(() => _camOn = false);
-      try {
-        _cameras = await Hardware.instance
-            .videoInputs()
-            .timeout(const Duration(seconds: 5));
-        if (mounted) setState(() {});
-      } catch (_) {}
       return;
     }
 
@@ -964,7 +966,14 @@ class _RoomScreenState extends State<RoomScreen> {
       } catch (_) {
         // 기본(내장) 실패 → 외장/사용 가능한 카메라로 재시도(USB 웹캠 등).
         final ok = await _tryEnableAnyCamera();
-        if (!ok && mounted) setState(() => _camOn = false);
+        if (!ok) {
+          if (mounted) setState(() => _camOn = false);
+          // 자동 켜기였는데 카메라 open이 실패/타임아웃한 기기(죽은 내장캠 등)는
+          // 다음 입장부터 자동 켜기를 꺼 둬 재멈춤을 막는다(설정에서 다시 켤 수 있음).
+          if (autoStart && AppSettings.startCameraOnJoin) {
+            await AppSettings.setStartCameraOnJoin(false);
+          }
+        }
       }
     }
     // 처음 켜진 카메라의 deviceId를 선택 메뉴 체크 표시에 반영
@@ -1165,6 +1174,12 @@ class _RoomScreenState extends State<RoomScreen> {
       await _room.localParticipant
           ?.setCameraEnabled(next)
           .timeout(const Duration(seconds: 8));
+      // 자동 켜기를 꺼 둔 기기에서 수동으로 켠 경우, 여기서 처음으로 카메라
+      // 목록/선택표시를 채운다(입장 시엔 열거를 건너뛰었으므로).
+      if (next) {
+        await _loadCameras();
+        _syncCurrentCameraId();
+      }
     } catch (_) {
       if (mounted) setState(() => _camOn = !next);
     }

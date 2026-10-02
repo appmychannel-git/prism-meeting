@@ -5,6 +5,7 @@ import 'config.dart';
 import 'join_screen.dart';
 import 'l10n.dart';
 import 'push_service.dart';
+import 'store_login_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,9 +64,12 @@ class _LocalizedHome extends StatelessWidget {
       valueListenable: L.localeNotifier,
       builder: (context, lang, _) => KeyedSubtree(
         key: ValueKey(lang),
-        child: AppConfig.cctvOnly
-            ? const CctvHubScreen()
-            : const JoinScreen(),
+        // 마켓앱 로그인 게이트(안드로이드TV). 마켓 없으면(모바일/웹) 그대로 통과.
+        child: StoreLoginGate(
+          child: AppConfig.cctvOnly
+              ? const CctvHubScreen()
+              : const JoinScreen(),
+        ),
       ),
     );
   }

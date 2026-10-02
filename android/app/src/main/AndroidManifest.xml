@@ -18,6 +18,21 @@
     <!-- 수신 통화: 잠금화면 위로 통화 UI를 띄우는 풀스크린 인텐트(CATEGORY_CALL) -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
 
+    <!-- ===== 마켓앱 로그인 연동(안드로이드TV) ===== -->
+    <!-- 마켓앱의 로그인 세션(ContentProvider)을 읽는 signature 권한.
+         마켓앱과 같은 키(RumpusApp.jks)로 서명돼야 읽힌다. -->
+    <uses-permission android:name="kr.co.viewplus.permission.READ_DEVICE_SESSION"/>
+
+    <!-- Android 11+ 패키지 가시성. 마켓 applicationId는 브랜드마다 다르므로
+         패키지명이 아니라 공통 authority로 선언한다(§2-5). -->
+    <queries>
+        <provider android:authorities="kr.co.viewplus.market.session"/>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="viewplus"/>
+        </intent>
+    </queries>
+
     <!-- ===== 안드로이드TV/디스플레이/태블릿에도 설치되도록 하드웨어 요구를 선택으로 ===== -->
     <!-- TV 박스는 카메라/터치가 없을 수 있으므로 required=false (USB 웹캠 사용 시나리오) -->
     <uses-feature android:name="android.hardware.camera" android:required="false"/>

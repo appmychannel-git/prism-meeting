@@ -54,6 +54,19 @@ class AppConfig {
     defaultValue: true,
   );
 
+  /// 마켓앱 로그인 연동(안드로이드TV). true면 기동 시 마켓앱의
+  /// ContentProvider(content://kr.co.viewplus.market.session)에서 로그인 세션을
+  /// 읽어온다.
+  ///   • 마켓앱 있음 + 로그인됨  → 그대로 실행(백그라운드로 서버 검증)
+  ///   • 마켓앱 있음 + 로그아웃  → 경고 화면(마켓 로그인 유도), 실행 차단
+  ///   • 마켓앱 없음(모바일/웹)  → 기존대로 실행(Phase 1: 모바일 미차단)
+  /// 안드로이드 외 플랫폼에서는 항상 통과한다(네이티브 채널 없음).
+  /// --dart-define=USE_STORE_LOGIN=true
+  static const bool useStoreLogin = bool.fromEnvironment(
+    'USE_STORE_LOGIN',
+    defaultValue: false,
+  );
+
   // ─────────────────────────────────────────────────────────────
   // 기능 플래그 (브랜드/빌드별 on·off). 빌드 시 --dart-define=<NAME>=true|false
   // ─────────────────────────────────────────────────────────────

@@ -14,6 +14,7 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _requireAccept = AppSettings.requireAccept;
+  bool _startCamera = AppSettings.startCameraOnJoin;
 
   @override
   Widget build(BuildContext context) {
@@ -21,6 +22,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: Text(L.t('menu_settings'))),
       body: ListView(
         children: [
+          SwitchListTile(
+            secondary: const Icon(Icons.videocam_outlined),
+            title: Text(L.t('start_camera_on_join')),
+            subtitle: Text(L.t('start_camera_on_join_sub')),
+            value: _startCamera,
+            onChanged: (v) async {
+              await AppSettings.setStartCameraOnJoin(v);
+              if (mounted) setState(() => _startCamera = v);
+            },
+          ),
+          const Divider(),
           SwitchListTile(
             title: Text(L.t('require_accept')),
             subtitle: Text(L.t('require_accept_sub')),

@@ -18,6 +18,8 @@ brand_config() {
   CCTV_ONLY=false
   DEFAULT_LANG=""   # 브랜드 기본 UI 언어(빈 값=기기 언어). 예: freedom="en"
   SERVER_STT=false  # 서버측 STT(자막봇) 사용. TV·셋톱 등 언어팩 없는 기기용. 예: freedom=true
+  # 마켓앱 로그인 연동(안드로이드TV). 전 브랜드 적용. 마켓 없으면(모바일/웹) 미차단.
+  USE_STORE_LOGIN=true
   case "$1" in
     #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;

@@ -49,6 +49,7 @@ build_one() {
     --dart-define=ENABLE_E2EE=$E2EE_EFFECTIVE \
     --dart-define=CCTV_ONLY=${CCTV_ONLY:-false} \
     --dart-define=SERVER_STT=${SERVER_STT:-false} \
+    --dart-define=USE_STORE_LOGIN=${USE_STORE_LOGIN:-false} \
     --dart-define=DEFAULT_LANG=${DEFAULT_LANG:-} \
     --dart-define=INVITE_BASE_URL=$invite_url \
     --dart-define=SHARE_BASE_URL=$share_url \
