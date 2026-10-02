@@ -149,6 +149,9 @@ class _RoomScreenState extends State<RoomScreen> {
   }
   final List<LiveCaption> _captionLog = []; // 확정된 자막 줄 누적(최근 N줄 표시)
   final Map<String, LiveCaption> _liveCaptions = {}; // identity -> 말하는 중(중간)
+  Timer? _captionSweeper; // 확정 없이 멈춘 '말하는 중' 라인 자동 정리
+  // 이 시간 동안 갱신 없는 '말하는 중' 라인은 제거(확정 유실/화자 이탈/인식 취소 대비).
+  static const int _liveCaptionStaleMs = 6000;
   DateTime? _lastInterimSentAt; // 중간 결과 송출 throttle
   CaptionMode _captionMode = CaptionMode.continuous; // 발언 방식
   bool _pttActive = false; // '눌러 말하기' 캡처 진행 중
@@ -197,7 +200,25 @@ class _RoomScreenState extends State<RoomScreen> {
     });
     // 서버측 STT 모드에선 기기 음성인식을 쓰지 않음(에이전트가 자막 발행).
     if (AppConfig.showTranslation && !AppConfig.serverStt) _initSpeech();
+    // 확정 없이 멈춘 '말하는 중' 자막 라인을 주기적으로 정리(엔진 무관 안전망).
+    _captionSweeper = Timer.periodic(
+        const Duration(seconds: 2), (_) => _sweepStaleCaptions());
     _initRoom();
+  }
+
+  void _sweepStaleCaptions() {
+    if (_liveCaptions.isEmpty) return;
+    final now = DateTime.now();
+    final stale = _liveCaptions.entries
+        .where((e) =>
+            now.difference(e.value.updatedAt).inMilliseconds > _liveCaptionStaleMs)
+        .map((e) => e.key)
+        .toList();
+    if (stale.isEmpty) return;
+    for (final k in stale) {
+      _liveCaptions.remove(k);
+    }
+    if (mounted) setState(() {});
   }
 
   /// 방(Room) 구성 → E2EE(옵션, 비밀번호 공유키) 적용 → 리스너 연결 → 접속.
@@ -221,6 +242,7 @@ class _RoomScreenState extends State<RoomScreen> {
     _stopBackgroundService(); // 화면공유 포그라운드 서비스 정리
     _deviceSub?.cancel();
     _rebuildTimer?.cancel();
+    _captionSweeper?.cancel();
     if (_speechAvailable) _speech.stop();
     if (_roomReady) {
       _room.removeListener(_onRoomChange);
