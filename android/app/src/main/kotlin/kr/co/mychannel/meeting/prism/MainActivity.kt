@@ -77,6 +77,18 @@ class MainActivity : FlutterActivity() {
                             result.success(null)
                         }
                     }
+                    // 기기 식별값(제조사/모델/보드). 카메라 센서 방향을 틀리게
+                    // 보고하는 특정 기기(상하 반전)를 Dart에서 가려내는 데 쓴다.
+                    "getDeviceInfo" -> {
+                        result.success(
+                            mapOf(
+                                "manufacturer" to Build.MANUFACTURER,
+                                "model" to Build.MODEL,
+                                "board" to Build.BOARD,
+                                "device" to Build.DEVICE,
+                            )
+                        )
+                    }
                     // 해당 앱의 "전체 화면 알림 허용" 설정 화면으로 이동.
                     "openFullScreenSettings" -> {
                         try {

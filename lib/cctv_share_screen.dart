@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'cctv_store.dart';
 import 'config.dart';
 import 'connection_service.dart';
+import 'device_quirks.dart';
 import 'l10n.dart';
 import 'push_service.dart';
 
@@ -138,6 +139,14 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
           connectOptions: const ConnectOptions(autoSubscribe: false));
       // 카메라만 송출(마이크는 끔).
       await _room.localParticipant?.setCameraEnabled(true);
+      // 카메라가 상하(180°) 반전되는 기기는 플래그를 알려 시청자가 회전해 바로잡게 한다.
+      if (DeviceQuirks.cameraFlip180) {
+        try {
+          await _room.localParticipant?.setAttributes(
+            {DeviceQuirks.flipAttrKey: DeviceQuirks.flipAttrValue},
+          );
+        } catch (_) {}
+      }
       if (mounted) setState(() => _connecting = false);
       // 접속 시점에 이미 방에 있던 시청자 수 반영(원격 켜기로 시청자가 먼저 들어온 경우).
       _updateViewers();
@@ -193,9 +202,16 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                       child: _dimmed
                           ? _dimView()
                           : (_localCam() != null
-                              ? VideoTrackRenderer(_localCam()!,
-                                  fit: VideoViewFit.cover,
-                                  mirrorMode: VideoViewMirrorMode.off)
+                              ? (DeviceQuirks.cameraFlip180
+                                  ? RotatedBox(
+                                      quarterTurns: 2,
+                                      child: VideoTrackRenderer(_localCam()!,
+                                          fit: VideoViewFit.cover,
+                                          mirrorMode:
+                                              VideoViewMirrorMode.off))
+                                  : VideoTrackRenderer(_localCam()!,
+                                      fit: VideoViewFit.cover,
+                                      mirrorMode: VideoViewMirrorMode.off))
                               : Container(
                                   color: const Color(0xFF1A1F27),
                                   child: const Center(

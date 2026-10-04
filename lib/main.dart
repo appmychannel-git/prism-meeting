@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_settings.dart';
 import 'cctv_hub_screen.dart';
 import 'config.dart';
+import 'device_quirks.dart';
 import 'join_screen.dart';
 import 'l10n.dart';
 import 'push_service.dart';
@@ -10,6 +11,7 @@ import 'store_login_gate.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppSettings.load(); // 사용자 설정(수락형 등) 로드
+  await DeviceQuirks.load(); // 기기별 보정(카메라 상하반전 기기 판정)
   await L.load(); // 저장된 앱 언어 복원(없으면 기기 언어)
   // 통화/친구 기능이 켜진 모바일에서만 Firebase(FCM/Firestore) 초기화.
   // (내부에서 예외를 삼키므로 구성이 없어도 앱 실행엔 영향 없음.)

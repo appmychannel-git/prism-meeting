@@ -21,6 +21,7 @@ import 'stt_platform.dart';
 import 'chat_panel.dart';
 import 'app_settings.dart';
 import 'config.dart';
+import 'device_quirks.dart';
 import 'connection_service.dart';
 import 'form_factor.dart';
 import 'translation_service.dart';
@@ -310,6 +311,7 @@ class _RoomScreenState extends State<RoomScreen> {
         _syncScreenShareState();
       })
       ..on<ParticipantNameUpdatedEvent>((_) => _onRoomChange()) // 이름 변경 반영
+      ..on<ParticipantAttributesChanged>((_) => _onRoomChange()) // 카메라반전 플래그 등
       ..on<ParticipantConnectionQualityUpdatedEvent>(
           (_) => _onRoomChange()) // 인터넷(연결) 품질 변화 반영
       ..on<ActiveSpeakersChangedEvent>((_) {
@@ -867,6 +869,16 @@ class _RoomScreenState extends State<RoomScreen> {
     // 방 접속 성공 → 즉시 회의 화면 표시.
     if (mounted) setState(() => _connecting = false);
     // (말하는 언어는 보내지 않는다 — 서버 STT는 항상 자동감지. 설정 메뉴 없음)
+
+    // 카메라가 상하(180°) 반전되는 기기는 참가자 attribute로 알린다.
+    // 뷰어(앱/웹)가 이 플래그를 보고 해당 참가자 카메라 타일을 180° 회전해 바로잡는다.
+    if (DeviceQuirks.cameraFlip180) {
+      try {
+        await _room.localParticipant?.setAttributes(
+          {DeviceQuirks.flipAttrKey: DeviceQuirks.flipAttrValue},
+        );
+      } catch (_) {}
+    }
 
     // 링크로 바로 입장한 경우: 입장 직후 이름 설정 팝업.
     if (widget.promptNameOnEnter) {
@@ -2267,13 +2279,23 @@ class _ParticipantTile extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (hasVideo)
-                VideoTrackRenderer(
-                  tile.video!,
-                  // 화면공유는 전체가 보이도록 contain(레터박스). 카메라도 기본 contain.
-                  fit: VideoViewFit.contain,
-                  // 화면공유는 절대 좌우반전하면 안 됨(글자가 뒤집힘). 카메라도 off로 통일.
-                  mirrorMode: VideoViewMirrorMode.off,
-                )
+                // 카메라가 상하반전되는 기기(attribute camFlip=180)의 "카메라" 타일은
+                // 180° 회전해 바로잡는다. 화면공유는 회전하지 않는다(글자 뒤집힘 방지).
+                Builder(builder: (_) {
+                  final flip = !isScreen &&
+                      p.attributes[DeviceQuirks.flipAttrKey] ==
+                          DeviceQuirks.flipAttrValue;
+                  final renderer = VideoTrackRenderer(
+                    tile.video!,
+                    // 화면공유는 전체가 보이도록 contain(레터박스). 카메라도 기본 contain.
+                    fit: VideoViewFit.contain,
+                    // 화면공유는 절대 좌우반전하면 안 됨(글자가 뒤집힘). 카메라도 off로 통일.
+                    mirrorMode: VideoViewMirrorMode.off,
+                  );
+                  return flip
+                      ? RotatedBox(quarterTurns: 2, child: renderer)
+                      : renderer;
+                })
               else
                 Center(
                   child: CircleAvatar(

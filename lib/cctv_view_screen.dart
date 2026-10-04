@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'config.dart';
 import 'connection_service.dart';
+import 'device_quirks.dart';
 import 'l10n.dart';
 
 /// CCTV 시청 화면 — 카메라 방을 구독만(영상만 봄).
@@ -49,7 +50,8 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
       ..on<TrackSubscribedEvent>((_) => _refresh())
       ..on<TrackUnsubscribedEvent>((_) => _refresh())
       ..on<ParticipantConnectedEvent>((_) => _refresh())
-      ..on<ParticipantDisconnectedEvent>((_) => _refresh());
+      ..on<ParticipantDisconnectedEvent>((_) => _refresh())
+      ..on<ParticipantAttributesChanged>((_) => _refresh()); // 카메라반전 플래그
     _roomReady = true;
     await _connect();
   }
@@ -106,6 +108,20 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
       }
     }
     return null;
+  }
+
+  /// 송출 중인 카메라의 참가자가 "상하반전 기기"(attribute camFlip=180)인가.
+  /// 맞으면 시청 화면을 180° 회전해 바로잡는다.
+  bool _remoteCamFlipped() {
+    for (final p in _room.remoteParticipants.values) {
+      for (final pub in p.videoTrackPublications) {
+        if (pub.source == TrackSource.camera && !pub.muted) {
+          return p.attributes[DeviceQuirks.flipAttrKey] ==
+              DeviceQuirks.flipAttrValue;
+        }
+      }
+    }
+    return false;
   }
 
   void _scheduleContinuePrompt() {
@@ -203,7 +219,13 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
                   children: [
                     Positioned.fill(
                       child: cam != null
-                          ? VideoTrackRenderer(cam, fit: VideoViewFit.contain)
+                          ? (_remoteCamFlipped()
+                              ? RotatedBox(
+                                  quarterTurns: 2,
+                                  child: VideoTrackRenderer(cam,
+                                      fit: VideoViewFit.contain))
+                              : VideoTrackRenderer(cam,
+                                  fit: VideoViewFit.contain))
                           : Center(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
