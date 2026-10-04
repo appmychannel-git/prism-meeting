@@ -872,7 +872,8 @@ class _RoomScreenState extends State<RoomScreen> {
 
     // 카메라가 상하(180°) 반전되는 기기는 참가자 attribute로 알린다.
     // 뷰어(앱/웹)가 이 플래그를 보고 해당 참가자 카메라 타일을 180° 회전해 바로잡는다.
-    if (DeviceQuirks.cameraFlip180) {
+    // (기기 자동 판정 + 설정 토글 오버라이드 = AppSettings.cameraFlip180)
+    if (AppSettings.cameraFlip180) {
       try {
         await _room.localParticipant?.setAttributes(
           {DeviceQuirks.flipAttrKey: DeviceQuirks.flipAttrValue},

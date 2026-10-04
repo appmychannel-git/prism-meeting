@@ -15,6 +15,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _requireAccept = AppSettings.requireAccept;
   bool _startCamera = AppSettings.startCameraOnJoin;
+  bool _flip180 = AppSettings.cameraFlip180;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +31,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onChanged: (v) async {
               await AppSettings.setStartCameraOnJoin(v);
               if (mounted) setState(() => _startCamera = v);
+            },
+          ),
+          const Divider(),
+          SwitchListTile(
+            secondary: const Icon(Icons.flip_camera_android_outlined),
+            title: Text(L.t('camera_flip_180')),
+            subtitle: Text(L.t('camera_flip_180_sub')),
+            value: _flip180,
+            onChanged: (v) async {
+              await AppSettings.setCameraFlip180(v);
+              if (mounted) setState(() => _flip180 = v);
             },
           ),
           const Divider(),

@@ -377,6 +377,17 @@ class L {
           '(e.g., a TV with only a USB camera). You can still turn the camera '
           'on manually after joining.',
     },
+    'camera_flip_180': {
+      'ko': '카메라 상하 반전(180°)',
+      'en': 'Flip camera upside down (180°)',
+    },
+    'camera_flip_180_sub': {
+      'ko': '카메라가 거꾸로 나올 때만 켜세요. 켜면 내 화면과 상대방 화면 모두에서 '
+          '내 영상이 180° 돌아갑니다. (정상 기기가 켜면 오히려 거꾸로 나갑니다.)',
+      'en': 'Turn on only if your camera appears upside down. When on, your video '
+          'is rotated 180° for you and everyone else. (On a normal device this '
+          'makes you appear upside down.)',
+    },
     'my_id_need_name': {
       'ko': '먼저 아래에서 표시 이름을 입력하면\nQR이 생성됩니다.',
       'en': 'Enter a display name below\nto generate your QR.',

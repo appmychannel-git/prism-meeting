@@ -7,6 +7,7 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:vibration/vibration.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'app_settings.dart';
 import 'cctv_store.dart';
 import 'config.dart';
 import 'connection_service.dart';
@@ -140,7 +141,8 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       // 카메라만 송출(마이크는 끔).
       await _room.localParticipant?.setCameraEnabled(true);
       // 카메라가 상하(180°) 반전되는 기기는 플래그를 알려 시청자가 회전해 바로잡게 한다.
-      if (DeviceQuirks.cameraFlip180) {
+      // (기기 자동 판정 + 설정 토글 오버라이드 = AppSettings.cameraFlip180)
+      if (AppSettings.cameraFlip180) {
         try {
           await _room.localParticipant?.setAttributes(
             {DeviceQuirks.flipAttrKey: DeviceQuirks.flipAttrValue},
@@ -202,7 +204,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                       child: _dimmed
                           ? _dimView()
                           : (_localCam() != null
-                              ? (DeviceQuirks.cameraFlip180
+                              ? (AppSettings.cameraFlip180
                                   ? RotatedBox(
                                       quarterTurns: 2,
                                       child: VideoTrackRenderer(_localCam()!,
