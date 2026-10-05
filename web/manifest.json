@@ -1,11 +1,11 @@
 {
-    "name": "prism_meeting",
-    "short_name": "prism_meeting",
+    "name": "__APP_BRAND__",
+    "short_name": "__APP_BRAND__",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "__APP_BRAND__",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

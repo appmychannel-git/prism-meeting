@@ -56,7 +56,9 @@ build_web_one() {
   pkg="$(brand_package "$brand")"
   scheme="$(brand_scheme "$brand")"
   apk_url="${base}download/${apk_name}"
-  sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g; s|__APK_URL__|${apk_url}|g" "$out/index.html"
+  sed -i "s/__APP_PACKAGE__/${pkg}/g; s/__APP_SCHEME__/${scheme}/g; s|__APK_URL__|${apk_url}|g; s|__APP_BRAND__|${APP_BRAND}|g" "$out/index.html"
+  # PWA 설치명·링크 미리보기 보조: manifest.json 의 브랜드도 치환.
+  sed -i "s|__APP_BRAND__|${APP_BRAND}|g" "$out/manifest.json"
   echo "   intent package=$pkg  scheme=$scheme  apk=$apk_url"
   # index.html·서비스워커는 캐시 안 함(Apache). 캐시로 옛 페이지가 뜨는 것 방지.
   # (nginx면 .htaccess 무시 → 서버 설정 필요)
