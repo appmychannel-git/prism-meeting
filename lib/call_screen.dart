@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:livekit_client/livekit_client.dart';
 
+import 'app_settings.dart';
 import 'connection_service.dart';
+import 'device_quirks.dart';
 import 'l10n.dart';
 import 'proximity.dart';
 import 'push_service.dart';
@@ -110,7 +112,8 @@ class _CallScreenState extends State<CallScreen> {
       ..on<TrackSubscribedEvent>((_) => _onChange())
       ..on<TrackUnsubscribedEvent>((_) => _onChange())
       ..on<TrackMutedEvent>((_) => _onChange())
-      ..on<TrackUnmutedEvent>((_) => _onChange());
+      ..on<TrackUnmutedEvent>((_) => _onChange())
+      ..on<ParticipantAttributesChanged>((_) => _onChange()); // 카메라반전 플래그
   }
 
   Future<void> _connect() async {
@@ -152,6 +155,14 @@ class _CallScreenState extends State<CallScreen> {
       } catch (_) {
         if (mounted) setState(() => _camOn = false);
       }
+    }
+    // 카메라 상하반전 기기는 플래그를 알려 상대가 내 영상을 180° 회전해 보게 한다.
+    if (AppSettings.cameraFlip180) {
+      try {
+        await lp?.setAttributes(
+          {DeviceQuirks.flipAttrKey: DeviceQuirks.flipAttrValue},
+        );
+      } catch (_) {}
     }
     // 오디오 출력(스피커/이어피스) 초기화.
     try {
@@ -335,15 +346,27 @@ class _CallScreenState extends State<CallScreen> {
   Widget _videoLayout(String peer, String status) {
     final remoteVid = _cameraTrackOf(_remote);
     final localVid = _cameraTrackOf(_room.localParticipant);
+    // 카메라 상하반전 기기(attribute camFlip=180)의 영상은 180° 회전해 바로잡는다.
+    final remoteFlip = _remote?.attributes[DeviceQuirks.flipAttrKey] ==
+        DeviceQuirks.flipAttrValue;
+    final localFlip = _room.localParticipant?.attributes[
+            DeviceQuirks.flipAttrKey] ==
+        DeviceQuirks.flipAttrValue;
     return Positioned.fill(
       child: Stack(
         children: [
           // 상대 영상(큰 화면)
           Positioned.fill(
             child: remoteVid != null
-                ? VideoTrackRenderer(remoteVid,
-                    fit: VideoViewFit.cover,
-                    mirrorMode: VideoViewMirrorMode.off)
+                ? (remoteFlip
+                    ? RotatedBox(
+                        quarterTurns: 2,
+                        child: VideoTrackRenderer(remoteVid,
+                            fit: VideoViewFit.cover,
+                            mirrorMode: VideoViewMirrorMode.off))
+                    : VideoTrackRenderer(remoteVid,
+                        fit: VideoViewFit.cover,
+                        mirrorMode: VideoViewMirrorMode.off))
                 : Container(
                     color: const Color(0xFF1A1F27),
                     child: Center(
@@ -388,9 +411,15 @@ class _CallScreenState extends State<CallScreen> {
                 width: 108,
                 height: 150,
                 child: (localVid != null && _camOn)
-                    ? VideoTrackRenderer(localVid,
-                        fit: VideoViewFit.cover,
-                        mirrorMode: VideoViewMirrorMode.auto)
+                    ? (localFlip
+                        ? RotatedBox(
+                            quarterTurns: 2,
+                            child: VideoTrackRenderer(localVid,
+                                fit: VideoViewFit.cover,
+                                mirrorMode: VideoViewMirrorMode.auto))
+                        : VideoTrackRenderer(localVid,
+                            fit: VideoViewFit.cover,
+                            mirrorMode: VideoViewMirrorMode.auto))
                     : Container(
                         color: const Color(0xFF2E3742),
                         child: const Center(
