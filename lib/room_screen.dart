@@ -904,6 +904,8 @@ class _RoomScreenState extends State<RoomScreen> {
       context: context,
       barrierDismissible: !initial, // 최초 입장 팝업은 바깥 탭으로 안 닫히게
       builder: (ctx) => AlertDialog(
+        // 가로 화면에서 키보드가 뜨면 눌려 글자-밑줄이 겹치지 않게.
+        scrollable: true,
         title: Text(initial ? L.t('name_set') : L.t('name_change')),
         content: TextField(
           controller: ctrl,
@@ -915,6 +917,10 @@ class _RoomScreenState extends State<RoomScreen> {
             labelText: L.t('display_name'),
             hintText: initial ? L.t('name_hint') : null,
             border: const OutlineInputBorder(),
+            counterText: '',
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
         ),
         actions: [

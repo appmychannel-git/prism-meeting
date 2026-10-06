@@ -209,6 +209,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     final pin = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: Text(L.t('cctv_enter_pin')),
         content: TextField(
           controller: ctrl,
@@ -219,6 +220,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
           decoration: InputDecoration(
             hintText: L.t('cctv_password'),
             border: const OutlineInputBorder(),
+            counterText: '',
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
           onSubmitted: (v) => Navigator.pop(ctx, v),
         ),
@@ -306,6 +311,8 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       context: context,
       barrierDismissible: true, // 바깥 탭(닫기) → 취소로 처리
       builder: (ctx) => AlertDialog(
+        // 가로 화면에서 키보드가 뜨면 눌려 글자-밑줄이 겹치지 않게.
+        scrollable: true,
         title: Text(L.t('name_set')),
         content: TextField(
           controller: ctrl,
@@ -318,6 +325,10 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
             labelText: L.t('display_name'),
             hintText: L.t('name_hint'),
             border: const OutlineInputBorder(),
+            counterText: '',
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
         ),
         actions: [

@@ -86,6 +86,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     final pin = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         title: Text(L.t('cctv_enter_pin')),
         content: TextField(
           controller: ctrl,
@@ -96,6 +97,10 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
           decoration: InputDecoration(
             hintText: L.t('cctv_password'),
             border: const OutlineInputBorder(),
+            counterText: '',
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
           onSubmitted: (v) => Navigator.pop(ctx, v),
         ),
