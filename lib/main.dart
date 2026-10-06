@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'app_settings.dart';
 import 'cctv_hub_screen.dart';
 import 'config.dart';
+import 'device_id.dart';
 import 'device_quirks.dart';
 import 'join_screen.dart';
 import 'l10n.dart';
+import 'my_id_screen.dart';
 import 'push_service.dart';
 import 'store_login_gate.dart';
 
@@ -68,11 +70,60 @@ class _LocalizedHome extends StatelessWidget {
         key: ValueKey(lang),
         // 마켓앱 로그인 게이트(안드로이드TV). 마켓 없으면(모바일/웹) 그대로 통과.
         child: StoreLoginGate(
-          child: AppConfig.cctvOnly
-              ? const CctvHubScreen()
-              : const JoinScreen(),
+          // 첫 실행: 내 아이디 입력(이미 설정됐으면 바로 홈).
+          child: _IdSetupGate(
+            child: AppConfig.cctvOnly
+                ? const CctvHubScreen()
+                : const JoinScreen(),
+          ),
         ),
       ),
     );
+  }
+}
+
+/// 첫 실행 게이트 — 내 아이디(표시 이름)가 비어 있으면 입력 화면을 띄우고,
+/// 설정돼 있으면 바로 홈([child])을 보여준다. 한 번 설정하면 다음부터 안 뜬다.
+class _IdSetupGate extends StatefulWidget {
+  const _IdSetupGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_IdSetupGate> createState() => _IdSetupGateState();
+}
+
+class _IdSetupGateState extends State<_IdSetupGate> {
+  bool _loaded = false;
+  bool _needSetup = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final name = await DeviceId.name();
+    if (!mounted) return;
+    setState(() {
+      _needSetup = name.trim().isEmpty;
+      _loaded = true;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_loaded) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0E1116),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_needSetup) {
+      // 첫 실행: 기존 "내 ID" 화면(표시 이름 + QR + 내 코드)으로 아이디 설정.
+      return MyIdScreen(onDone: () => setState(() => _needSetup = false));
+    }
+    return widget.child;
   }
 }

@@ -131,6 +131,8 @@ class L {
       'ko': '회의에서 보일 이름 (예: 홍길동)',
       'en': 'Name shown in the meeting (e.g., John)',
     },
+    // 첫 실행 온보딩: "내 ID" 화면의 완료(시작) 버튼
+    'id_setup_start': {'ko': '시작', 'en': 'Start'},
     'err_room_required': {'ko': '방 코드를 입력하세요.', 'en': 'Please enter a room code.'},
     'err_private_pin': {
       'ko': '비밀번호를 입력하세요.',

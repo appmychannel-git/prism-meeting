@@ -14,8 +14,14 @@ import 'onscreen_keyboard.dart';
 import 'push_service.dart';
 
 /// 내 ID 화면. 상대가 QR 스캔 / 코드 입력 / 링크로 나를 친구추가·전화할 수 있다.
+///
+/// [onDone] 이 주어지면 "첫 실행 온보딩 모드" — 상단 뒤로가기 대신 "시작" 버튼이
+/// 뜨고(아이디 입력 후 활성), 누르면 [onDone] 호출로 홈으로 간다. null이면 일반 화면.
 class MyIdScreen extends StatefulWidget {
-  const MyIdScreen({super.key});
+  const MyIdScreen({super.key, this.onDone});
+
+  final VoidCallback? onDone;
+
   @override
   State<MyIdScreen> createState() => _MyIdScreenState();
 }
@@ -130,7 +136,21 @@ class _MyIdScreenState extends State<MyIdScreen> {
     // 실제로 공유 QR을 보여줄지(=태블릿/TV + 공유모드 선택).
     final showShareQr = large && _shareMode;
     return Scaffold(
-      appBar: AppBar(title: Text(L.t('my_id_title'))),
+      appBar: AppBar(
+        title: Text(L.t('my_id_title')),
+        // 첫 실행 모드에선 뒤로가기를 숨기고(돌아갈 곳 없음) "시작" 버튼으로 홈 진입.
+        automaticallyImplyLeading: widget.onDone == null,
+        actions: [
+          if (widget.onDone != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: TextButton(
+                onPressed: hasName ? widget.onDone : null,
+                child: Text(L.t('id_setup_start')),
+              ),
+            ),
+        ],
+      ),
       body: uuid == null
           ? const Center(child: CircularProgressIndicator())
           : large
