@@ -73,7 +73,7 @@ android {
         create("viewplus") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.viewplus"
-            manifestPlaceholders["appLabel"] = " Viewplus Meeting"
+            manifestPlaceholders["appLabel"] = "Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/viewplus/"
         }
         create("mychannel") {

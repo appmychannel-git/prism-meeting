@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'block_store.dart';
@@ -19,18 +21,41 @@ class FriendsScreen extends StatefulWidget {
   State<FriendsScreen> createState() => _FriendsScreenState();
 }
 
-class _FriendsScreenState extends State<FriendsScreen> {
+class _FriendsScreenState extends State<FriendsScreen>
+    with WidgetsBindingObserver {
   List<Friend> _friends = [];
   List<Friend> _suggestions = []; // 나를 추가했지만 내가 아직 안 추가한 사람
   final Map<String, DeviceStatus> _status = {}; // uuid → 온라인/통화중/이름
   String _myUuid = '';
   String _myName = '';
   bool _loading = true;
+  // 친구 온라인/통화중 상태를 주기적으로 다시 조회(화면을 열어둔 채로도 색이 갱신).
+  Timer? _statusTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _load();
+    // 20초마다 상태 재조회 → 친구가 켜지면/통화 시작하면 색이 바뀐다.
+    _statusTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (_friends.isNotEmpty) _loadStatuses(_friends);
+    });
+  }
+
+  @override
+  void dispose() {
+    _statusTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 앱으로 돌아오면 즉시 최신 상태로 갱신.
+    if (state == AppLifecycleState.resumed && _friends.isNotEmpty) {
+      _loadStatuses(_friends);
+    }
   }
 
   Future<void> _load() async {
