@@ -149,6 +149,9 @@ class _FriendsScreenState extends State<FriendsScreen>
     final code = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
+        // 가로 화면(TV/태블릿)에서 키보드가 뜨면 다이얼로그가 눌려 입력 글자와
+        // 밑줄이 겹치던 문제 → 스크롤 가능 + 카운터 숨김 + dense 로 높이 축소.
+        scrollable: true,
         title: Text(L.t('add_by_code')),
         content: TextField(
           controller: ctrl,
@@ -158,6 +161,10 @@ class _FriendsScreenState extends State<FriendsScreen>
           decoration: InputDecoration(
             hintText: L.t('code_hint'),
             border: const OutlineInputBorder(),
+            counterText: '', // 0/8 카운터 숨김(좁을 때 밑줄과 겹침 방지)
+            isDense: true,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
           ),
           onSubmitted: (v) => Navigator.pop(ctx, v),
         ),
