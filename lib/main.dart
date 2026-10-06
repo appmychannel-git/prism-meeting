@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'app_settings.dart';
 import 'cctv_hub_screen.dart';
@@ -64,19 +66,116 @@ class _LocalizedHome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<String>(
-      valueListenable: L.localeNotifier,
-      builder: (context, lang, _) => KeyedSubtree(
-        key: ValueKey(lang),
-        // 마켓앱 로그인 게이트(안드로이드TV). 마켓 없으면(모바일/웹) 그대로 통과.
-        child: StoreLoginGate(
-          // 첫 실행: 내 아이디 입력(이미 설정됐으면 바로 홈).
-          child: _IdSetupGate(
-            child: AppConfig.cctvOnly
-                ? const CctvHubScreen()
-                : const JoinScreen(),
+    // 앱 시작 시 스플래시를 ~4초 유지(언어 변경 재빌드에는 다시 안 뜸).
+    return _SplashGate(
+      child: ValueListenableBuilder<String>(
+        valueListenable: L.localeNotifier,
+        builder: (context, lang, _) => KeyedSubtree(
+          key: ValueKey(lang),
+          // 마켓앱 로그인 게이트(안드로이드TV). 마켓 없으면(모바일/웹) 그대로 통과.
+          child: StoreLoginGate(
+            // 첫 실행: 내 아이디 입력(이미 설정됐으면 바로 홈).
+            child: _IdSetupGate(
+              child: AppConfig.cctvOnly
+                  ? const CctvHubScreen()
+                  : const JoinScreen(),
+            ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// 앱 시작 스플래시 — 약 4초 유지 후 [child](홈/게이트)로 전환.
+/// 우측 상단에 버전 정보를 표시한다. (언어 변경 등 내부 재빌드에는 다시 뜨지 않도록
+/// 홈 라우트 바로 안쪽, 언어 리스너 바깥에 둔다.)
+class _SplashGate extends StatefulWidget {
+  const _SplashGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_SplashGate> createState() => _SplashGateState();
+}
+
+class _SplashGateState extends State<_SplashGate> {
+  bool _done = false;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _done = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_done) return widget.child;
+    return const _SplashScreen();
+  }
+}
+
+/// 스플래시 화면: 가운데 브랜드 아이콘·이름, 우측 상단 버전.
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0E1116),
+      body: Stack(
+        children: [
+          // 우측 상단 버전 정보
+          Positioned(
+            top: 0,
+            right: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'v${AppConfig.appVersion}',
+                  style: const TextStyle(
+                    color: Colors.white54,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // 가운데 브랜드 아이콘 + 이름
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.video_camera_front_rounded,
+                  size: 72,
+                  color: Color(0xFF5B8DEF),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  AppConfig.appBrand,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
