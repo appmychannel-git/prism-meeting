@@ -116,6 +116,9 @@ class _RoomScreenState extends State<RoomScreen> {
 
   bool _micOn = true;
   bool _camOn = true;
+  // 카메라 여는 중 오버레이(카메라 없는/고장난 기기에서 네이티브 open이 메인스레드를
+  // 블록해 UI가 잠시 굳을 때, "카메라 여는 중" 문구를 미리 그려 이유를 알린다).
+  OverlayEntry? _camOverlay;
   bool _screenSharing = false; // 내가 화면공유 송출 중인가
   bool _shareBusy = false; // 화면공유 토글 진행 중(중복 탭 방지)
   bool _bgServiceOn = false; // 안드로이드 mediaProjection FGS 활성화됨
@@ -236,6 +239,7 @@ class _RoomScreenState extends State<RoomScreen> {
   void dispose() {
     WakelockPlus.disable(); // 회의 나가면 화면 유지 해제
     _stopBackgroundService(); // 화면공유 포그라운드 서비스 정리
+    _hideCamOpening(); // 카메라 여는 중 오버레이 정리
     _deviceSub?.cancel();
     _rebuildTimer?.cancel();
     _captionSweeper?.cancel();
@@ -950,6 +954,15 @@ class _RoomScreenState extends State<RoomScreen> {
     // 끄면 카메라 시도 자체를 안 한다(고장난 카메라 기기 UI 멈춤 회피 + 음성통화).
     final autoStart = widget.startVideo == null; // 통화가 아닌 일반 입장 자동켜기
     final wantCamera = widget.startVideo ?? AppSettings.startCameraOnJoin;
+    // 지난 입장에서 카메라를 열다 멈춘 채 앱이 종료됐으면(pending 플래그가 남음)
+    // 이번엔 자동 켜기를 끄고 이유를 안내한다(재멈춤 방지).
+    if (autoStart && wantCamera && AppSettings.camAttemptPending) {
+      await AppSettings.setStartCameraOnJoin(false);
+      await AppSettings.setCamAttemptPending(false);
+      if (mounted) setState(() => _camOn = false);
+      _showCamFailedNotice();
+      return;
+    }
     if (!wantCamera) {
       // 카메라 자동 켜기 OFF. 카메라 없는/고장난 기기(스탠드TV 등)에서 이 설정을
       // 끄는 것이므로, 여기서는 카메라 열거(videoInputs)조차 하지 않는다 —
@@ -974,23 +987,86 @@ class _RoomScreenState extends State<RoomScreen> {
       // 카메라 없음 → 아바타로 참여(시도 안 함).
       if (mounted) setState(() => _camOn = false);
     } else {
+      // 카메라 open이 네이티브에서 메인스레드를 블록해 굳을 수 있으므로,
+      // ① "진행 중" 플래그를 디스크에 남겨(멈춘 채 강제종료돼도 다음 실행이 감지)
+      // ② "카메라 여는 중" 오버레이를 먼저 한 프레임 그려두고(블록돼도 이유가 보이게)
+      // 호출한다.
+      await AppSettings.setCamAttemptPending(true);
+      _showCamOpening();
+      await Future.delayed(const Duration(milliseconds: 200)); // 오버레이 렌더 보장
       try {
         await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
+        _hideCamOpening();
       } catch (_) {
         // 기본(내장) 실패 → 외장/사용 가능한 카메라로 재시도(USB 웹캠 등).
         final ok = await _tryEnableAnyCamera();
+        _hideCamOpening();
         if (!ok) {
           if (mounted) setState(() => _camOn = false);
           // 자동 켜기였는데 카메라 open이 실패/타임아웃한 기기(죽은 내장캠 등)는
-          // 다음 입장부터 자동 켜기를 꺼 둬 재멈춤을 막는다(설정에서 다시 켤 수 있음).
+          // 다음 입장부터 자동 켜기를 꺼 둬 재멈춤을 막고, 사용자에게 이유를 안내한다.
           if (autoStart && AppSettings.startCameraOnJoin) {
             await AppSettings.setStartCameraOnJoin(false);
+            _showCamFailedNotice();
           }
         }
       }
+      // 시도가 끝났으면(성공/실패 모두) 진행 중 플래그 해제.
+      await AppSettings.setCamAttemptPending(false);
     }
     // 처음 켜진 카메라의 deviceId를 선택 메뉴 체크 표시에 반영
     _syncCurrentCameraId();
+  }
+
+  // "카메라 여는 중" 오버레이 표시(네이티브 블록으로 굳어도 이유가 보이도록).
+  void _showCamOpening() {
+    if (_camOverlay != null || !mounted) return;
+    final overlay = Overlay.maybeOf(context, rootOverlay: true);
+    if (overlay == null) return;
+    _camOverlay = OverlayEntry(
+      builder: (_) => IgnorePointer(
+        child: Container(
+          color: Colors.black.withValues(alpha: 0.6),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                L.t('cam_opening'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 15),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_camOverlay!);
+  }
+
+  void _hideCamOpening() {
+    _camOverlay?.remove();
+    _camOverlay = null;
+  }
+
+  // 카메라를 못 연 기기: 자동 켜기를 끈 뒤 이유를 안내(재발 안 함 + 설정에서 재활성 안내).
+  void _showCamFailedNotice() {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('cam_failed_title')),
+        content: Text(L.t('cam_failed_msg')),
+        actions: [
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(L.t('ok')),
+          ),
+        ],
+      ),
+    );
   }
 
   // 현재 활성 카메라의 deviceId를 트랙 설정에서 읽어 _currentCameraId에 반영.

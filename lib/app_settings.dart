@@ -8,6 +8,7 @@ class AppSettings {
   static const _kRequireAccept = 'require_accept';
   static const _kStartCamera = 'start_camera_on_join';
   static const _kCameraFlip180 = 'camera_flip_180';
+  static const _kCamAttemptPending = 'camera_attempt_pending';
 
   /// 수락형 친구요청: on이면 "내 친구가 아닌 사람"의 전화를 자동 거절.
   /// 기본 off(아무나 내 QR/코드로 전화 가능).
@@ -29,12 +30,19 @@ class AppSettings {
   static bool _cameraFlip180 = false;
   static bool get cameraFlip180 => _cameraFlip180;
 
+  /// 카메라 open 시도가 "끝나지 않은 채" 남아 있는지(진행 중 플래그).
+  /// 입장 때 카메라를 열다 네이티브에서 멈춰 앱이 강제종료되면 이 값이 true 로
+  /// 남는다. 다음 실행에서 true 면 "지난번에 멈췄다"고 보고 자동 켜기를 꺼 준다.
+  static bool _camAttemptPending = false;
+  static bool get camAttemptPending => _camAttemptPending;
+
   static Future<void> load() async {
     final sp = await SharedPreferences.getInstance();
     _requireAccept = sp.getBool(_kRequireAccept) ?? false;
     _startCameraOnJoin = sp.getBool(_kStartCamera) ?? AppConfig.startCamera;
     // 저장값 없으면 기기 자동 판정값을 기본으로.
     _cameraFlip180 = sp.getBool(_kCameraFlip180) ?? DeviceQuirks.cameraFlip180;
+    _camAttemptPending = sp.getBool(_kCamAttemptPending) ?? false;
   }
 
   static Future<void> setRequireAccept(bool v) async {
@@ -53,5 +61,11 @@ class AppSettings {
     _cameraFlip180 = v;
     final sp = await SharedPreferences.getInstance();
     await sp.setBool(_kCameraFlip180, v);
+  }
+
+  static Future<void> setCamAttemptPending(bool v) async {
+    _camAttemptPending = v;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool(_kCamAttemptPending, v);
   }
 }

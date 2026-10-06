@@ -379,6 +379,19 @@ class L {
           '(e.g., a TV with only a USB camera). You can still turn the camera '
           'on manually after joining.',
     },
+    // 입장 시 카메라 열기 상태/실패 안내(카메라 없는·고장난 기기 대응)
+    'cam_opening': {
+      'ko': '카메라 여는 중…\n(카메라가 없는 기기는 잠시 멈출 수 있어요)',
+      'en': 'Starting camera…\n(may briefly freeze on devices without a camera)',
+    },
+    'cam_failed_title': {'ko': '카메라를 열 수 없습니다', 'en': "Can't open camera"},
+    'cam_failed_msg': {
+      'ko': '이 기기에서 카메라를 열 수 없어 "입장 시 카메라 자동 켜기"를 껐습니다.\n'
+          '다음부터는 멈추지 않습니다. 설정에서 다시 켤 수 있어요.',
+      'en': "Couldn't open the camera on this device, so \"Turn on camera when "
+          'joining" has been turned off.\nIt won\'t freeze next time. You can '
+          'turn it back on in Settings.',
+    },
     'camera_flip_180': {
       'ko': '카메라 상하 반전(180°)',
       'en': 'Flip camera upside down (180°)',
