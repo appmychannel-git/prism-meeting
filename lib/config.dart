@@ -20,7 +20,7 @@ import 'package:flutter/foundation.dart'
 class AppConfig {
   /// 앱 표시 버전. 입장 화면 우측 상단에 노출한다.
   /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
-  static const String appVersion = '1.0.10';
+  static const String appVersion = '1.0.11';
 
   /// 앱 표시 브랜드명(브라우저 타이틀 + 입장화면 제목).
   /// 기본 'Prism Meeting'. 거래처 시연 등 브랜드를 숨길 땐
@@ -248,11 +248,14 @@ class AppConfig {
   }
 
   /// CCTV 딥링크. QR을 찍으면 앱이 열려 시청 화면으로 이동한다(다른 QR과 통일).
-  /// 보안상 **비밀번호(핀)는 링크에 담지 않는다** → 앱에서 별도 입력.
-  static String cctvLink(String code) {
+  /// [pin]을 주면 링크에 함께 담아 스캔 시 비번 입력 없이 바로 접속한다(그룹별 QR).
+  /// pin 없이 호출하면 코드만 담아(비번 별도 입력) 기존과 동일하게 동작한다.
+  static String cctvLink(String code, {String? pin}) {
     final base = inviteBaseUrl;
     final sep = base.contains('?') ? '&' : '?';
-    return '$base$sep${Uri(queryParameters: {'cctv': code}).query}';
+    final params = {'cctv': code};
+    if (pin != null && pin.isNotEmpty) params['pin'] = pin;
+    return '$base$sep${Uri(queryParameters: params).query}';
   }
 
   /// 공유 페이지 주소. TV가 띄운 "공유 QR"을 휴대폰으로 찍으면 이 페이지가 열리고,

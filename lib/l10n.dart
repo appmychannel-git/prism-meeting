@@ -340,6 +340,25 @@ class L {
           'code ({code}) must reconnect with the new password.',
     },
     'cctv_pw_change_apply': {'ko': '변경하고 시작', 'en': 'Change & start'},
+    // ── QR목록(송출 코드 그룹) ──
+    'cctv_tab_qrlist': {'ko': 'QR목록', 'en': 'QR codes'},
+    'cctv_my_code': {'ko': '내 코드', 'en': 'My code'},
+    'cctv_qrlist_hint': {
+      'ko': '코드별 비밀번호를 만들어 QR로 나눠주세요. 특정 코드만 켜고 끌 수 있어요.',
+      'en': 'Create a password per code and share its QR. Toggle each on/off.',
+    },
+    'cctv_no_codes': {
+      'ko': '아직 추가한 코드가 없습니다.',
+      'en': 'No codes added yet.',
+    },
+    'cctv_add_code': {'ko': '코드 추가', 'en': 'Add code'},
+    'cctv_code_name': {'ko': '코드 이름', 'en': 'Code name'},
+    'cctv_code_name_hint': {'ko': '예: 가족, 매장직원', 'en': 'e.g. Family, Staff'},
+    'cctv_code_default': {'ko': '기본', 'en': 'Default'},
+    'confirm_remove_code': {
+      'ko': '이 코드를 삭제할까요? 이 코드(비번)로 접속하던 사람은 접속할 수 없게 됩니다.',
+      'en': 'Delete this code? Viewers using it can no longer connect.',
+    },
     'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},
     'cctv_my_list': {'ko': '내 CCTV', 'en': 'My CCTV'},
     'cctv_add': {'ko': '새 CCTV 추가', 'en': 'Add CCTV'},

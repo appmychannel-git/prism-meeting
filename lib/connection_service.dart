@@ -42,6 +42,7 @@ class ConnectionService {
     required String participantName,
     required String identity,
     String? pin,
+    List<String>? pins, // CCTV 호스트: 그룹별 유효 비번 집합(X-Room-Pins).
     bool create = false,
   }) async {
     final params = {
@@ -58,6 +59,10 @@ class ConnectionService {
     // 보안: 비밀번호는 URL 쿼리 대신 헤더로 전송(서버/프록시 로그 노출 방지).
     final headers = <String, String>{};
     if (pin != null && pin.isNotEmpty) headers['X-Room-Pin'] = pin;
+    // CCTV 호스트가 그룹별 비번 집합을 보낼 때(쉼표 구분). 서버가 meta.pins 로 저장.
+    if (pins != null && pins.isNotEmpty) {
+      headers['X-Room-Pins'] = pins.join(',');
+    }
 
     final http.Response resp;
     try {

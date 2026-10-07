@@ -26,9 +26,9 @@ class CctvEntry {
         note: (j['note'] ?? '').toString(),
       );
 
-  CctvEntry copyWith({String? name, String? note}) => CctvEntry(
+  CctvEntry copyWith({String? name, String? note, String? pin}) => CctvEntry(
         code: code,
-        pin: pin,
+        pin: pin ?? this.pin,
         name: name ?? this.name,
         note: note ?? this.note,
       );
@@ -36,12 +36,45 @@ class CctvEntry {
   String get roomId => 'cctv-$code';
 }
 
-/// CCTV 로컬 저장: ① 내 공유 기기의 고정 코드/비번 ② 시청 목록.
+/// 공유(송출) 접속 그룹 — 같은 기기 코드(방)에 대해 그룹별로 다른 비번을 둔다.
+/// 그룹마다 QR(기기코드+그 비번)을 발급해 특정 그룹만 활성/비활성/삭제할 수 있다.
+class CctvShareGroup {
+  final String id;
+  final String name;
+  final String pin;
+  final bool enabled;
+  const CctvShareGroup({
+    required this.id,
+    required this.name,
+    required this.pin,
+    this.enabled = true,
+  });
+
+  Map<String, dynamic> toJson() =>
+      {'id': id, 'name': name, 'pin': pin, 'enabled': enabled};
+  factory CctvShareGroup.fromJson(Map<String, dynamic> j) => CctvShareGroup(
+        id: (j['id'] ?? '').toString(),
+        name: (j['name'] ?? '').toString(),
+        pin: (j['pin'] ?? '').toString(),
+        enabled: j['enabled'] != false, // 기본 활성
+      );
+
+  CctvShareGroup copyWith({String? name, String? pin, bool? enabled}) =>
+      CctvShareGroup(
+        id: id,
+        name: name ?? this.name,
+        pin: pin ?? this.pin,
+        enabled: enabled ?? this.enabled,
+      );
+}
+
+/// CCTV 로컬 저장: ① 내 공유 기기의 고정 코드 + 접속 그룹(비번들) ② 시청 목록.
 class CctvStore {
   static const _kMyCode = 'cctv_my_code';
   static const _kMyPin = 'cctv_my_pin';
   static const _kSaved = 'cctv_saved';
   static const _kIsCamera = 'cctv_is_camera';
+  static const _kShareGroups = 'cctv_share_groups';
 
   /// 이 기기가 "대기 중 원격 켜기 가능한 CCTV 카메라"로 등록됐는지.
   static Future<bool> isCamera() async {
@@ -88,10 +121,72 @@ class CctvStore {
     return (code, pin);
   }
 
-  /// 공유 비밀번호 설정/변경(송출 화면에서 사용자가 지정).
+  /// 공유 비밀번호 설정/변경(과거 단일 비번 호환용). 신규 UI는 그룹을 쓴다.
   static Future<void> setMyPin(String pin) async {
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_kMyPin, pin);
+  }
+
+  // ── 공유(송출) 접속 그룹 ──
+  static String _newGroupId() =>
+      DateTime.now().microsecondsSinceEpoch.toString();
+
+  /// 접속 그룹 목록. 저장된 게 없고 과거 단일 비번만 있으면 "기본" 그룹으로 이관.
+  static Future<List<CctvShareGroup>> shareGroups() async {
+    final sp = await SharedPreferences.getInstance();
+    final raw = sp.getString(_kShareGroups);
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final arr = jsonDecode(raw) as List;
+        return arr
+            .map((e) => CctvShareGroup.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } catch (_) {}
+    }
+    // 마이그레이션: 과거 단일 비번(setMyPin)이 있으면 "기본" 그룹 1개로.
+    final oldPin = sp.getString(_kMyPin) ?? '';
+    if (oldPin.isNotEmpty) {
+      final g = CctvShareGroup(id: _newGroupId(), name: '기본', pin: oldPin);
+      await _saveGroups([g]);
+      return [g];
+    }
+    return [];
+  }
+
+  static Future<void> _saveGroups(List<CctvShareGroup> gs) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(
+        _kShareGroups, jsonEncode(gs.map((g) => g.toJson()).toList()));
+  }
+
+  static Future<void> addShareGroup(String name, String pin) async {
+    final gs = await shareGroups();
+    gs.add(CctvShareGroup(id: _newGroupId(), name: name, pin: pin));
+    await _saveGroups(gs);
+  }
+
+  static Future<void> updateShareGroup(String id,
+      {String? name, String? pin, bool? enabled}) async {
+    final gs = await shareGroups();
+    final i = gs.indexWhere((g) => g.id == id);
+    if (i < 0) return;
+    gs[i] = gs[i].copyWith(name: name, pin: pin, enabled: enabled);
+    await _saveGroups(gs);
+  }
+
+  static Future<void> removeShareGroup(String id) async {
+    final gs = await shareGroups();
+    gs.removeWhere((g) => g.id == id);
+    await _saveGroups(gs);
+  }
+
+  /// 현재 "활성" 그룹들의 비번(송출 시 서버로 보낼 유효 비번 집합).
+  static Future<List<String>> enabledSharePins() async {
+    final gs = await shareGroups();
+    return gs
+        .where((g) => g.enabled && g.pin.isNotEmpty)
+        .map((g) => g.pin)
+        .toList();
   }
 
   // ── 시청 목록 ──

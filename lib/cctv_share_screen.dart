@@ -38,7 +38,8 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
 
   String _code = ''; // 표시/입력용 코드(cctv- 제외). 이 기기 고정값.
   String _roomId = ''; // 실제 방 이름 cctv-<code>
-  String _pin = '';
+  String _pin = ''; // 대표 비번(e2ee 키/표시용) = 활성 그룹 중 첫 번째
+  List<String> _pins = []; // 활성 그룹들의 비번 집합(서버로 전송)
   bool _connecting = true;
   String? _error;
   int _viewers = 0;
@@ -84,23 +85,26 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   }
 
   Future<void> _init() async {
-    // 이 기기의 고정 코드 + 저장된 공유 비번(없으면 '').
-    final (code, pin) = await CctvStore.myShareCredentials();
+    // 이 기기의 고정 코드 + 활성 그룹(코드)들의 비번 집합.
+    final (code, _) = await CctvStore.myShareCredentials();
     _code = code;
     _roomId = 'cctv-$code';
-    _pin = pin;
-    // 수동 공유: 송출 전 비밀번호 설정/확인 창. (원격 켜기는 저장된 비번으로 바로 송출)
-    if (widget.promptPassword) {
-      final ok = await _promptSharePassword();
-      if (!ok) {
-        // 취소 → 송출하지 않고 화면 닫기.
+    _pins = await CctvStore.enabledSharePins();
+    // 활성 코드가 없으면: 수동 공유면 첫 코드 추가를 유도, 그래도 없으면 닫는다.
+    if (_pins.isEmpty) {
+      if (widget.promptPassword) {
+        await _promptAddFirstCode();
+        _pins = await CctvStore.enabledSharePins();
+      }
+      if (_pins.isEmpty) {
         if (mounted) Navigator.of(context).maybePop();
         return;
       }
     }
-    // E2EE(옵션): 비밀번호를 공유키로.
-    final e2ee = (AppConfig.e2ee && pin.isNotEmpty)
-        ? await E2EEOptions.sharedKey('$_roomId:$pin')
+    _pin = _pins.first; // e2ee 키/표시용 대표 비번
+    // E2EE(옵션): 대표 비번을 공유키로.
+    final e2ee = (AppConfig.e2ee && _pin.isNotEmpty)
+        ? await E2EEOptions.sharedKey('$_roomId:$_pin')
         : null;
     _room = Room(
       roomOptions: RoomOptions(
@@ -118,44 +122,16 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     await _connect();
   }
 
-  // 송출 시작 전 비밀번호 설정/확인. 바뀌면 경고. true=진행(송출), false=취소(닫기).
-  Future<bool> _promptSharePassword() async {
-    while (true) {
-      if (!mounted) return false;
-      final typed = await _askPassword();
-      if (typed == null) return false; // 취소
-      final pw = typed.trim();
-      if (pw.isEmpty) {
-        _snack(L.t('cctv_need_password'));
-        continue;
-      }
-      // 첫 설정이거나 기존과 동일 → 그대로 적용하고 진행.
-      if (_pin.isEmpty || pw == _pin) {
-        await CctvStore.setMyPin(pw);
-        _pin = pw;
-        return true;
-      }
-      // 비번이 바뀜 → 기존 접속자 영향 경고 후 확인.
-      if (!mounted) return false;
-      final confirmed = await _confirmPasswordChange();
-      if (confirmed == true) {
-        await CctvStore.setMyPin(pw);
-        _pin = pw;
-        return true;
-      }
-      // 취소 → 다시 입력.
-    }
-  }
-
-  // 비밀번호 입력 다이얼로그. 현재 비번이 있으면 미리 채워 보여준다.
-  Future<String?> _askPassword() {
-    final ctrl = TextEditingController(text: _pin);
-    return showDialog<String>(
+  // 활성 코드가 하나도 없을 때(첫 사용) 첫 코드(이름+비번)를 바로 추가하도록 유도.
+  Future<void> _promptAddFirstCode() async {
+    final nameCtrl = TextEditingController();
+    final pinCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: Text(L.t('cctv_set_password')),
+        title: Text(L.t('cctv_add_code')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,12 +140,26 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                 style: const TextStyle(fontSize: 12, color: Colors.white54)),
             const SizedBox(height: 10),
             TextField(
-              controller: ctrl,
-              autofocus: true,
+              controller: nameCtrl,
+              maxLength: 20,
+              decoration: InputDecoration(
+                labelText: L.t('cctv_code_name'),
+                hintText: L.t('cctv_code_name_hint'),
+                border: const OutlineInputBorder(),
+                counterText: '',
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: pinCtrl,
               keyboardType: TextInputType.number,
               maxLength: 6,
               obscureText: true,
               decoration: InputDecoration(
+                labelText: L.t('cctv_password'),
                 hintText: L.t('cctv_password_new_hint'),
                 border: const OutlineInputBorder(),
                 counterText: '',
@@ -177,43 +167,27 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
               ),
-              onSubmitted: (v) => Navigator.pop(ctx, v),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: Text(L.t('cancel'))),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text),
-              child: Text(L.t('cctv_start'))),
-        ],
-      ),
-    ).whenComplete(ctrl.dispose);
-  }
-
-  // 비번 변경 경고(기존 코드로 접속한 사람은 새 비번으로 다시 접속해야 함).
-  Future<bool?> _confirmPasswordChange() {
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(L.t('cctv_pw_change_title')),
-        content: Text(L.t('cctv_pw_change_msg', {'code': _code})),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
               child: Text(L.t('cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text(L.t('cctv_pw_change_apply'))),
+              child: Text(L.t('cctv_start'))),
         ],
       ),
     );
-  }
-
-  void _snack(String m) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+    final name = nameCtrl.text.trim();
+    final pin = pinCtrl.text.trim();
+    nameCtrl.dispose();
+    pinCtrl.dispose();
+    if (ok == true && pin.isNotEmpty) {
+      await CctvStore.addShareGroup(
+          name.isNotEmpty ? name : L.t('cctv_code_default'), pin);
+    }
   }
 
   @override
@@ -245,6 +219,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
         participantName: 'CCTV',
         identity: 'cam-${DateTime.now().millisecondsSinceEpoch}',
         pin: _pin,
+        pins: _pins, // 활성 그룹들의 비번 집합(서버가 meta.pins 로 저장)
         create: true,
       );
       await _room.connect(d.serverUrl, d.token,
@@ -418,8 +393,12 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     );
   }
 
-  // QR + 코드 + 비밀번호를 하단 시트로 표시(버튼 누를 때만 노출).
-  void _showShareInfo() {
+  // 활성 그룹(코드)별 QR을 하단 시트로 표시(각 QR에 그 그룹 비번 내장 → 스캔 시 바로 접속).
+  Future<void> _showShareInfo() async {
+    final groups = (await CctvStore.shareGroups())
+        .where((g) => g.enabled && g.pin.isNotEmpty)
+        .toList();
+    if (!mounted) return;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0E1116),
@@ -432,31 +411,10 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: SizedBox(
-                      width: 170,
-                      height: 170,
-                      child: PrettyQrView.data(
-                        // 딥링크: 찍으면 앱이 열려 시청화면으로(핀은 앱에서 별도 입력).
-                        data: AppConfig.cctvLink(_code),
-                        decoration: const PrettyQrDecoration(
-                          shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _kv(L.t('cctv_code'), _code),
-                const SizedBox(height: 10),
-                _kv(L.t('cctv_password'), _pin),
-                const SizedBox(height: 16),
+                Text('${L.t('cctv_code')}: $_code',
+                    style: const TextStyle(color: Colors.white54)),
+                const SizedBox(height: 14),
+                for (final g in groups) _groupQrCard(g),
                 Text(
                   L.t('cctv_share_hint'),
                   textAlign: TextAlign.center,
@@ -466,6 +424,40 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // 그룹 하나의 QR 카드(이름 + 비번 내장 QR + 비번 텍스트).
+  Widget _groupQrCard(CctvShareGroup g) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        children: [
+          Text(g.name,
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: SizedBox(
+              width: 160,
+              height: 160,
+              child: PrettyQrView.data(
+                data: AppConfig.cctvLink(_code, pin: g.pin),
+                decoration: const PrettyQrDecoration(
+                  shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _kv(L.t('cctv_password'), g.pin),
+        ],
       ),
     );
   }
