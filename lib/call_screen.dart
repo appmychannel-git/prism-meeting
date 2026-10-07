@@ -55,6 +55,9 @@ class _CallScreenState extends State<CallScreen> {
   // 영상통화는 스피커 기본 on, 음성통화는 이어피스(스피커 off) 기본.
   late bool _speakerOn = widget.video;
   bool _frontCamera = true;
+  // 카메라가 2개 이상(전/후면)인가. 카메라가 성공적으로 켜진 뒤에만 안전하게 판정한다.
+  // 1개뿐이면 전환 버튼은 의미가 없어(같은 카메라 재초기화로 잠깐 깜빡일 뿐) 숨긴다.
+  bool _multiCamera = false;
   bool _peerWasHere = false;
   bool _leaving = false;
 
@@ -150,11 +153,7 @@ class _CallScreenState extends State<CallScreen> {
       if (mounted) setState(() => _micOn = false);
     }
     if (widget.video) {
-      try {
-        await lp?.setCameraEnabled(true).timeout(const Duration(seconds: 8));
-      } catch (_) {
-        if (mounted) setState(() => _camOn = false);
-      }
+      await _enableCameraOnConnect(lp);
     }
     // 카메라 상하반전 기기는 플래그를 알려 상대가 내 영상을 180° 회전해 보게 한다.
     if (AppSettings.cameraFlip180) {
@@ -202,6 +201,59 @@ class _CallScreenState extends State<CallScreen> {
     } catch (_) {}
   }
 
+  // 카메라 없는/고장난 기기(일부 TV박스·스탠드TV)에서 카메라 서비스 호출
+  // (videoInputs/setCameraEnabled)이 네이티브 메인스레드를 블록해 통화가 00:00 에
+  // 굳고 결국 끊기던 문제 방지. 이런 "phantom camera" 기기는 카메라 feature 를 보고하고
+  // 열거(videoInputs)조차 멈춰, Dart timeout 으로도 끊을 수 없다. 그래서 유일하게 안전한
+  // 신호인 사용자 설정(AppSettings.startCameraOnJoin — 카메라 없는 기기는 OFF, 또는
+  // 지난 멈춤 후 자동 OFF)으로 판단해, OFF면 카메라를 "아예 건드리지 않고" 영상 없이
+  // (음성 송신 + 상대 영상 수신) 통화한다. room_screen 과 동일한 원리.
+  Future<void> _enableCameraOnConnect(LocalParticipant? lp) async {
+    if (lp == null) return;
+    // 직전 카메라 시도가 멈춘 채 종료된 흔적이 있으면 → 이 기기 카메라는 못 쓰므로
+    // 자동 켜기를 영구히 끄고(다음부턴 음성통화로 바로 진행) 재멈춤을 막는다.
+    if (AppSettings.camAttemptPending) {
+      await AppSettings.setCamAttemptPending(false);
+      await AppSettings.setStartCameraOnJoin(false);
+      if (mounted) setState(() => _camOn = false);
+      return;
+    }
+    // 카메라 자동 켜기 OFF(카메라 없는/고장 기기) → 카메라 서비스를 호출하지 않는다.
+    if (!AppSettings.startCameraOnJoin) {
+      if (mounted) setState(() => _camOn = false);
+      return;
+    }
+    await _tryEnableCamera(lp);
+  }
+
+  // 카메라 켜기 공통: open 이 메인스레드를 블록해 굳을 수 있으므로 "진행 중" 플래그를
+  // 디스크에 남겨(멈춘 채 강제종료돼도 다음 실행이 감지), 켜기를 시도한다.
+  Future<void> _tryEnableCamera(LocalParticipant? lp) async {
+    if (lp == null) return;
+    await AppSettings.setCamAttemptPending(true);
+    try {
+      await lp.setCameraEnabled(true).timeout(const Duration(seconds: 8));
+      if (mounted) setState(() => _camOn = true);
+      // 카메라가 열렸으니(카메라 서비스 응답) 이제 안전하게 개수를 센다.
+      // 2개 이상일 때만 전/후면 전환 버튼을 보여준다(1개뿐이면 전환 무의미).
+      await _detectMultiCamera();
+    } catch (_) {
+      if (mounted) setState(() => _camOn = false);
+    }
+    await AppSettings.setCamAttemptPending(false);
+  }
+
+  // 사용 가능한 카메라가 2개 이상인지 판정(카메라가 켜진 뒤에만 호출 — 열거가 안전).
+  Future<void> _detectMultiCamera() async {
+    try {
+      final cams = await Hardware.instance
+          .videoInputs()
+          .timeout(const Duration(seconds: 5));
+      // videoInputs()는 영상 입력 장치만 돌려준다. 2개 이상이면 전/후면 전환 가능.
+      if (mounted) setState(() => _multiCamera = cams.length >= 2);
+    } catch (_) {}
+  }
+
   Future<void> _toggleMic() async {
     final next = !_micOn;
     setState(() => _micOn = next);
@@ -214,12 +266,24 @@ class _CallScreenState extends State<CallScreen> {
 
   Future<void> _toggleCam() async {
     final next = !_camOn;
-    setState(() => _camOn = next);
-    try {
-      await _room.localParticipant?.setCameraEnabled(next);
-    } catch (_) {
-      if (mounted) setState(() => _camOn = !next);
+    if (next) {
+      // 켜기(사용자 명시적): 직전 시도가 멈춘 흔적이 있으면 보호를 위해 켜지 않는다.
+      if (AppSettings.camAttemptPending) {
+        await AppSettings.setCamAttemptPending(false);
+        if (mounted) setState(() => _camOn = false);
+        return;
+      }
+      setState(() => _camOn = true);
+      await _tryEnableCamera(_room.localParticipant);
+      return;
     }
+    // 끄기.
+    setState(() => _camOn = false);
+    try {
+      await _room.localParticipant
+          ?.setCameraEnabled(false)
+          .timeout(const Duration(seconds: 8));
+    } catch (_) {}
   }
 
   Future<void> _hangup() async {
@@ -463,12 +527,14 @@ class _CallScreenState extends State<CallScreen> {
               bg: _camOn ? const Color(0xFF2E3742) : const Color(0xFF5A3A3A),
               onTap: _toggleCam,
             ),
-            _btn(
-              icon: Icons.cameraswitch,
-              label: L.t('cam_flip'),
-              bg: const Color(0xFF2E3742),
-              onTap: _flipCamera,
-            ),
+            // 전/후면 전환은 카메라가 켜져 있고 2개 이상일 때만(1개뿐이면 무의미).
+            if (_camOn && _multiCamera)
+              _btn(
+                icon: Icons.cameraswitch,
+                label: L.t('cam_flip'),
+                bg: const Color(0xFF2E3742),
+                onTap: _flipCamera,
+              ),
           ],
           _btn(
             icon: Icons.call_end,

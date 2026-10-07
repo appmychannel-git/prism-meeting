@@ -119,60 +119,74 @@ class _SplashGateState extends State<_SplashGate> {
 
   @override
   Widget build(BuildContext context) {
-    if (_done) return widget.child;
+    // 가로(TV)이고 브랜드 전용 이미지가 있을 때만 4초 브랜드 스플래시를 띄운다.
+    // 모바일(세로)은 가로형 이미지가 잘리므로 Flutter 스플래시를 생략하고
+    // OS 네이티브 스플래시만 쓴다. 전용 이미지가 없는 브랜드(prism)도 네이티브만.
+    final useSplash = AppConfig.splashImage.isNotEmpty &&
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (_done || !useSplash) return widget.child;
     return const _SplashScreen();
   }
 }
 
-/// 스플래시 화면: 가운데 브랜드 아이콘·이름, 우측 상단 버전.
+/// 스플래시 화면 — 가로(TV)에서 브랜드 전용 이미지(`assets/splash/<brand>`)를
+/// 꽉 채워 보여준다(네이티브 스플래시와 동일한 브랜드 화면). 우측 상단에 버전 표시.
+/// (모바일 세로·전용 이미지 없는 브랜드는 [_SplashGate]에서 이 화면을 아예 띄우지
+///  않고 네이티브 스플래시만 쓴다.)
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
+
+  /// 'FEEE19' 같은 6자리 hex → Color. 실패/빈 값이면 검정.
+  Color _bgColor() {
+    final hex = AppConfig.splashBg.trim();
+    if (hex.length == 6) {
+      final v = int.tryParse(hex, radix: 16);
+      if (v != null) return Color(0xFF000000 | v);
+    }
+    return Colors.black;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E1116),
+      backgroundColor: _bgColor(),
       body: Stack(
         children: [
-          // 우측 상단 버전 정보
+          // 브랜드 이미지 — 화면을 꽉 채운다(가로 TV 기준).
+          Positioned.fill(
+            child: Image.asset(
+              'assets/splash/${AppConfig.splashImage}',
+              fit: BoxFit.cover,
+              // 에셋 누락 등 로드 실패 시 배경색만.
+              errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+            ),
+          ),
+          // 우측 상단 버전 정보 — 어떤 배경에서도 보이도록 반투명 어두운 칩.
           Positioned(
             top: 0,
             right: 0,
             child: SafeArea(
               child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  'v${AppConfig.appVersion}',
-                  style: const TextStyle(
-                    color: Colors.white54,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
+                padding: const EdgeInsets.all(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    'v${AppConfig.appVersion}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          // 가운데 브랜드 아이콘 + 이름
-          Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.video_camera_front_rounded,
-                  size: 72,
-                  color: Color(0xFF5B8DEF),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  AppConfig.appBrand,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
             ),
           ),
         ],

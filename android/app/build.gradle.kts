@@ -49,6 +49,8 @@ android {
         // host는 공통, path는 flavor에서 /apps/meeting/<brand>/ 로 덮어씀.
         manifestPlaceholders["deepLinkHost"] = "androidtv.mychannel.co.kr"
         manifestPlaceholders["deepLinkPath"] = "/apps/meeting/prism/"
+        // TV 런처 배너(매니페스트 android:banner). 기본은 런처 아이콘, 전용 배너가 있는 flavor만 덮어씀.
+        manifestPlaceholders["appBanner"] = "@mipmap/ic_launcher"
         // Firestore/Firebase 등 메서드 수가 많아 64K DEX 한계 회피.
         multiDexEnabled = true
     }
@@ -75,6 +77,7 @@ android {
             applicationId = "kr.co.mychannel.meeting.viewplus"
             manifestPlaceholders["appLabel"] = "Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/viewplus/"
+            manifestPlaceholders["appBanner"] = "@drawable/banner"
         }
         create("mychannel") {
             dimension = "brand"
@@ -104,8 +107,9 @@ android {
         create("viewpluscctv") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.cctv.viewplus"
-            manifestPlaceholders["appLabel"] = "Viewplus CCTV"
+            manifestPlaceholders["appLabel"] = "CCTV"
             manifestPlaceholders["deepLinkPath"] = "/apps/cctv/viewplus/"
+            manifestPlaceholders["appBanner"] = "@drawable/banner"
         }
         create("freedomcctv") {
             dimension = "brand"

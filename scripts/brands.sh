@@ -20,6 +20,10 @@ brand_config() {
   SERVER_STT=false  # 서버측 STT(자막봇) 사용. TV·셋톱 등 언어팩 없는 기기용. 예: freedom=true
   # 마켓앱 로그인 연동(안드로이드TV). 전 브랜드 적용. 마켓 없으면(모바일/웹) 미차단.
   USE_STORE_LOGIN=true
+  # 시작 스플래시 — 브랜드 전용 이미지(assets/splash/<값>.png)가 있는 브랜드만 지정.
+  # 빈 값이면 기본(브랜드명+아이콘) 다크 스플래시. SPLASH_BG=이미지 뒤 여백 배경색(hex).
+  SPLASH_IMAGE=""
+  SPLASH_BG=""
   case "$1" in
     #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
@@ -31,9 +35,22 @@ brand_config() {
     freedom)      APP_BRAND="Freedom Meeting"  ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=true ; START_CAMERA=true;  E2EE=false; DEFAULT_LANG="en"; SERVER_STT=true ;;
     # ── CCTV 전용 앱(회의/친구 없음, 홈=CCTV) ──
     gbledcctv)    APP_BRAND="글로벌 CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
-    viewpluscctv) APP_BRAND="Viewplus CCTV"   ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
+    viewpluscctv) APP_BRAND="CCTV"   ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
     freedomcctv)  APP_BRAND="Freedom CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true; DEFAULT_LANG="en" ;;
     *) echo "알 수 없는 브랜드: $1  ($BRAND_LIST|all)"; exit 1 ;;
+  esac
+  # 브랜드 전용 스플래시 이미지(assets/splash/<값> 번들됨, 확장자 포함). 배경색은 해당
+  # flavor 의 ic_launcher_background 와 맞춘다(이미지 여백 색). prism 은 전용 이미지가
+  # 없어 기본 다크 스플래시를 쓴다.
+  case "$1" in
+    gbled)        SPLASH_IMAGE="gbled.jpg";        SPLASH_BG="0082F8" ;;
+    viewplus)     SPLASH_IMAGE="viewplus.jpg";     SPLASH_BG="FEEE19" ;;
+    mychannel)    SPLASH_IMAGE="mychannel.png";    SPLASH_BG="5E86A6" ;;
+    ecoglow)      SPLASH_IMAGE="ecoglow.jpg";      SPLASH_BG="FFFFFF" ;;
+    freedom)      SPLASH_IMAGE="freedom.jpg";      SPLASH_BG="161616" ;;
+    gbledcctv)    SPLASH_IMAGE="gbledcctv.jpg";    SPLASH_BG="0082F8" ;;
+    viewpluscctv) SPLASH_IMAGE="viewpluscctv.png"; SPLASH_BG="FEEE19" ;;
+    freedomcctv)  SPLASH_IMAGE="freedomcctv.jpg";  SPLASH_BG="161616" ;;
   esac
 }
 

@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.7+7
+version: 1.0.9+9
 
 environment:
   sdk: ^3.11.5
@@ -90,6 +90,8 @@ flutter:
   # 수신 통화 벨소리(앱 내 반복 재생용).
   assets:
     - assets/sounds/
+    # 브랜드별 시작 스플래시 이미지(브랜드 전용 splash.png가 있는 빌드만 사용).
+    - assets/splash/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

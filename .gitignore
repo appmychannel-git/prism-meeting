@@ -52,3 +52,7 @@ app.*.map.json
 
 # 브랜드별 Firebase 설정(로컬만 유지)
 ios/firebase/*/GoogleService-Info.plist
+
+# 작업용 스크래치(아이콘 백업/배너 작업파일) — 커밋 제외
+_backup/
+_work/

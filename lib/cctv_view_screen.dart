@@ -7,6 +7,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'config.dart';
 import 'connection_service.dart';
 import 'device_quirks.dart';
+import 'directory.dart';
 import 'l10n.dart';
 
 /// CCTV 시청 화면 — 카메라 방을 구독만(영상만 봄).
@@ -28,6 +29,13 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   String? _error;
   bool _leaving = false;
   Timer? _continueTimer;
+
+  // ── 연결 대기 타임아웃 ──
+  // 방에는 붙었지만 호스트(카메라)가 일정 시간 영상을 안 보내면 "연결할 수 없음" 안내.
+  // (호스트가 꺼져 있거나, 코드가 만료/재생성돼 아무도 송출하지 않는 경우)
+  Timer? _waitTimer;
+  bool _timedOut = false;
+  static const int _waitTimeoutSec = 15;
 
   // 시청 확인 주기(분).
   static const int _continueMinutes = 5;
@@ -59,6 +67,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   @override
   void dispose() {
     _continueTimer?.cancel();
+    _waitTimer?.cancel();
     WakelockPlus.disable();
     if (_roomReady) {
       _listener.dispose();
@@ -68,7 +77,69 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   }
 
   void _refresh() {
+    // 호스트 영상이 들어오면 대기 타임아웃 해제.
+    if (_remoteCam() != null) {
+      _waitTimer?.cancel();
+      _timedOut = false;
+    }
     if (mounted) setState(() {});
+  }
+
+  // 방 연결 후 호스트 영상 대기 타이머 시작(이미 오면 즉시 해제됨).
+  void _startWaitTimer() {
+    _waitTimer?.cancel();
+    _timedOut = false;
+    _waitTimer = Timer(const Duration(seconds: _waitTimeoutSec), () {
+      if (mounted && _remoteCam() == null) setState(() => _timedOut = true);
+    });
+  }
+
+  // "연결할 수 없음"에서 재시도 — 호스트를 다시 깨우고 대기 타이머 재시작.
+  void _retry() {
+    final code = widget.roomId.startsWith('cctv-')
+        ? widget.roomId.substring(5)
+        : widget.roomId;
+    DirectoryService.requestCctvWake(code);
+    setState(() => _timedOut = false);
+    _startWaitTimer();
+  }
+
+  // 호스트가 응답 없을 때(꺼짐/코드 만료) 표시하는 안내 + 재시도/닫기.
+  Widget _unreachableView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.videocam_off_outlined,
+                size: 44, color: Color(0xFFFF8A80)),
+            const SizedBox(height: 12),
+            Text(
+              L.t('cctv_unreachable'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FilledButton.icon(
+                  onPressed: _retry,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(L.t('retry')),
+                ),
+                const SizedBox(width: 12),
+                TextButton(
+                  onPressed: _end,
+                  child: Text(L.t('close')),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _connect() async {
@@ -87,6 +158,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
       await _room.connect(d.serverUrl, d.token,
           connectOptions: const ConnectOptions(autoSubscribe: true));
       if (mounted) setState(() => _connecting = false);
+      _startWaitTimer();
       _scheduleContinuePrompt();
     } catch (e) {
       if (mounted) {
@@ -226,22 +298,24 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
                                       fit: VideoViewFit.contain))
                               : VideoTrackRenderer(cam,
                                   fit: VideoViewFit.contain))
-                          : Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const CircularProgressIndicator(),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    _connecting
-                                        ? L.t('call_connecting')
-                                        : L.t('cctv_waiting'),
-                                    style:
-                                        const TextStyle(color: Colors.white70),
+                          : _timedOut
+                              ? _unreachableView()
+                              : Center(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const CircularProgressIndicator(),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        _connecting
+                                            ? L.t('call_connecting')
+                                            : L.t('cctv_waiting'),
+                                        style: const TextStyle(
+                                            color: Colors.white70),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                            ),
+                                ),
                     ),
                     Positioned(
                       right: 12,

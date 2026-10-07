@@ -20,7 +20,7 @@ import 'package:flutter/foundation.dart'
 class AppConfig {
   /// 앱 표시 버전. 입장 화면 우측 상단에 노출한다.
   /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
-  static const String appVersion = '1.0.7';
+  static const String appVersion = '1.0.9';
 
   /// 앱 표시 브랜드명(브라우저 타이틀 + 입장화면 제목).
   /// 기본 'Prism Meeting'. 거래처 시연 등 브랜드를 숨길 땐
@@ -52,6 +52,22 @@ class AppConfig {
   static const bool startCamera = bool.fromEnvironment(
     'START_CAMERA',
     defaultValue: true,
+  );
+
+  /// 시작 스플래시에 쓸 브랜드 이미지 파일명(확장자 포함, `assets/splash/<값>`).
+  /// 예: 'viewplus.jpg', 'viewpluscctv.png'. 빈 값이면 기본(브랜드명+아이콘) 다크
+  /// 스플래시를 쓴다. 브랜드 전용 splash 가 있는 빌드만 build_brand.sh/build_web.sh
+  /// 가 `--dart-define=SPLASH_IMAGE=<brand.ext>` 로 넘긴다.
+  static const String splashImage = String.fromEnvironment(
+    'SPLASH_IMAGE',
+    defaultValue: '',
+  );
+
+  /// 스플래시 이미지 뒤 배경색(6자리 hex, 예: 'FEEE19'). 이미지 종횡비가
+  /// 화면과 달라 여백이 생길 때 그 여백 색. 빈 값이면 검정.
+  static const String splashBg = String.fromEnvironment(
+    'SPLASH_BG',
+    defaultValue: '',
   );
 
   /// 마켓앱 로그인 연동(안드로이드TV). true면 기동 시 마켓앱의

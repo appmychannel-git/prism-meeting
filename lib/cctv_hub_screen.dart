@@ -10,6 +10,7 @@ import 'config.dart';
 import 'confirm_dialog.dart';
 import 'device_id.dart';
 import 'directory.dart';
+import 'fullscreen_perm.dart';
 import 'l10n.dart';
 import 'scan_screen.dart';
 import 'share_qr.dart';
@@ -23,6 +24,7 @@ class CctvHubScreen extends StatefulWidget {
 
 class _CctvHubScreenState extends State<CctvHubScreen> {
   final _nameCtrl = TextEditingController();
+  final _noteCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   List<CctvEntry> _saved = [];
@@ -37,13 +39,44 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   void initState() {
     super.initState();
     _load();
-    if (AppConfig.cctvOnly) _initDeepLinks();
+    if (AppConfig.cctvOnly) {
+      _initDeepLinks();
+      // Android 14+ 전체화면 인텐트 권한 안내(1회). 이 권한이 없으면 대기모드에서
+      // 시청자가 재생을 눌러도 원격 켜기 알림이 화면을 깨우지 못하고 소리만 난다.
+      // (미팅앱은 join_screen 에서 안내하지만 CCTV 전용 앱은 홈이 이 화면이라 여기서.)
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _maybePromptFullScreen());
+    }
+  }
+
+  // 전체화면 알림 권한이 없으면(대기모드에서 원격 켜기가 화면을 못 깨움) 설정으로 안내.
+  Future<void> _maybePromptFullScreen() async {
+    if (await FullScreenPerm.canUse() || !mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('fs_perm_title_cctv')),
+        content: Text(L.t('fs_perm_desc_cctv')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(L.t('later')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(L.t('open_settings')),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) FullScreenPerm.openSettings();
   }
 
   @override
   void dispose() {
     _linkSub?.cancel();
     _nameCtrl.dispose();
+    _noteCtrl.dispose();
     _codeCtrl.dispose();
     _pinCtrl.dispose();
     super.dispose();
@@ -184,14 +217,78 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       return;
     }
     final name = _nameCtrl.text.trim().isNotEmpty ? _nameCtrl.text.trim() : code;
-    final e = CctvEntry(code: code, pin: pin, name: name);
+    final note = _noteCtrl.text.trim();
+    final e = CctvEntry(code: code, pin: pin, name: name, note: note);
     await CctvStore.add(e); // 저장 → 다음부턴 목록에서 원터치
     _nameCtrl.clear();
+    _noteCtrl.clear();
     _codeCtrl.clear();
     _pinCtrl.clear();
     await _load();
     if (!mounted) return;
     _open(e);
+  }
+
+  /// 저장된 CCTV의 이름·메모 편집.
+  Future<void> _editEntry(CctvEntry e) async {
+    final nameCtrl = TextEditingController(text: e.name == e.code ? '' : e.name);
+    final noteCtrl = TextEditingController(text: e.note);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: Text(L.t('cctv_edit')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              maxLength: 20,
+              decoration: InputDecoration(
+                labelText: L.t('cctv_name'),
+                hintText: L.t('cctv_name_hint'),
+                border: const OutlineInputBorder(),
+                counterText: '',
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: noteCtrl,
+              maxLength: 40,
+              decoration: InputDecoration(
+                labelText: L.t('cctv_note'),
+                hintText: L.t('cctv_note_hint'),
+                border: const OutlineInputBorder(),
+                counterText: '',
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(L.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true), child: Text(L.t('ok'))),
+        ],
+      ),
+    );
+    final newName = nameCtrl.text.trim();
+    final newNote = noteCtrl.text.trim();
+    nameCtrl.dispose();
+    noteCtrl.dispose();
+    if (saved != true) return;
+    await CctvStore.add(e.copyWith(
+      name: newName.isNotEmpty ? newName : e.code,
+      note: newNote,
+    ));
+    await _load();
   }
 
   @override
@@ -258,12 +355,19 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
               child: ListTile(
                 leading: const Icon(Icons.videocam),
                 title: Text(e.name),
-                subtitle:
-                    Text(e.code, style: const TextStyle(fontSize: 12)),
+                subtitle: Text(
+                  e.note.isNotEmpty ? e.note : e.code,
+                  style: const TextStyle(fontSize: 12),
+                ),
                 onTap: () => _open(e),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      tooltip: L.t('cctv_edit'),
+                      onPressed: () => _editEntry(e),
+                    ),
                     IconButton(
                       icon: const Icon(Icons.play_arrow),
                       tooltip: L.t('cctv_start_view'),
@@ -300,6 +404,16 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
             border: const OutlineInputBorder(),
           ),
         ),
+        TextField(
+          controller: _noteCtrl,
+          maxLength: 40,
+          decoration: InputDecoration(
+            labelText: L.t('cctv_note'),
+            hintText: L.t('cctv_note_hint'),
+            border: const OutlineInputBorder(),
+          ),
+        ),
+        const SizedBox(height: 4),
         TextField(
           controller: _codeCtrl,
           decoration: InputDecoration(

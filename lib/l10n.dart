@@ -327,6 +327,9 @@ class L {
     'cctv_add_view': {'ko': '추가하고 시청', 'en': 'Add & view'},
     'cctv_name': {'ko': '이름(선택)', 'en': 'Name (optional)'},
     'cctv_name_hint': {'ko': '예: 거실 TV', 'en': 'e.g. Living room TV'},
+    'cctv_note': {'ko': '메모(선택)', 'en': 'Memo (optional)'},
+    'cctv_note_hint': {'ko': '예: 매장 입구 / 2층', 'en': 'e.g. Store entrance'},
+    'cctv_edit': {'ko': '이름·메모 편집', 'en': 'Edit name & memo'},
     'cctv_live_badge': {'ko': 'CCTV', 'en': 'CCTV'},
     'cctv_dim_hint': {
       'ko': 'CCTV (화면 절전) · 탭하여 화면 켜기',
@@ -356,6 +359,11 @@ class L {
     },
     'cctv_viewers': {'ko': '시청자 {n}명', 'en': '{n} viewer(s)'},
     'cctv_waiting': {'ko': '카메라 신호 대기 중...', 'en': 'Waiting for camera...'},
+    'cctv_unreachable': {
+      'ko': '연결할 수 없습니다.\n기기가 꺼져 있거나 코드가 만료됐을 수 있어요.',
+      'en': "Can't connect.\nThe device may be off or the code may have expired.",
+    },
+    'retry': {'ko': '재시도', 'en': 'Retry'},
     'cctv_continue_title': {'ko': '계속 시청', 'en': 'Keep watching'},
     'cctv_continue_msg': {
       'ko': '계속 시청하시겠습니까? (응답이 없으면 자동 종료됩니다)',
@@ -428,6 +436,15 @@ class L {
           '설정을 열어 허용해 주세요. (허용 전엔 상단 알림으로만 표시됩니다)',
       'en': 'To ring on the lock screen, allow "full-screen notifications". '
           'Open settings to enable it. (Otherwise it shows only as a banner.)',
+    },
+    'fs_perm_title_cctv': {'ko': '원격 켜기 권한', 'en': 'Remote wake permission'},
+    'fs_perm_desc_cctv': {
+      'ko': '대기화면에서도 시청자가 재생을 누르면 CCTV가 자동으로 켜지려면 '
+          '"전체 화면 알림"을 허용해야 합니다. 설정을 열어 허용해 주세요. '
+          '(허용 전엔 알림만 울리고 화면이 켜지지 않습니다)',
+      'en': 'To auto-start CCTV from standby when a viewer taps play, allow '
+          '"full-screen notifications". Open settings to enable it. '
+          '(Otherwise it only rings and the screen stays off.)',
     },
     'fs_perm_menu': {'ko': '통화 알림 설정', 'en': 'Call notification settings'},
     'fs_perm_menu_sub': {

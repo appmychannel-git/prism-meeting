@@ -10,13 +10,28 @@ class CctvEntry {
   final String code; // cctv- 제외한 코드
   final String pin;
   final String name;
-  const CctvEntry({required this.code, required this.pin, required this.name});
+  final String note; // 사용자 메모(목록 둘째 줄). 비면 코드를 대신 표시.
+  const CctvEntry({
+    required this.code,
+    required this.pin,
+    required this.name,
+    this.note = '',
+  });
 
-  Map<String, dynamic> toJson() => {'code': code, 'pin': pin, 'name': name};
+  Map<String, dynamic> toJson() =>
+      {'code': code, 'pin': pin, 'name': name, 'note': note};
   factory CctvEntry.fromJson(Map<String, dynamic> j) => CctvEntry(
         code: (j['code'] ?? '').toString(),
         pin: (j['pin'] ?? '').toString(),
         name: (j['name'] ?? '').toString(),
+        note: (j['note'] ?? '').toString(),
+      );
+
+  CctvEntry copyWith({String? name, String? note}) => CctvEntry(
+        code: code,
+        pin: pin,
+        name: name ?? this.name,
+        note: note ?? this.note,
       );
 
   String get roomId => 'cctv-$code';
