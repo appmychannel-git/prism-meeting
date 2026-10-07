@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:app_links/app_links.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
@@ -91,6 +92,9 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       final initial = await _appLinks!.getInitialLink();
       if (initial != null) _onLink(initial);
     } catch (_) {}
+    // 웹: app_links 가 쿼리(?cctv=&pin=)를 못 넘기는 경우 대비해 현재 URL 에서도 읽는다
+    // (같은 URL 이면 _lastLink 로 중복 무시).
+    if (kIsWeb) _onLink(Uri.base);
     _linkSub = _appLinks!.uriLinkStream.listen(_onLink);
   }
 

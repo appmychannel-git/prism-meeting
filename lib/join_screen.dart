@@ -137,16 +137,17 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
       return;
     }
 
-    // CCTV 딥링크(CCTV 공유 QR): ...?cctv=<코드> → 앱에서 시청화면으로 이동.
-    // 보안상 핀은 링크에 없으므로 앱에서 별도 입력받는다.
+    // CCTV 딥링크(CCTV 공유 QR): ...?cctv=<코드>[&pin=<비번>] → 시청화면으로 이동.
+    // 그룹 QR은 pin 도 함께 담겨 있어 비번 입력 없이 바로 접속한다.
     final cctv = uri.queryParameters['cctv'];
     if (cctv != null && cctv.trim().isNotEmpty) {
       final key = uri.toString();
       if (key == _lastProcessedLinkKey) return;
       _lastProcessedLinkKey = key;
       final code = cctv.trim();
+      final cctvPin = uri.queryParameters['pin'];
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _handleCctvLink(code);
+        if (mounted) _handleCctvLink(code, pin: cctvPin?.trim());
       });
       return;
     }
@@ -189,16 +190,21 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   }
 
   // CCTV 딥링크로 앱이 열렸을 때: 비밀번호(핀) 입력 → 시청화면.
-  Future<void> _handleCctvLink(String code) async {
+  Future<void> _handleCctvLink(String code, {String? pin}) async {
     if (!AppConfig.cctvEnabled) return; // CCTV 없는 브랜드는 무시
-    final pin = await _promptCctvPin();
-    if (pin == null || pin.trim().isEmpty || !mounted) return;
+    // 그룹 QR은 링크에 비번이 담겨 있으면 그대로 사용, 없으면 직접 입력받는다.
+    var p = pin;
+    if (p == null || p.isEmpty) {
+      p = await _promptCctvPin();
+    }
+    if (p == null || p.trim().isEmpty || !mounted) return;
+    final pinV = p.trim();
     // QR로 본 CCTV를 목록에 자동 저장 → 시청화면에서 나와도 목록에 남아 원터치 재시청.
-    await CctvStore.add(CctvEntry(code: code, pin: pin.trim(), name: code));
+    await CctvStore.add(CctvEntry(code: code, pin: pinV, name: code));
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => CctvViewScreen(roomId: 'cctv-$code', pin: pin.trim()),
+        builder: (_) => CctvViewScreen(roomId: 'cctv-$code', pin: pinV),
       ),
     );
   }
