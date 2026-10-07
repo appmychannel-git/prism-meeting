@@ -465,7 +465,9 @@ class PushService with WidgetsBindingObserver {
     // 같은 프레임에 여러 경로(콜드스타트/알림/대기플래그)가 동시에 호출해도
     // 두 번 열리지 않도록 push 직전에 즉시 플래그를 세운다(중복 연결 방지).
     CctvShareScreen.active = true;
-    nav.push(MaterialPageRoute(builder: (_) => const CctvShareScreen()));
+    // 원격 켜기(FCM)는 사용자가 없으므로 비번 입력창을 띄우지 않고 저장된 비번으로 바로 송출.
+    nav.push(MaterialPageRoute(
+        builder: (_) => const CctvShareScreen(promptPassword: false)));
   }
 
   void _onIncomingDoc(CallDoc c) {

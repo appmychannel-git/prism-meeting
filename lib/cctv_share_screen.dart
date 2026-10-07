@@ -18,7 +18,11 @@ import 'push_service.dart';
 /// CCTV 공유(카메라) 화면 — 이 기기 카메라를 송출한다.
 /// 이 화면을 켜둔 동안만 송출(나가면 종료). QR(코드)+비밀번호로 시청자가 접속.
 class CctvShareScreen extends StatefulWidget {
-  const CctvShareScreen({super.key});
+  const CctvShareScreen({super.key, this.promptPassword = true});
+
+  /// 수동으로 "이 기기를 CCTV로 공유"를 눌러 열렸을 땐 true → 송출 전 비밀번호
+  /// 입력/설정 창을 띄운다. 원격 켜기(FCM)로 열렸을 땐 false → 저장된 비번으로 바로 송출.
+  final bool promptPassword;
 
   /// 원격 켜기 중복 실행 방지용(송출 화면이 떠 있는지).
   static bool active = false;
@@ -80,11 +84,20 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   }
 
   Future<void> _init() async {
-    // 이 기기의 고정 코드/비번(최초 1회 생성 후 유지) → 매번 같은 코드로 공유.
+    // 이 기기의 고정 코드 + 저장된 공유 비번(없으면 '').
     final (code, pin) = await CctvStore.myShareCredentials();
     _code = code;
     _roomId = 'cctv-$code';
     _pin = pin;
+    // 수동 공유: 송출 전 비밀번호 설정/확인 창. (원격 켜기는 저장된 비번으로 바로 송출)
+    if (widget.promptPassword) {
+      final ok = await _promptSharePassword();
+      if (!ok) {
+        // 취소 → 송출하지 않고 화면 닫기.
+        if (mounted) Navigator.of(context).maybePop();
+        return;
+      }
+    }
     // E2EE(옵션): 비밀번호를 공유키로.
     final e2ee = (AppConfig.e2ee && pin.isNotEmpty)
         ? await E2EEOptions.sharedKey('$_roomId:$pin')
@@ -103,6 +116,104 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       ..on<ParticipantDisconnectedEvent>((_) => _updateViewers());
     _roomReady = true;
     await _connect();
+  }
+
+  // 송출 시작 전 비밀번호 설정/확인. 바뀌면 경고. true=진행(송출), false=취소(닫기).
+  Future<bool> _promptSharePassword() async {
+    while (true) {
+      if (!mounted) return false;
+      final typed = await _askPassword();
+      if (typed == null) return false; // 취소
+      final pw = typed.trim();
+      if (pw.isEmpty) {
+        _snack(L.t('cctv_need_password'));
+        continue;
+      }
+      // 첫 설정이거나 기존과 동일 → 그대로 적용하고 진행.
+      if (_pin.isEmpty || pw == _pin) {
+        await CctvStore.setMyPin(pw);
+        _pin = pw;
+        return true;
+      }
+      // 비번이 바뀜 → 기존 접속자 영향 경고 후 확인.
+      if (!mounted) return false;
+      final confirmed = await _confirmPasswordChange();
+      if (confirmed == true) {
+        await CctvStore.setMyPin(pw);
+        _pin = pw;
+        return true;
+      }
+      // 취소 → 다시 입력.
+    }
+  }
+
+  // 비밀번호 입력 다이얼로그. 현재 비번이 있으면 미리 채워 보여준다.
+  Future<String?> _askPassword() {
+    final ctrl = TextEditingController(text: _pin);
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: Text(L.t('cctv_set_password')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${L.t('cctv_code')}: $_code',
+                style: const TextStyle(fontSize: 12, color: Colors.white54)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: L.t('cctv_password_new_hint'),
+                border: const OutlineInputBorder(),
+                counterText: '',
+                isDense: true,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              ),
+              onSubmitted: (v) => Navigator.pop(ctx, v),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx), child: Text(L.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text),
+              child: Text(L.t('cctv_start'))),
+        ],
+      ),
+    ).whenComplete(ctrl.dispose);
+  }
+
+  // 비번 변경 경고(기존 코드로 접속한 사람은 새 비번으로 다시 접속해야 함).
+  Future<bool?> _confirmPasswordChange() {
+    return showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(L.t('cctv_pw_change_title')),
+        content: Text(L.t('cctv_pw_change_msg', {'code': _code})),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(L.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(L.t('cctv_pw_change_apply'))),
+        ],
+      ),
+    );
+  }
+
+  void _snack(String m) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
   }
 
   @override

@@ -308,6 +308,10 @@ class L {
     'unblock': {'ko': '차단 해제', 'en': 'Unblock'},
     'blocked_list': {'ko': '차단 목록', 'en': 'Blocked'},
     'blocked_empty': {'ko': '차단한 사람이 없습니다.', 'en': 'No blocked people.'},
+    'show_blocked': {'ko': '차단 포함', 'en': 'Show blocked'},
+    'blocked_label': {'ko': '차단됨', 'en': 'Blocked'},
+    'blocked_snack': {'ko': '차단했습니다', 'en': 'Blocked'},
+    'unblocked_snack': {'ko': '차단을 해제했습니다', 'en': 'Unblocked'},
     // ── CCTV ──
     'menu_cctv': {'ko': 'CCTV', 'en': 'CCTV'},
     'cctv_share': {'ko': '이 기기를 CCTV로 공유', 'en': 'Share this device as CCTV'},
@@ -321,6 +325,21 @@ class L {
     'cctv_code': {'ko': '코드', 'en': 'Code'},
     'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
     'cctv_enter_pin': {'ko': 'CCTV 비밀번호 입력', 'en': 'Enter CCTV password'},
+    'cctv_set_password': {'ko': 'CCTV 비밀번호 설정', 'en': 'Set CCTV password'},
+    'cctv_password_new_hint': {
+      'ko': '시청자가 입력할 비밀번호',
+      'en': 'Password viewers will enter',
+    },
+    'cctv_need_password': {'ko': '비밀번호를 입력하세요', 'en': 'Enter a password'},
+    'cctv_start': {'ko': '시작', 'en': 'Start'},
+    'cctv_pw_change_title': {'ko': '비밀번호 변경', 'en': 'Change password'},
+    'cctv_pw_change_msg': {
+      'ko': '비밀번호가 다릅니다.\n기존 코드({code})로 접속한 사람들은 '
+          '새 비밀번호로 접속해야 합니다.',
+      'en': 'The password is different.\nViewers who connected with the old '
+          'code ({code}) must reconnect with the new password.',
+    },
+    'cctv_pw_change_apply': {'ko': '변경하고 시작', 'en': 'Change & start'},
     'cctv_start_view': {'ko': '시청 시작', 'en': 'Start viewing'},
     'cctv_my_list': {'ko': '내 CCTV', 'en': 'My CCTV'},
     'cctv_add': {'ko': '새 CCTV 추가', 'en': 'Add CCTV'},

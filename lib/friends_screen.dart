@@ -25,6 +25,11 @@ class _FriendsScreenState extends State<FriendsScreen>
     with WidgetsBindingObserver {
   List<Friend> _friends = [];
   List<Friend> _suggestions = []; // 나를 추가했지만 내가 아직 안 추가한 사람
+  // 차단 상태(uuid 집합) + 친구목록엔 없지만 차단된 사람(과거 차단 — 목록에 함께 표시).
+  Set<String> _blockedUuids = {};
+  List<Friend> _blockedOnly = [];
+  // 차단 내역을 함께 볼지(우측 상단 체크박스). 기본 = 함께 보기.
+  bool _showBlocked = true;
   final Map<String, DeviceStatus> _status = {}; // uuid → 온라인/통화중/이름
   String _myUuid = '';
   String _myName = '';
@@ -69,19 +74,25 @@ class _FriendsScreenState extends State<FriendsScreen>
     // 나를 추가한 사람들 중, 내가 아직 친구로 안 넣은 사람만 추천으로(차단 제외).
     final added = await DirectoryService.whoAddedMe(id);
     final friendIds = fs.map((f) => f.uuid).toSet();
-    final blocked = (await BlockStore.list()).map((f) => f.uuid).toSet();
+    final blockedList = await BlockStore.list();
+    final blocked = blockedList.map((f) => f.uuid).toSet();
     final sugg = added
         .where((f) =>
             f.uuid != id &&
             !friendIds.contains(f.uuid) &&
             !blocked.contains(f.uuid))
         .toList();
+    // 친구목록엔 없지만 차단된 사람(과거 차단)도 목록에 함께 표시.
+    final blockedOnly =
+        blockedList.where((f) => !friendIds.contains(f.uuid)).toList();
     if (!mounted) return;
     setState(() {
       _friends = fs;
       _myUuid = id;
       _myName = nm;
       _suggestions = sugg;
+      _blockedUuids = blocked;
+      _blockedOnly = blockedOnly;
       _loading = false;
     });
     _loadStatuses(fs); // 온라인/통화중 + 이름 동기화(비동기, 뒤에 갱신)
@@ -245,12 +256,45 @@ class _FriendsScreenState extends State<FriendsScreen>
   void _snack(String m) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 
+  /// 목록에 보여줄 친구(+과거 차단자). 활성(안 차단) 먼저, 차단된 사람은 아래로.
+  /// '차단 포함' 체크 해제 시 차단된 사람은 숨긴다.
+  List<Friend> get _displayFriends {
+    final all = [..._friends, ..._blockedOnly];
+    final visible = _showBlocked
+        ? all
+        : all.where((f) => !_blockedUuids.contains(f.uuid)).toList();
+    final active = visible.where((f) => !_blockedUuids.contains(f.uuid));
+    final blocked = visible.where((f) => _blockedUuids.contains(f.uuid));
+    return [...active, ...blocked];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(L.t('menu_friends')),
         actions: [
+          // 우측 상단: 차단 내역 함께 보기 체크박스(기본 켜짐).
+          InkWell(
+            onTap: () => setState(() => _showBlocked = !_showBlocked),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Checkbox(
+                    visualDensity: VisualDensity.compact,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    value: _showBlocked,
+                    onChanged: (v) =>
+                        setState(() => _showBlocked = v ?? true),
+                  ),
+                  Text(L.t('show_blocked'),
+                      style: const TextStyle(fontSize: 13)),
+                ],
+              ),
+            ),
+          ),
           IconButton(
             onPressed: _addByCode,
             icon: const Icon(Icons.dialpad),
@@ -274,7 +318,7 @@ class _FriendsScreenState extends State<FriendsScreen>
                     for (final f in _suggestions) _suggestionTile(f),
                     const Divider(height: 1),
                   ],
-                  if (_friends.isEmpty && _suggestions.isEmpty)
+                  if (_displayFriends.isEmpty && _suggestions.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(48),
                       child: Text(
@@ -284,9 +328,9 @@ class _FriendsScreenState extends State<FriendsScreen>
                       ),
                     )
                   else ...[
-                    if (_friends.isNotEmpty)
+                    if (_displayFriends.isNotEmpty)
                       _sectionHeader(L.t('menu_friends')),
-                    for (final f in _friends) _friendTile(f),
+                    for (final f in _displayFriends) _friendTile(f),
                   ],
                 ],
               ),
@@ -335,8 +379,11 @@ class _FriendsScreenState extends State<FriendsScreen>
   }
 
   Widget _friendTile(Friend f) {
-    final dot = _statusColor(f.uuid);
-    return ListTile(
+    final blocked = _blockedUuids.contains(f.uuid);
+    // 차단된 사람은 온라인 점 숨김(상태 무의미).
+    final dot = blocked ? null : _statusColor(f.uuid);
+    final tile = ListTile(
+      contentPadding: const EdgeInsets.only(left: 16, right: 4),
       leading: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -364,74 +411,73 @@ class _FriendsScreenState extends State<FriendsScreen>
       ),
       title: Text(f.name.isNotEmpty ? f.name : L.t('unnamed')),
       subtitle: Text(
-        f.uuid,
+        blocked ? L.t('blocked_label') : f.uuid,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 11),
+        style: TextStyle(
+          fontSize: blocked ? 12 : 11,
+          color: blocked ? const Color(0xFFFF6B6B) : null,
+        ),
       ),
       onTap: () => _callSheet(f),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          IconButton(
-            icon: const Icon(Icons.call),
-            tooltip: L.t('call_voice'),
-            onPressed: () => _call(f, video: false),
+          // 전화 · 영상통화 · 차단(토글) · 삭제
+          _tileAction(Icons.call, L.t('call_voice'),
+              () => _call(f, video: false)),
+          _tileAction(Icons.videocam, L.t('call_video'),
+              () => _call(f, video: true)),
+          _tileAction(
+            Icons.block,
+            blocked ? L.t('unblock') : L.t('block'),
+            () => _toggleBlock(f),
+            color: blocked ? const Color(0xFFFF6B6B) : Colors.white54,
           ),
-          IconButton(
-            icon: const Icon(Icons.videocam),
-            tooltip: L.t('call_video'),
-            onPressed: () => _call(f, video: true),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (v) {
-              if (v == 'remove') _removeFriend(f);
-              if (v == 'block') _blockFriend(f);
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'remove',
-                child: Row(children: [
-                  const Icon(Icons.delete_outline, size: 20),
-                  const SizedBox(width: 10),
-                  Text(L.t('remove_friend')),
-                ]),
-              ),
-              PopupMenuItem(
-                value: 'block',
-                child: Row(children: [
-                  const Icon(Icons.block, size: 20, color: Color(0xFFFF6B6B)),
-                  const SizedBox(width: 10),
-                  Text(L.t('block')),
-                ]),
-              ),
-            ],
-          ),
+          _tileAction(Icons.delete_outline, L.t('remove_friend'),
+              () => _deleteFriend(f),
+              color: Colors.white54),
         ],
       ),
     );
+    // 차단된 사람은 흐리게(목록엔 남기되 비활성 느낌).
+    return blocked ? Opacity(opacity: 0.6, child: tile) : tile;
   }
 
-  Future<void> _removeFriend(Friend f) async {
+  // 타일용 컴팩트 아이콘 버튼(한 줄에 4개가 들어가도록 작게).
+  Widget _tileAction(IconData icon, String tooltip, VoidCallback onTap,
+      {Color? color}) {
+    return IconButton(
+      icon: Icon(icon, size: 22, color: color),
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.all(6),
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      onPressed: onTap,
+    );
+  }
+
+  /// 차단 토글 — 친구는 목록에 그대로 두고 차단/해제만 전환(그 사람의 전화만 자동 거절).
+  Future<void> _toggleBlock(Friend f) async {
+    if (_blockedUuids.contains(f.uuid)) {
+      await BlockStore.remove(f.uuid);
+      if (mounted) _snack(L.t('unblocked_snack'));
+    } else {
+      await BlockStore.add(f);
+      if (mounted) _snack(L.t('blocked_snack'));
+    }
+    await _load();
+  }
+
+  /// 친구 삭제 — 목록에서 완전 제거(차단 상태였으면 차단목록에서도 제거 + 서버 관계 제거).
+  Future<void> _deleteFriend(Friend f) async {
     if (!await confirmDialog(context, L.t('confirm_remove_friend'),
         confirmLabel: L.t('remove_friend'))) {
       return;
     }
     await FriendStore.remove(f.uuid);
+    await BlockStore.remove(f.uuid);
     // 서버 관계도 제거해야 복구 로직이 되살리지 않음.
-    await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
-    await _load();
-  }
-
-  /// 친구 목록에서 바로 차단: 차단목록 추가 + 친구 삭제 + 서버 관계 제거.
-  /// (차단하면 그 사람의 전화가 자동 거절되고, 추천에도 안 뜬다.)
-  Future<void> _blockFriend(Friend f) async {
-    if (!await confirmDialog(context, L.t('confirm_block'),
-        confirmLabel: L.t('block'))) {
-      return;
-    }
-    await BlockStore.add(f);
-    await FriendStore.remove(f.uuid);
     await DirectoryService.removeEdge(from: _myUuid, to: f.uuid);
     await _load();
   }

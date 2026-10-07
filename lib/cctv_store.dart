@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -75,19 +74,24 @@ class CctvStore {
     return DateTime.now().millisecondsSinceEpoch - ms < 60000;
   }
 
-  /// 이 기기를 CCTV로 공유할 때 쓰는 **고정** 코드/비번(최초 1회 생성 후 유지).
+  /// 이 기기를 CCTV로 공유할 때 쓰는 **고정 코드** + **사용자가 설정한 비번**.
+  /// 코드는 최초 1회 생성 후 유지. 비번은 송출 화면에서 사용자가 직접 설정하며,
+  /// 아직 설정 전이면 빈 문자열(''). (과거 자동 생성된 비번이 있으면 그대로 반환)
   static Future<(String code, String pin)> myShareCredentials() async {
     final sp = await SharedPreferences.getInstance();
     var code = sp.getString(_kMyCode);
-    var pin = sp.getString(_kMyPin);
     if (code == null || code.isEmpty) {
       code = AppConfig.generateRoomCode();
-      // 보안 강화: 6자리(1,000,000가지). 4자리는 무차별 대입에 취약.
-      pin = (100000 + Random().nextInt(900000)).toString();
       await sp.setString(_kMyCode, code);
-      await sp.setString(_kMyPin, pin);
     }
-    return (code, pin ?? '');
+    final pin = sp.getString(_kMyPin) ?? '';
+    return (code, pin);
+  }
+
+  /// 공유 비밀번호 설정/변경(송출 화면에서 사용자가 지정).
+  static Future<void> setMyPin(String pin) async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.setString(_kMyPin, pin);
   }
 
   // ── 시청 목록 ──
