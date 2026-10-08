@@ -367,6 +367,17 @@ class L {
       'en': 'No codes added yet.',
     },
     'cctv_add_code': {'ko': '코드 추가', 'en': 'Add code'},
+    'cctv_reissue': {'ko': '코드 재발급', 'en': 'Reissue code'},
+    'cctv_reissue_confirm': {
+      'ko': '코드를 재발급할까요?\n기존 코드/QR은 모두 무효가 되고, 시청자는 '
+          '새 QR로 다시 등록해야 합니다. (비밀번호 그룹은 그대로 유지됩니다)',
+      'en': 'Reissue the code?\nThe old code/QRs become invalid and viewers must '
+          're-add the new QR. (Password groups are kept.)',
+    },
+    'cctv_reissue_done': {
+      'ko': '새 코드로 재발급했습니다. 새 QR을 다시 공유하세요.',
+      'en': 'Reissued. Share the new QR codes.',
+    },
     'cctv_default_badge': {
       'ko': '기본 (끌 수 없음)',
       'en': 'Default (always on)',
@@ -424,6 +435,11 @@ class L {
     'cctv_unreachable': {
       'ko': '연결할 수 없습니다.\n기기가 꺼져 있거나 코드가 만료됐을 수 있어요.',
       'en': "Can't connect.\nThe device may be off or the code may have expired.",
+    },
+    // 방없음 안내(그룹 삭제/비활성/비번변경/코드 만료 공통 — 구분하지 않음).
+    'cctv_not_found': {
+      'ko': '이 CCTV에 접속할 수 없습니다.\n삭제되었거나 사용 중지됐을 수 있어요.',
+      'en': "This CCTV is unavailable.\nIt may have been removed or turned off.",
     },
     'retry': {'ko': '재시도', 'en': 'Retry'},
     'cctv_continue_title': {'ko': '계속 시청', 'en': 'Keep watching'},

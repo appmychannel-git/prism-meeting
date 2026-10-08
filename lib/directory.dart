@@ -6,6 +6,9 @@ import 'package:http/http.dart' as http;
 import 'config.dart';
 import 'friends.dart';
 
+/// CCTV 원격 켜기(/cctv-wake) 결과.
+enum CctvWakeResult { sent, notFound, offline, error }
+
 /// 상대 기기의 현재 상태(온라인/통화중/이름).
 class DeviceStatus {
   final String name;
@@ -183,16 +186,54 @@ class DirectoryService {
   }
 
   /// 시청자가 CCTV 기기를 원격으로 깨운다(토큰서버 /cctv-wake → FCM).
-  /// 실패해도 예외 없음(이미 켜져 있으면 그냥 시청됨).
-  static Future<void> requestCctvWake(String code) async {
+  /// 반환값으로 결과를 알려준다(시청자 화면이 "방없음" 안내를 바로 띄우기 위함):
+  ///  - [CctvWakeResult.sent]         깨우기 신호 전송됨(기기가 곧 송출 시작 기대)
+  ///  - [CctvWakeResult.notFound]     등록된 CCTV가 없음(코드 만료/삭제) → 방없음
+  ///  - [CctvWakeResult.offline]      기기 오프라인(토큰 없음)
+  ///  - [CctvWakeResult.error]        네트워크/서버 오류(판단 불가 → 재시도 여지)
+  static Future<CctvWakeResult> requestCctvWake(String code) async {
     final url =
         AppConfig.tokenServerUrl.replaceFirst(RegExp(r'/token/?$'), '/cctv-wake');
+    try {
+      final resp = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'code': code}),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200) return CctvWakeResult.sent;
+      if (resp.statusCode == 404) {
+        // 서버 메시지로 "기기 없음(코드 만료/삭제)"과 "오프라인"을 구분.
+        var msg = '';
+        try {
+          final j = jsonDecode(resp.body);
+          if (j is Map && j['error'] != null) msg = j['error'].toString();
+        } catch (_) {}
+        return msg.contains('오프라인')
+            ? CctvWakeResult.offline
+            : CctvWakeResult.notFound;
+      }
+      return CctvWakeResult.error;
+    } catch (_) {
+      return CctvWakeResult.error;
+    }
+  }
+
+  /// CCTV 공유 비번(그룹) 집합을 서버 방 메타데이터에 **즉시** 반영한다(방 삭제 없이).
+  /// 송출 중이거나 방이 아직 잔존(EMPTY_SEC)할 때 그룹 토글/삭제/비번변경이 바로 적용돼,
+  /// 비활성/삭제된 비번으로는 새 시청자가 들어오지 못한다. 방이 없으면 서버가 무시(noop).
+  /// 실패해도 예외 없음(다음 송출 때 카메라가 어차피 자기 비번을 재지정).
+  static Future<void> updateCctvPins(String code, List<String> pins) async {
+    if (code.isEmpty) return;
+    final url =
+        AppConfig.tokenServerUrl.replaceFirst(RegExp(r'/token/?$'), '/cctv-pins');
     try {
       await http
           .post(
             Uri.parse(url),
             headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({'code': code}),
+            body: jsonEncode({'code': code, 'pins': pins}),
           )
           .timeout(const Duration(seconds: 8));
     } catch (_) {}

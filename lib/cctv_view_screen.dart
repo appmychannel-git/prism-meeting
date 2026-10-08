@@ -27,7 +27,10 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   bool _roomReady = false;
   bool _connecting = true;
   String? _error;
-  bool _leaving = false;
+  bool _leaving = false; // 사용자가 직접 닫는 중(정상 종료)
+  bool _popped = false; // pop 중복 방지
+  bool _connected = false; // 방 접속 성공 여부
+  bool _sawVideo = false; // 호스트 영상을 한 번이라도 받았는지
   Timer? _continueTimer;
 
   // ── 연결 대기 타임아웃 ──
@@ -54,7 +57,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
         : null;
     _room = Room(roomOptions: RoomOptions(e2eeOptions: e2ee));
     _listener = _room.createListener()
-      ..on<RoomDisconnectedEvent>((_) => _end())
+      ..on<RoomDisconnectedEvent>((_) => _onDisconnected())
       ..on<TrackSubscribedEvent>((_) => _refresh())
       ..on<TrackUnsubscribedEvent>((_) => _refresh())
       ..on<ParticipantConnectedEvent>((_) => _refresh())
@@ -81,8 +84,35 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
     if (_remoteCam() != null) {
       _waitTimer?.cancel();
       _timedOut = false;
+      _sawVideo = true;
     }
     if (mounted) setState(() {});
+  }
+
+  // 방에서 끊겼을 때: 사용자가 닫은 게 아니고 영상도 못 받았으면
+  // "조용히 튕김" 대신 방없음(삭제/사용중지/비번변경)으로 안내한다.
+  void _onDisconnected() {
+    if (_leaving) {
+      _end();
+      return;
+    }
+    if (!_sawVideo) {
+      _showNotFound();
+      return;
+    }
+    _end(); // 영상까지 봤다면 호스트가 송출을 끝낸 것 → 정상 종료
+  }
+
+  // 방없음 안내(삭제/비활성/비번변경/코드만료 공통).
+  void _showNotFound() {
+    if (!mounted || _leaving) return;
+    _continueTimer?.cancel();
+    _waitTimer?.cancel();
+    setState(() {
+      _connecting = false;
+      _timedOut = false;
+      _error = L.t('cctv_not_found');
+    });
   }
 
   // 방 연결 후 호스트 영상 대기 타이머 시작(이미 오면 즉시 해제됨).
@@ -94,15 +124,24 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
     });
   }
 
-  // "연결할 수 없음"에서 재시도 — 호스트를 다시 깨우고 대기 타이머 재시작.
+  // "연결할 수 없음"에서 재시도.
+  //  - 아직 방에 못 들어갔으면 전체 접속 흐름을 처음부터 다시(깨우기 포함).
+  //  - 이미 들어가 있으면(영상만 안 옴) 호스트를 다시 깨우고 대기 타이머만 재시작.
   void _retry() {
-    final code = widget.roomId.startsWith('cctv-')
-        ? widget.roomId.substring(5)
-        : widget.roomId;
-    DirectoryService.requestCctvWake(code);
     setState(() => _timedOut = false);
-    _startWaitTimer();
+    if (!_connected) {
+      setState(() => _connecting = true);
+      _connect();
+    } else {
+      DirectoryService.requestCctvWake(_code());
+      _startWaitTimer();
+    }
   }
+
+  // widget.roomId(cctv-<code>)에서 코드만.
+  String _code() => widget.roomId.startsWith('cctv-')
+      ? widget.roomId.substring(5)
+      : widget.roomId;
 
   // 호스트가 응답 없을 때(꺼짐/코드 만료) 표시하는 안내 + 재시도/닫기.
   Widget _unreachableView() {
@@ -142,7 +181,76 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
     );
   }
 
+  // 접속 흐름:
+  //  1) create:false 로 먼저 시도(방을 새로 만들지 않음) → 방없음/비번무효를 구분.
+  //     - 성공            → 시청 시작
+  //     - 403(비번 무효)  → 방없음 안내(삭제/비활성/비번변경 공통)
+  //     - 404(방 없음)    → 호스트가 꺼져 있을 수 있음 → 깨우고 방 생기면 재시도(폴링)
+  //  이렇게 하면 예전처럼 시청자가 빈 방을 만들어 두었다가 카메라 재생성에 조용히
+  //  튕기는 문제가 사라지고, 왜 못 보는지 명확히 안내된다.
   Future<void> _connect() async {
+    final err = await _attemptJoin();
+    if (!mounted) return;
+    if (err == null) {
+      _onConnected();
+      return;
+    }
+    if (err.statusCode == 403 || err.statusCode == 429) {
+      // 비번 무효(그룹 삭제/비활성/비번변경) 또는 잠금 → 방없음/서버 메시지 안내.
+      setState(() {
+        _connecting = false;
+        _error = err.statusCode == 429 ? err.message : L.t('cctv_not_found');
+      });
+      return;
+    }
+    // 404 등: 호스트가 아직 송출 전일 수 있음 → 깨우고 방이 생길 때까지 대기.
+    final wake = await DirectoryService.requestCctvWake(_code());
+    if (!mounted) return;
+    if (wake == CctvWakeResult.notFound) {
+      // 등록된 CCTV가 없음(코드 만료/삭제) → 방없음 즉시 안내.
+      setState(() {
+        _connecting = false;
+        _error = L.t('cctv_not_found');
+      });
+      return;
+    }
+    _pollForHost();
+  }
+
+  // 방이 생길 때까지(카메라가 송출 시작) 짧게 폴링하며 접속 시도.
+  Future<void> _pollForHost() async {
+    final deadline =
+        DateTime.now().add(const Duration(seconds: _waitTimeoutSec));
+    while (mounted && !_connected && DateTime.now().isBefore(deadline)) {
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted || _connected) return;
+      final err = await _attemptJoin();
+      if (!mounted) return;
+      if (err == null) {
+        _onConnected();
+        return;
+      }
+      if (err.statusCode == 403 || err.statusCode == 429) {
+        setState(() {
+          _connecting = false;
+          _error = err.statusCode == 429 ? err.message : L.t('cctv_not_found');
+        });
+        return;
+      }
+      // 404 → 아직 카메라가 방을 안 만듦 → 계속 대기.
+    }
+    // 제한시간 내 호스트 응답 없음 → "연결할 수 없음"(재시도/닫기).
+    if (mounted && !_connected) {
+      setState(() {
+        _connecting = false;
+        _timedOut = true;
+      });
+    }
+  }
+
+  // 토큰 발급(create:false) + 방 접속 1회 시도.
+  // 성공 시 null, 실패 시 RoomJoinException(상태코드 포함) 반환.
+  Future<RoomJoinException?> _attemptJoin() async {
     try {
       final d = await ConnectionService.fetchFromServer(
         tokenServerUrl: AppConfig.tokenServerUrl,
@@ -150,24 +258,28 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
         participantName: 'Viewer',
         identity: 'viewer-${DateTime.now().millisecondsSinceEpoch}',
         pin: widget.pin,
-        // 원격 켜기 중이면 카메라가 아직 방을 안 만들었을 수 있어, 시청자가 방을
-        // 먼저 만들어 두고 기다린다(cctv- 방은 create 중복 허용). 카메라가 깨어나
-        // 같은 방에 들어와 송출하면 화면에 뜬다.
-        create: true,
+        create: false, // 방을 새로 만들지 않음(방없음/비번무효 구분 위해)
       );
       await _room.connect(d.serverUrl, d.token,
           connectOptions: const ConnectOptions(autoSubscribe: true));
-      if (mounted) setState(() => _connecting = false);
-      _startWaitTimer();
-      _scheduleContinuePrompt();
+      return null;
+    } on RoomJoinException catch (e) {
+      return e;
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _connecting = false;
-          _error = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
+      return RoomJoinException(0, e.toString().replaceFirst('Exception: ', ''));
     }
+  }
+
+  void _onConnected() {
+    _connected = true;
+    if (mounted) {
+      setState(() {
+        _connecting = false;
+        _timedOut = false;
+      });
+    }
+    _startWaitTimer();
+    _scheduleContinuePrompt();
   }
 
   VideoTrack? _remoteCam() {
@@ -238,6 +350,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   }
 
   Future<void> _hangup() async {
+    _leaving = true; // 정상 종료 의도 표시(연결 끊김을 "방없음"으로 오인하지 않도록)
     try {
       await _room.disconnect();
     } catch (_) {}
@@ -245,8 +358,9 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   }
 
   void _end() {
-    if (_leaving || !mounted) return;
+    if (_popped || !mounted) return;
     _leaving = true;
+    _popped = true;
     Navigator.of(context).pop();
   }
 

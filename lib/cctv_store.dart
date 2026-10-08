@@ -127,6 +127,15 @@ class CctvStore {
     await sp.setString(_kMyPin, pin);
   }
 
+  /// 이 기기 공유 코드 재발급(새 코드로 교체). 그룹(비번)은 유지 → QR만 새 코드로
+  /// 재생성된다. 기존 코드/QR은 모두 무효가 되므로 시청자는 새 QR로 다시 등록해야 한다.
+  static Future<String> reissueMyCode() async {
+    final sp = await SharedPreferences.getInstance();
+    final code = AppConfig.generateRoomCode();
+    await sp.setString(_kMyCode, code);
+    return code;
+  }
+
   // ── 공유(송출) 접속 그룹 ──
   static String _newGroupId() =>
       DateTime.now().microsecondsSinceEpoch.toString();

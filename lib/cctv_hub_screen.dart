@@ -176,6 +176,14 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     });
   }
 
+  /// 그룹(토글/추가/삭제/비번) 변경을 서버 방 메타데이터에 즉시 반영.
+  /// 송출 중이거나 방이 잔존하는 동안에도 새 시청자부터 바로 적용된다.
+  /// (방이 없으면 서버가 무시 → 다음 송출 때 카메라가 어차피 재지정)
+  Future<void> _syncPins() async {
+    final pins = await CctvStore.enabledSharePins();
+    await DirectoryService.updateCctvPins(_myCode, pins);
+  }
+
   /// 이 기기를 "대기 중 원격 켜기 가능한 CCTV"로 등록/해제.
   Future<void> _toggleCamera(bool on) async {
     final (code, _) = await CctvStore.myShareCredentials();
@@ -520,6 +528,12 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
             title: Text('${L.t('cctv_my_code')}: $_myCode'),
             subtitle: Text(L.t('cctv_qrlist_hint'),
                 style: const TextStyle(fontSize: 12)),
+            // 내 코드 영역 오른쪽: 코드 재발급(새 코드로 교체, 그룹 유지).
+            trailing: TextButton.icon(
+              onPressed: _reissueCode,
+              icon: const Icon(Icons.autorenew, size: 18),
+              label: Text(L.t('cctv_reissue')),
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -577,6 +591,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
                   : (v) async {
                       await CctvStore.updateShareGroup(g.id, enabled: v);
                       await _load();
+                      await _syncPins(); // 서버에 즉시 반영
                     },
             ),
             // 기본 코드는 삭제 버튼 숨김(자리 맞춤용 빈 공간).
@@ -667,6 +682,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       await CctvStore.updateShareGroup(g.id, name: nm, pin: pin);
     }
     await _load();
+    await _syncPins(); // 비번 변경/추가를 서버에 즉시 반영
   }
 
   Future<void> _addCode() => _codeDialog();
@@ -679,6 +695,32 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     }
     await CctvStore.removeShareGroup(g.id);
     await _load();
+    await _syncPins(); // 삭제를 서버에 즉시 반영(그 비번으로 새 접속 차단)
+  }
+
+  // 코드 재발급: 새 코드로 교체(그룹/비번 유지 → QR만 새 코드로). 기존 QR은 전부 무효.
+  Future<void> _reissueCode() async {
+    if (!await confirmDialog(context, L.t('cctv_reissue_confirm'),
+        confirmLabel: L.t('cctv_reissue'))) {
+      return;
+    }
+    final oldCode = _myCode;
+    final newCode = await CctvStore.reissueMyCode();
+    // 대기 중 원격 켜기 등록 상태면 새 코드로 재등록(옛 코드 해제).
+    if (_isCamera) {
+      try {
+        final uuid = await DeviceId.uuid();
+        final name = await DeviceId.name();
+        await DirectoryService.unregisterCctvCamera(oldCode);
+        await DirectoryService.registerCctvCamera(
+            code: newCode, uuid: uuid, name: name.isNotEmpty ? name : 'CCTV');
+      } catch (_) {}
+    }
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(L.t('cctv_reissue_done'))));
+    }
   }
 
   // 그룹 QR(코드+비번 내장) 보기. 하단 바에 가리지 않도록 스크롤 + 넉넉한 하단 여백.

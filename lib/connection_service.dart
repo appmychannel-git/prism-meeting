@@ -11,6 +11,19 @@ class ConnectionDetails {
   const ConnectionDetails({required this.serverUrl, required this.token});
 }
 
+/// 토큰 서버가 접속을 거절했을 때의 예외(상태코드 포함).
+/// 시청자 화면이 404(방 없음)와 403(비번 무효)을 구분해 안내하기 위해 사용한다.
+///  - statusCode 404: 존재하지 않는 방(아직 송출 전이거나 코드 만료/삭제)
+///  - statusCode 403: 비밀번호 무효(그룹 삭제/비활성/비번 변경) 또는 틀림
+///  - statusCode 0  : 네트워크/파싱 오류
+class RoomJoinException implements Exception {
+  final int statusCode;
+  final String message;
+  const RoomJoinException(this.statusCode, this.message);
+  @override
+  String toString() => message;
+}
+
 /// LiveKit 접속 정보를 가져오는 서비스.
 ///
 /// 두 가지 방식을 지원한다:
@@ -68,24 +81,24 @@ class ConnectionService {
     try {
       resp = await http.get(uri, headers: headers);
     } catch (e) {
-      throw Exception('${L.t('conn_fail')}: $tokenServerUrl\n$e');
+      throw RoomJoinException(0, '${L.t('conn_fail')}: $tokenServerUrl\n$e');
     }
 
     if (resp.statusCode != 200) {
-      // 서버가 준 error 메시지를 깔끔히 표시
+      // 서버가 준 error 메시지를 깔끔히 표시(상태코드도 함께 전달 → 호출부가 404/403 구분).
       String msg = '${L.t('http_fail')} (HTTP ${resp.statusCode})';
       try {
         final j = jsonDecode(resp.body);
         if (j is Map && j['error'] != null) msg = j['error'].toString();
       } catch (_) {}
-      throw Exception(msg);
+      throw RoomJoinException(resp.statusCode, msg);
     }
 
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final url = data['serverUrl'] as String?;
     final token = (data['participantToken'] ?? data['token']) as String?;
     if (url == null || token == null) {
-      throw Exception('${L.t('resp_invalid')}: ${resp.body}');
+      throw RoomJoinException(resp.statusCode, '${L.t('resp_invalid')}: ${resp.body}');
     }
     return ConnectionDetails(serverUrl: url, token: token);
   }
