@@ -12,7 +12,9 @@ import 'app_settings.dart';
 import 'cctv_store.dart';
 import 'config.dart';
 import 'connection_service.dart';
+import 'device_id.dart';
 import 'device_quirks.dart';
+import 'directory.dart';
 import 'l10n.dart';
 import 'push_service.dart';
 
@@ -38,6 +40,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
   bool _roomReady = false;
 
   String _code = ''; // 표시/입력용 코드(cctv- 제외). 이 기기 고정값.
+  String _name = ''; // 이 기기 이름(QR에 담아 시청자 목록에 표시)
   String _roomId = ''; // 실제 방 이름 cctv-<code>
   String _pin = ''; // 대표 비번(e2ee 키/표시용) = 활성 그룹 중 첫 번째
   List<String> _pins = []; // 활성 그룹들의 비번 집합(서버로 전송)
@@ -89,7 +92,10 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     // 이 기기의 고정 코드 + 활성 그룹(코드)들의 비번 집합.
     final (code, _) = await CctvStore.myShareCredentials();
     _code = code;
+    _name = await DeviceId.name();
     _roomId = 'cctv-$code';
+    // 송출 시작 시 이름을 디렉터리에 게시(코드로 추가한 시청자가 이름을 보도록).
+    if (_name.isNotEmpty) DirectoryService.setCctvName(code, _name);
     _pins = await CctvStore.enabledSharePins();
     // 활성 코드가 없으면: 수동 공유면 첫 코드 추가를 유도, 그래도 없으면 닫는다.
     if (_pins.isEmpty) {
@@ -435,9 +441,17 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       padding: const EdgeInsets.only(bottom: 18),
       child: Column(
         children: [
+          // 기기 이름(QR에 담겨 상대 목록에 표시됨).
+          if (_name.isNotEmpty) ...[
+            Text(_name,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold)),
+            const SizedBox(height: 2),
+          ],
           Text(g.name,
-              style: const TextStyle(
-                  color: Colors.white, fontWeight: FontWeight.bold)),
+              style: const TextStyle(color: Colors.white70, fontSize: 14)),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
@@ -449,7 +463,7 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
               width: 160,
               height: 160,
               child: PrettyQrView.data(
-                data: AppConfig.cctvLink(_code, pin: g.pin),
+                data: AppConfig.cctvLink(_code, pin: g.pin, name: _name),
                 decoration: const PrettyQrDecoration(
                   shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
                 ),

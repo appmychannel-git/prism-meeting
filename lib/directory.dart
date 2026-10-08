@@ -181,8 +181,35 @@ class DirectoryService {
   static Future<void> unregisterCctvCamera(String code) async {
     if (code.isEmpty) return;
     try {
-      await _db.collection('cctvCameras').doc(code).delete();
+      // uuid 만 제거(원격 켜기 비활성) — 이름은 남겨 둬 시청자 목록 표시에 쓰이게 한다.
+      await _db.collection('cctvCameras').doc(code).set({
+        'uuid': FieldValue.delete(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     } catch (_) {}
+  }
+
+  /// 이 기기(코드)의 이름을 디렉터리에 게시(merge). 원격 켜기 등록과 무관하게
+  /// 유지돼, 다른 기기가 코드로 추가할 때 이름을 조회할 수 있다.
+  static Future<void> setCctvName(String code, String name) async {
+    if (code.isEmpty || name.trim().isEmpty) return;
+    try {
+      await _db.collection('cctvCameras').doc(code).set({
+        'name': name.trim(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  /// 코드로 등록된 CCTV 기기의 이름 조회. QR에 이름이 없을 때(수동 코드 추가)
+  /// 시청자 목록 표시용으로 best-effort 조회.
+  static Future<String> getCctvCameraName(String code) async {
+    if (code.isEmpty) return '';
+    try {
+      final d = await _db.collection('cctvCameras').doc(code).get();
+      if (d.exists) return (d.get('name') ?? '').toString();
+    } catch (_) {}
+    return '';
   }
 
   /// 시청자가 CCTV 기기를 원격으로 깨운다(토큰서버 /cctv-wake → FCM).

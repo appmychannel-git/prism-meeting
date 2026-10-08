@@ -436,6 +436,23 @@ class L {
       'ko': '연결할 수 없습니다.\n기기가 꺼져 있거나 코드가 만료됐을 수 있어요.',
       'en': "Can't connect.\nThe device may be off or the code may have expired.",
     },
+    // CCTV 전용 앱 첫 실행(이름 + 기본 공유 비번).
+    'cctv_setup_title': {'ko': 'CCTV 설정', 'en': 'CCTV setup'},
+    'cctv_setup_desc': {
+      'ko': '이 기기의 이름과 공유 비밀번호를 정해주세요.\n이름은 QR로 공유할 때 상대 기기 목록에 표시됩니다.',
+      'en': 'Set this device\'s name and share password.\nThe name is shown in the viewer\'s list when you share via QR.',
+    },
+    'cctv_setup_name': {'ko': '기기 이름', 'en': 'Device name'},
+    'cctv_name_sub': {
+      'ko': 'QR로 공유할 때 상대 목록에 이 이름이 표시됩니다.',
+      'en': 'Shown in the viewer\'s list when shared via QR.',
+    },
+    'cctv_setup_name_hint': {'ko': '예: 거실 CCTV', 'en': 'e.g. Living room CCTV'},
+    'cctv_setup_pw': {'ko': '기본 공유 비밀번호(숫자 6자리)', 'en': 'Share password (6 digits)'},
+    'cctv_setup_pw_desc': {
+      'ko': '이 기기를 CCTV로 공유할 때 쓰는 기본 비밀번호입니다. 나중에 바꿀 수 있어요.',
+      'en': 'Default password used when sharing this device as CCTV. You can change it later.',
+    },
     // 방없음 안내(그룹 삭제/비활성/비번변경/코드 만료 공통 — 구분하지 않음).
     'cctv_not_found': {
       'ko': '이 CCTV에 접속할 수 없습니다.\n삭제되었거나 사용 중지됐을 수 있어요.',

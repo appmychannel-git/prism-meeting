@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'app_settings.dart';
 import 'cctv_hub_screen.dart';
+import 'cctv_setup_screen.dart';
+import 'cctv_store.dart';
 import 'config.dart';
 import 'device_id.dart';
 import 'device_quirks.dart';
@@ -218,9 +220,15 @@ class _IdSetupGateState extends State<_IdSetupGate> {
 
   Future<void> _check() async {
     final name = await DeviceId.name();
+    var need = name.trim().isEmpty;
+    // CCTV 전용 앱: 이름뿐 아니라 기본 공유 비번(기본 그룹)도 있어야 설정 완료로 본다.
+    if (AppConfig.cctvOnly && !need) {
+      final groups = await CctvStore.shareGroups();
+      if (groups.isEmpty) need = true;
+    }
     if (!mounted) return;
     setState(() {
-      _needSetup = name.trim().isEmpty;
+      _needSetup = need;
       _loaded = true;
     });
   }
@@ -234,8 +242,11 @@ class _IdSetupGateState extends State<_IdSetupGate> {
       );
     }
     if (_needSetup) {
-      // 첫 실행: 기존 "내 ID" 화면(표시 이름 + QR + 내 코드)으로 아이디 설정.
-      return MyIdScreen(onDone: () => setState(() => _needSetup = false));
+      // CCTV 전용 앱: 이름 + 기본 공유 비번 설정 화면.
+      // 그 외(미팅): 기존 "내 ID" 화면(표시 이름 + QR + 내 코드).
+      return AppConfig.cctvOnly
+          ? CctvSetupScreen(onDone: () => setState(() => _needSetup = false))
+          : MyIdScreen(onDone: () => setState(() => _needSetup = false));
     }
     return widget.child;
   }

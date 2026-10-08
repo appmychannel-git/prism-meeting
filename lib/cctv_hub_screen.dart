@@ -35,6 +35,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   // QR목록(송출 코드 그룹) + 이 기기 고정 코드.
   List<CctvShareGroup> _groups = [];
   String _myCode = '';
+  String _myName = ''; // 이 기기 이름(QR에 담아 시청자 목록에 표시)
 
   // CCTV 전용 모드에서 홈이 이 화면이라, 들어오는 CCTV 딥링크(?cctv=)를 여기서 처리.
   AppLinks? _appLinks;
@@ -44,7 +45,12 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    _load().then((_) {
+      // 기기 이름을 디렉터리에 1회 게시(기존 사용자·코드 추가 시 이름 조회 보장).
+      if (mounted && _myName.isNotEmpty) {
+        DirectoryService.setCctvName(_myCode, _myName);
+      }
+    });
     if (AppConfig.cctvOnly) {
       _initDeepLinks();
       // Android 14+ 전체화면 인텐트 권한 안내(1회). 이 권한이 없으면 대기모드에서
@@ -104,30 +110,37 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     final code = uri.queryParameters['cctv'];
     if (code == null || code.trim().isEmpty) return;
     final pin = uri.queryParameters['pin']; // 그룹별 QR은 비번도 함께 담김
+    final name = uri.queryParameters['nm']; // 송출 기기 이름(목록 표시용)
     final key = uri.toString();
     if (key == _lastLink) return; // 중복 처리 방지
     _lastLink = key;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openByCode(code.trim(), pin: pin?.trim());
+      if (mounted) _openByCode(code.trim(), pin: pin?.trim(), name: name?.trim());
     });
   }
 
   // 딥링크 코드로 시청: 비번(QR에 담겼으면 그대로, 없으면 입력) → 목록 저장 → 시청.
-  Future<void> _openByCode(String code, {String? pin}) async {
+  // [name]은 QR에 담긴 송출 기기 이름(없으면 서버에서 조회, 그래도 없으면 코드).
+  Future<void> _openByCode(String code, {String? pin, String? name}) async {
     var p = pin;
-    if (p == null || p.isEmpty) {
+    final hadPin = p != null && p.isNotEmpty;
+    if (!hadPin) {
       p = await _promptPin();
     }
     if (p == null || p.trim().isEmpty || !mounted) return;
-    final e = CctvEntry(code: code, pin: p.trim(), name: code);
+    // 기기 이름: QR에 있으면 사용, 없으면 등록된 기기명 조회, 그래도 없으면 코드.
+    var nm = (name ?? '').trim();
+    if (nm.isEmpty) nm = await DirectoryService.getCctvCameraName(code);
+    if (nm.isEmpty) nm = code;
+    final e = CctvEntry(code: code, pin: p.trim(), name: nm);
     await CctvStore.add(e);
     await _load();
     if (!mounted) return;
-    _open(e);
+    _open(e, askPin: false); // 방금 비번을 받았으므로 바로 재생
   }
 
-  Future<String?> _promptPin() async {
-    final ctrl = TextEditingController();
+  Future<String?> _promptPin({String initial = ''}) async {
+    final ctrl = TextEditingController(text: initial);
     final pin = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -167,12 +180,14 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     final cam = await CctvStore.isCamera();
     final groups = await CctvStore.shareGroups();
     final (code, _) = await CctvStore.myShareCredentials();
+    final name = await DeviceId.name();
     if (!mounted) return;
     setState(() {
       _saved = s;
       _isCamera = cam;
       _groups = groups;
       _myCode = code;
+      _myName = name;
     });
   }
 
@@ -223,11 +238,27 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     return v;
   }
 
-  void _open(CctvEntry e) {
+  /// CCTV 시청 시작. [askPin]이면 비밀번호 입력창을 띄워(저장값 미리 채움) 확인 후 재생
+  /// (틀리면 접속 단계에서 바로 안내됨). QR/수동추가처럼 방금 비번을 받은 경우엔 false.
+  Future<void> _open(CctvEntry e, {bool askPin = true}) async {
+    var entry = e;
+    if (askPin) {
+      // 저장된 비번은 채우지 않고 매번 새로 입력받는다(빈 칸).
+      final p = await _promptPin();
+      if (p == null || p.trim().isEmpty || !mounted) return;
+      final pin = p.trim();
+      if (pin != e.pin) {
+        // 입력한 새 비번을 저장(다음부터 이 값으로 채움).
+        entry = e.copyWith(pin: pin);
+        await CctvStore.add(entry);
+        await _load();
+      }
+    }
     // 대기 중인 CCTV면 원격으로 깨운다(이미 켜져 있으면 무시됨).
-    DirectoryService.requestCctvWake(e.code);
+    DirectoryService.requestCctvWake(entry.code);
+    if (!mounted) return;
     Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => CctvViewScreen(roomId: e.roomId, pin: e.pin),
+      builder: (_) => CctvViewScreen(roomId: entry.roomId, pin: entry.pin),
     ));
   }
 
@@ -240,19 +271,21 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
           .showSnackBar(SnackBar(content: Text(L.t('cctv_need_code_pw'))));
       return;
     }
-    // 이름은 쓰지 않는다(목록엔 코드명을 표시). 메모만 받는다.
     final note = _noteCtrl.text.trim();
-    final e = CctvEntry(code: code, pin: pin, name: code, note: note);
+    // 기기 이름: 등록된 기기명 조회(없으면 코드). 목록 제목에 사용.
+    var nm = await DirectoryService.getCctvCameraName(code);
+    if (nm.isEmpty) nm = code;
+    final e = CctvEntry(code: code, pin: pin, name: nm, note: note);
     await CctvStore.add(e); // 저장 → 다음부턴 목록에서 원터치
     _noteCtrl.clear();
     _codeCtrl.clear();
     _pinCtrl.clear();
     await _load();
     if (!mounted) return;
-    _open(e);
+    _open(e, askPin: false); // 방금 비번을 입력했으므로 바로 재생
   }
 
-  /// 저장된 CCTV의 메모·비밀번호 편집(이름은 코드명 고정이라 편집 안 함).
+  /// 저장된 CCTV 편집 — 이름·코드는 보기 전용, 메모·비밀번호는 변경 가능.
   Future<void> _editEntry(CctvEntry e) async {
     final noteCtrl = TextEditingController(text: e.note);
     final pinCtrl = TextEditingController(text: e.pin);
@@ -260,10 +293,18 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         scrollable: true,
-        title: Text(e.code),
+        title: Text(e.name.isNotEmpty ? e.name : e.code),
         content: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 이름·코드(보기 전용).
+            Text('${L.t('cctv_setup_name')}: ${e.name.isNotEmpty ? e.name : '-'}',
+                style: const TextStyle(fontSize: 13, color: Colors.white70)),
+            const SizedBox(height: 4),
+            Text('${L.t('cctv_code')}: ${e.code}',
+                style: const TextStyle(fontSize: 13, color: Colors.white70)),
+            const SizedBox(height: 12),
             TextField(
               controller: noteCtrl,
               maxLength: 40,
@@ -403,8 +444,8 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
             Card(
               child: ListTile(
                 leading: const Icon(Icons.videocam),
-                // 이름 영역엔 코드명을 보여주고, 부제는 메모(있을 때만).
-                title: Text(e.code),
+                // 제목=기기 이름(없으면 코드), 부제=메모(있을 때만).
+                title: Text(e.name.isNotEmpty ? e.name : e.code),
                 subtitle: e.note.isNotEmpty
                     ? Text(e.note, style: const TextStyle(fontSize: 12))
                     : null,
@@ -522,6 +563,22 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // 기기 이름(QR 공유 시 상대 목록에 표시) — 여기서 확인·수정.
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.badge_outlined, size: 28),
+            title: Text('${L.t('cctv_setup_name')}: '
+                '${_myName.isNotEmpty ? _myName : '-'}'),
+            subtitle: Text(L.t('cctv_name_sub'),
+                style: const TextStyle(fontSize: 12)),
+            trailing: IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: L.t('cctv_edit'),
+              onPressed: _editMyName,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
         Card(
           child: ListTile(
             leading: const Icon(Icons.videocam, size: 28),
@@ -698,6 +755,42 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     await _syncPins(); // 삭제를 서버에 즉시 반영(그 비번으로 새 접속 차단)
   }
 
+  // 기기 이름 수정 — 저장 + 디렉터리 게시(새 QR/시청자 목록에 반영).
+  Future<void> _editMyName() async {
+    final ctrl = TextEditingController(text: _myName);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        scrollable: true,
+        title: Text(L.t('cctv_setup_name')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          maxLength: 20,
+          decoration: InputDecoration(
+            hintText: L.t('cctv_setup_name_hint'),
+            border: const OutlineInputBorder(),
+            counterText: '',
+          ),
+          onSubmitted: (_) => Navigator.pop(ctx, true),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(L.t('cancel'))),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true), child: Text(L.t('ok'))),
+        ],
+      ),
+    );
+    final name = ctrl.text.trim();
+    ctrl.dispose();
+    if (ok != true || name.isEmpty) return;
+    await DeviceId.setName(name);
+    await DirectoryService.setCctvName(_myCode, name);
+    await _load();
+  }
+
   // 코드 재발급: 새 코드로 교체(그룹/비번 유지 → QR만 새 코드로). 기존 QR은 전부 무효.
   Future<void> _reissueCode() async {
     if (!await confirmDialog(context, L.t('cctv_reissue_confirm'),
@@ -738,11 +831,19 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // 기기 이름(QR에 담겨 상대 목록에 표시됨).
+              if (_myName.isNotEmpty) ...[
+                Text(_myName,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+              ],
               Text(g.name,
                   style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold)),
+                      color: Colors.white70,
+                      fontSize: 14)),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -754,7 +855,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
                   width: 170,
                   height: 170,
                   child: PrettyQrView.data(
-                    data: AppConfig.cctvLink(_myCode, pin: g.pin),
+                    data: AppConfig.cctvLink(_myCode, pin: g.pin, name: _myName),
                     decoration: const PrettyQrDecoration(
                       shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
                     ),
