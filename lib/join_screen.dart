@@ -64,6 +64,12 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 방 만들기/참여하기의 "내 이름" 기본값 = 내 아이디에서 설정한 이름(수정 가능).
+    DeviceId.name().then((n) {
+      if (mounted && n.isNotEmpty && _nameCtrl.text.isEmpty) {
+        setState(() => _nameCtrl.text = n);
+      }
+    });
     if (kIsWeb) {
       // 웹: 현재 URL(...?room=코드&pin=코드)에서 바로 읽음
       _applyLinkUri(Uri.base);
@@ -313,7 +319,14 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     // (코드/PIN은 이미 갱신됨 → 회의 나오면 폼에 반영돼 있음)
     if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     _nameDialogOpen = true;
-    final ctrl = TextEditingController();
+    // 기본값: 현재 이름 필드(내 아이디 이름) → 없으면 저장된 내 이름. 수정 가능.
+    var defName = _nameCtrl.text.trim();
+    if (defName.isEmpty) defName = await DeviceId.name();
+    if (!mounted) {
+      _nameDialogOpen = false;
+      return;
+    }
+    final ctrl = TextEditingController(text: defName);
     final result = await showDialog<String?>(
       context: context,
       barrierDismissible: true, // 바깥 탭(닫기) → 취소로 처리

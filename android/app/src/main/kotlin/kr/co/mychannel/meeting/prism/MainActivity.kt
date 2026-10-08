@@ -3,12 +3,16 @@ package kr.co.mychannel.meeting.prism
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.database.Cursor
+import android.hardware.camera2.CameraDevice
+import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
@@ -18,6 +22,10 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 class MainActivity : FlutterActivity() {
     private val channelName = "app/fullscreen"
@@ -138,6 +146,19 @@ class MainActivity : FlutterActivity() {
                         }
                         result.success(true)
                     }
+                    // CCTV 송출 전 카메라 사용 가능 여부 사전검사(백그라운드 스레드).
+                    // 반환: "ok"(열림) | "none"(카메라 0개) | "blocked"(열기 실패) |
+                    //       "timeout"(제한시간 내 콜백 없음) | "unknown"(권한없음/판단보류).
+                    // 메인스레드를 막지 않으므로, 카메라 없는 기기에서도 Flutter가 멈추지 않고
+                    // 바로 "카메라 없음" 안내를 띄울 수 있다. (setCameraEnabled 직접 호출은
+                    // phantom-camera 기기에서 메인스레드를 블록해 멈춘다)
+                    "probeCamera" -> {
+                        val timeoutMs = call.argument<Int>("timeoutMs") ?: 5000
+                        Thread {
+                            val res = probeCamera(timeoutMs)
+                            runOnUiThread { result.success(res) }
+                        }.start()
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -166,6 +187,46 @@ class MainActivity : FlutterActivity() {
                 "stopObserve" -> result.success(stopObserve())
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    // 카메라를 백그라운드에서 실제로 열어보고 결과를 돌려준다(메인스레드 비차단).
+    private fun probeCamera(timeoutMs: Int): String {
+        return try {
+            if (checkSelfPermission(android.Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED) {
+                return "unknown" // 권한 없음 → 판단 보류(Dart에서 기존 경로)
+            }
+            val cm = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+            val ids = cm.cameraIdList
+            if (ids.isEmpty()) return "none" // 카메라 0개(진짜 없음)
+            val latch = CountDownLatch(1)
+            val opened = AtomicBoolean(false)
+            val deviceRef = AtomicReference<CameraDevice?>(null)
+            val ht = HandlerThread("camProbe").apply { start() }
+            val handler = Handler(ht.looper)
+            try {
+                cm.openCamera(ids[0], object : CameraDevice.StateCallback() {
+                    override fun onOpened(c: CameraDevice) {
+                        deviceRef.set(c); opened.set(true); latch.countDown()
+                    }
+                    override fun onDisconnected(c: CameraDevice) {
+                        try { c.close() } catch (_: Exception) {}; latch.countDown()
+                    }
+                    override fun onError(c: CameraDevice, error: Int) {
+                        try { c.close() } catch (_: Exception) {}; latch.countDown()
+                    }
+                }, handler)
+            } catch (e: Exception) {
+                try { ht.quitSafely() } catch (_: Exception) {}
+                return "blocked"
+            }
+            val done = latch.await(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            try { deviceRef.get()?.close() } catch (_: Exception) {}
+            try { ht.quitSafely() } catch (_: Exception) {}
+            if (!done) "timeout" else if (opened.get()) "ok" else "blocked"
+        } catch (e: Exception) {
+            "unknown"
         }
     }
 

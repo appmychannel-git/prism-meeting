@@ -34,6 +34,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   // 시청자 identity — 기기별 고정값. 재시도/재진입 때 같은 identity 로 접속해야
   // LiveKit 이 이전 세션을 즉시 교체해 유령 참가자(시청자 2명 표시)가 안 생긴다.
   String _identity = 'viewer';
+  String _uuid = ''; // 기기 uuid(원격 깨우기 차단/비번 검사에 전달)
   bool _sawVideo = false; // 호스트 영상을 한 번이라도 받았는지
   Timer? _continueTimer;
 
@@ -57,7 +58,8 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   Future<void> _init() async {
     // 기기별 고정 identity(재시도/재진입 시 이전 세션 교체 → 유령 참가자 방지).
     try {
-      _identity = 'viewer-${await DeviceId.uuid()}';
+      _uuid = await DeviceId.uuid();
+      _identity = 'viewer-$_uuid';
     } catch (_) {}
     // E2EE(옵션): 비밀번호를 공유키로 사용(회의/CCTV 당사자만 복호화).
     final e2ee = (AppConfig.e2ee && widget.pin.isNotEmpty)
@@ -141,7 +143,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
       setState(() => _connecting = true);
       _connect();
     } else {
-      DirectoryService.requestCctvWake(_code());
+      DirectoryService.requestCctvWake(_code(), pin: widget.pin, uuid: _uuid);
       _startWaitTimer();
     }
   }
@@ -212,7 +214,9 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
       return;
     }
     // 404 등: 호스트가 아직 송출 전일 수 있음 → 깨우고 방이 생길 때까지 대기.
-    final wake = await DirectoryService.requestCctvWake(_code());
+    // 비번·기기ID를 함께 보내 서버가 차단/비번을 먼저 검사(틀리면 안 깨움 → 방없음).
+    final wake = await DirectoryService.requestCctvWake(_code(),
+        pin: widget.pin, uuid: _uuid);
     if (!mounted) return;
     if (wake == CctvWakeResult.notFound) {
       // 등록된 CCTV가 없음(코드 만료/삭제) → 방없음 즉시 안내.

@@ -357,6 +357,37 @@ class L {
     'cctv_pw_change_apply': {'ko': '변경하고 시작', 'en': 'Change & start'},
     // ── QR목록(송출 코드 그룹) ──
     'cctv_tab_qrlist': {'ko': 'QR목록', 'en': 'QR codes'},
+    'cctv_tab_friends': {'ko': '친구목록', 'en': 'Viewers'},
+    // 친구목록(시청자) 탭.
+    'cctv_viewers_title': {'ko': '이 CCTV를 추가한 사람', 'en': 'People who added this CCTV'},
+    'cctv_viewers_sub': {
+      'ko': 'QR·코드로 이 CCTV를 추가한 기기 목록입니다. 차단하면 입장할 수 없습니다.',
+      'en': 'Devices that added this CCTV via QR/code. Blocked devices can\'t join.',
+    },
+    'cctv_viewers_empty': {
+      'ko': '아직 이 CCTV를 추가한 사람이 없습니다.',
+      'en': 'No one has added this CCTV yet.',
+    },
+    'cctv_viewer_blocked': {'ko': '차단됨', 'en': 'Blocked'},
+    'cctv_block_confirm': {
+      'ko': '{name} 님을 차단할까요?\n차단하면 이 CCTV에 입장할 수 없습니다.',
+      'en': 'Block {name}?\nThey won\'t be able to join this CCTV.',
+    },
+    'cctv_block_failed': {'ko': '처리하지 못했습니다. 다시 시도해 주세요.', 'en': 'Failed. Please try again.'},
+    'cctv_pw_wrong': {'ko': '비밀번호가 올바르지 않습니다.', 'en': 'Wrong password.'},
+    'cctv_share_exit_confirm': {
+      'ko': '뒤로 가면 CCTV 공유가 중단됩니다. 계속할까요?',
+      'en': 'Going back will stop CCTV sharing. Continue?',
+    },
+    'cctv_share_exit_ok': {'ko': '공유 중단', 'en': 'Stop sharing'},
+    'cctv_share_fg_notice': {
+      'ko': 'CCTV 송출은 송출 화면이 켜져 있는 동안 동작합니다. 다른 앱으로 전환하거나 홈으로 나가면 송출이 중단됩니다. 계속 송출하려면 송출 화면을 그대로 두세요.',
+      'en': 'CCTV broadcasting works only while the broadcast screen is open. Switching apps or going to the home screen stops it. Keep the broadcast screen open to keep broadcasting.',
+    },
+    'cctv_no_camera': {
+      'ko': '이 기기의 카메라를 사용할 수 없어 송출할 수 없습니다.',
+      'en': "This device's camera is unavailable, so it can't broadcast.",
+    },
     'cctv_my_code': {'ko': '내 코드', 'en': 'My code'},
     'cctv_qrlist_hint': {
       'ko': '코드별 비밀번호를 만들어 QR로 나눠주세요. 특정 코드만 켜고 끌 수 있어요.',

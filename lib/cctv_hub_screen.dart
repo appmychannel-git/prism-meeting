@@ -26,16 +26,24 @@ class CctvHubScreen extends StatefulWidget {
   State<CctvHubScreen> createState() => _CctvHubScreenState();
 }
 
-class _CctvHubScreenState extends State<CctvHubScreen> {
+class _CctvHubScreenState extends State<CctvHubScreen>
+    with SingleTickerProviderStateMixin {
   final _noteCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
   List<CctvEntry> _saved = [];
   bool _isCamera = false;
+  bool _showAddForm = false; // 시청 탭: 저장 목록이 있을 때 "새 CCTV 추가" 폼 표시 여부
   // QR목록(송출 코드 그룹) + 이 기기 고정 코드.
   List<CctvShareGroup> _groups = [];
   String _myCode = '';
   String _myName = ''; // 이 기기 이름(QR에 담아 시청자 목록에 표시)
+  // 친구목록 탭: 이 기기 CCTV를 추가한 시청자들(호스트용).
+  List<CctvViewer> _viewers = [];
+  bool _viewersLoading = false;
+
+  static const int _friendsTabIndex = 2; // 시청/녹화/친구목록/QR목록
+  late final TabController _tabs;
 
   // CCTV 전용 모드에서 홈이 이 화면이라, 들어오는 CCTV 딥링크(?cctv=)를 여기서 처리.
   AppLinks? _appLinks;
@@ -45,11 +53,22 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   @override
   void initState() {
     super.initState();
-    _load().then((_) {
-      // 기기 이름을 디렉터리에 1회 게시(기존 사용자·코드 추가 시 이름 조회 보장).
-      if (mounted && _myName.isNotEmpty) {
-        DirectoryService.setCctvName(_myCode, _myName);
+    _tabs = TabController(length: 4, vsync: this);
+    // 친구목록 탭으로 전환할 때마다 시청자 목록을 새로고침.
+    _tabs.addListener(() {
+      if (!_tabs.indexIsChanging && _tabs.index == _friendsTabIndex) {
+        _loadViewers();
       }
+    });
+    _load().then((_) async {
+      // 이름·비번을 디렉터리에 1회 게시(기존 사용자·코드 추가 시 이름 조회 +
+      // 원격 깨우기 비번 대조 보장).
+      if (mounted && _myName.isNotEmpty) {
+        final pins = await CctvStore.enabledSharePins();
+        DirectoryService.updateCctvPins(_myCode, pins, name: _myName);
+      }
+      _loadViewers(); // 친구목록(시청자) 조회
+      _refreshEntryNames(); // 추가해둔 CCTV들의 기기 이름을 최신으로 갱신
     });
     if (AppConfig.cctvOnly) {
       _initDeepLinks();
@@ -86,6 +105,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
 
   @override
   void dispose() {
+    _tabs.dispose();
     _linkSub?.cancel();
     _noteCtrl.dispose();
     _codeCtrl.dispose();
@@ -191,12 +211,148 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     });
   }
 
+  /// 추가해둔 CCTV들의 기기 이름을 서버에서 다시 받아 최신으로 갱신(호스트가 이름을
+  /// 바꾼 경우 반영). 변경된 게 있으면 목록을 다시 그린다.
+  Future<void> _refreshEntryNames() async {
+    if (_saved.isEmpty) return;
+    var changed = false;
+    for (final e in List<CctvEntry>.from(_saved)) {
+      final nm = await DirectoryService.getCctvCameraName(e.code);
+      if (nm.isNotEmpty && nm != e.name) {
+        await CctvStore.add(e.copyWith(name: nm));
+        changed = true;
+      }
+    }
+    if (changed && mounted) await _load();
+  }
+
+  /// 이 기기 CCTV를 추가한 시청자 목록(친구목록 탭) 조회.
+  Future<void> _loadViewers() async {
+    if (_myCode.isEmpty) return;
+    if (mounted) setState(() => _viewersLoading = true);
+    final vs = await DirectoryService.listCctvViewers(_myCode);
+    if (!mounted) return;
+    setState(() {
+      _viewers = vs;
+      _viewersLoading = false;
+    });
+  }
+
+  // 친구목록 탭: 이 기기 CCTV를 추가한 사람들 + 차단/해제.
+  Widget _friendsTab() {
+    return RefreshIndicator(
+      onRefresh: _loadViewers,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(L.t('cctv_viewers_title'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.white70)),
+              ),
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                tooltip: L.t('retry'),
+                onPressed: _viewersLoading ? null : _loadViewers,
+              ),
+            ],
+          ),
+          Text(L.t('cctv_viewers_sub'),
+              style: const TextStyle(fontSize: 12, color: Colors.white54)),
+          const SizedBox(height: 12),
+          if (_viewersLoading && _viewers.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (_viewers.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Text(L.t('cctv_viewers_empty'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white54)),
+            )
+          else
+            for (final v in _viewers) _viewerTile(v),
+        ],
+      ),
+    );
+  }
+
+  Widget _viewerTile(CctvViewer v) {
+    final label = v.name.isNotEmpty ? v.name : v.uuid;
+    final tile = Card(
+      child: ListTile(
+        leading: Icon(Icons.person,
+            color: v.blocked ? Colors.white30 : const Color(0xFF4ADE80)),
+        title: Text(label),
+        subtitle: v.blocked
+            ? Text(L.t('cctv_viewer_blocked'),
+                style: const TextStyle(fontSize: 12, color: Color(0xFFFF8A80)))
+            : (v.lastSeen.isNotEmpty
+                ? Text(v.lastSeen, style: const TextStyle(fontSize: 11))
+                : null),
+        trailing: TextButton.icon(
+          onPressed: () => _toggleBlockViewer(v),
+          icon: Icon(v.blocked ? Icons.check_circle_outline : Icons.block,
+              size: 18),
+          label: Text(v.blocked ? L.t('unblock') : L.t('block')),
+        ),
+      ),
+    );
+    return v.blocked ? Opacity(opacity: 0.6, child: tile) : tile;
+  }
+
+  Future<void> _toggleBlockViewer(CctvViewer v) async {
+    final toBlock = !v.blocked;
+    final label = v.name.isNotEmpty ? v.name : v.uuid;
+    if (toBlock &&
+        !await confirmDialog(
+            context, L.t('cctv_block_confirm', {'name': label}),
+            confirmLabel: L.t('block'))) {
+      return;
+    }
+    final ok =
+        await DirectoryService.setCctvViewerBlocked(_myCode, v.uuid, toBlock);
+    if (!mounted) return;
+    if (!ok) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(L.t('cctv_block_failed'))));
+      return;
+    }
+    await _loadViewers();
+  }
+
   /// 그룹(토글/추가/삭제/비번) 변경을 서버 방 메타데이터에 즉시 반영.
   /// 송출 중이거나 방이 잔존하는 동안에도 새 시청자부터 바로 적용된다.
   /// (방이 없으면 서버가 무시 → 다음 송출 때 카메라가 어차피 재지정)
   Future<void> _syncPins() async {
     final pins = await CctvStore.enabledSharePins();
-    await DirectoryService.updateCctvPins(_myCode, pins);
+    await DirectoryService.updateCctvPins(_myCode, pins, name: _myName);
+  }
+
+  /// "이 기기를 CCTV로 공유" — 기본 비밀번호를 확인한 뒤에만 송출 시작.
+  /// (아무나 송출을 켜지 못하도록. 기본 그룹이 아직 없으면 송출 화면에서 첫 코드 설정 유도.)
+  Future<void> _startShare() async {
+    final groups = await CctvStore.shareGroups();
+    if (!mounted) return;
+    if (groups.isNotEmpty) {
+      final basePin = groups.first.pin;
+      final p = await _promptPin();
+      if (p == null || !mounted) return;
+      if (p.trim() != basePin) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_wrong'))));
+        return;
+      }
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const CctvShareScreen()),
+    );
+    await _load();
   }
 
   /// 이 기기를 "대기 중 원격 켜기 가능한 CCTV"로 등록/해제.
@@ -254,9 +410,13 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
         await _load();
       }
     }
-    // 대기 중인 CCTV면 원격으로 깨운다(이미 켜져 있으면 무시됨).
-    DirectoryService.requestCctvWake(entry.code);
+    // 호스트의 "친구목록"에 이 기기를 시청자로 등록하고, 원격으로 깨운다.
+    // 깨우기엔 비번·기기ID를 함께 보내 서버가 차단/비번을 먼저 검사(틀리면 안 깨움).
+    final myUuid = await DeviceId.uuid();
     if (!mounted) return;
+    DirectoryService.registerCctvViewer(entry.code, myUuid, _myName);
+    DirectoryService.requestCctvWake(entry.code,
+        pin: entry.pin, uuid: myUuid);
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => CctvViewScreen(roomId: entry.roomId, pin: entry.pin),
     ));
@@ -280,6 +440,7 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     _noteCtrl.clear();
     _codeCtrl.clear();
     _pinCtrl.clear();
+    _showAddForm = false; // 추가 후엔 목록+버튼 상태로 복귀
     await _load();
     if (!mounted) return;
     _open(e, askPin: false); // 방금 비번을 입력했으므로 바로 재생
@@ -393,47 +554,56 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        // CCTV 전용 모드(홈)에선 좌측 햄버거 드로어로 앱 언어·앱 공유 제공(미팅과 통일).
-        drawer: AppConfig.cctvOnly ? _buildDrawer(context) : null,
-        appBar: AppBar(
-          centerTitle: true,
-          title: Text(L.t('menu_cctv')),
-          // 우측 상단: 앱 버전(5번 누르면 지원 기기 안내).
-          actions: const [
-            Padding(
-              padding: EdgeInsets.only(right: 14),
-              child: Center(child: VersionBadge()),
-            ),
-          ],
-          bottom: TabBar(
-            tabs: [
-              Tab(icon: const Icon(Icons.play_circle_outline),
-                  text: L.t('cctv_tab_view')),
-              Tab(icon: const Icon(Icons.videocam),
-                  text: L.t('cctv_tab_share')),
-              Tab(icon: const Icon(Icons.qr_code_2),
-                  text: L.t('cctv_tab_qrlist')),
-            ],
+    return Scaffold(
+      // CCTV 전용 모드(홈)에선 좌측 햄버거 드로어로 앱 언어·앱 공유 제공(미팅과 통일).
+      drawer: AppConfig.cctvOnly ? _buildDrawer(context) : null,
+      appBar: AppBar(
+        centerTitle: true,
+        title: Text(L.t('menu_cctv')),
+        // 우측 상단: 앱 버전(5번 누르면 지원 기기 안내).
+        actions: const [
+          Padding(
+            padding: EdgeInsets.only(right: 14),
+            child: Center(child: VersionBadge()),
           ),
-        ),
-        body: TabBarView(
-          children: [
-            _viewTab(),
-            _shareTab(),
-            _qrListTab(),
+        ],
+        bottom: TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
+          tabs: [
+            Tab(icon: const Icon(Icons.play_circle_outline),
+                text: L.t('cctv_tab_view')),
+            Tab(icon: const Icon(Icons.videocam),
+                text: L.t('cctv_tab_share')),
+            Tab(icon: const Icon(Icons.people_outline),
+                text: L.t('cctv_tab_friends')),
+            Tab(icon: const Icon(Icons.qr_code_2),
+                text: L.t('cctv_tab_qrlist')),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          _viewTab(),
+          _shareTab(),
+          _friendsTab(),
+          _qrListTab(),
+        ],
       ),
     );
   }
 
-  // 시청 탭: 저장한 CCTV 목록 + 새 CCTV 추가.
+  // 시청 탭:
+  //  - 저장된 CCTV가 없으면: 새 CCTV 추가 입력폼
+  //  - 있으면: 내 CCTV 목록만. 아래 "새 CCTV 추가" 버튼 → 누르면 입력폼이 열린다.
   Widget _viewTab() {
+    final showForm = _saved.isEmpty || _showAddForm;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      // 하단: 시스템 네비게이션바가 노출된 기기에서 버튼이 가리지 않도록 여백 추가.
+      padding: EdgeInsets.fromLTRB(
+          16, 16, 16, MediaQuery.of(context).viewPadding.bottom + 32),
       children: [
         if (_saved.isNotEmpty) ...[
           Text(L.t('cctv_my_list'),
@@ -479,50 +649,71 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
                 ),
               ),
             ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
         ],
-        Text(L.t('cctv_add'),
-            style: const TextStyle(
-                fontWeight: FontWeight.bold, color: Colors.white70)),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _noteCtrl,
-          maxLength: 40,
-          decoration: InputDecoration(
-            labelText: L.t('cctv_note'),
-            hintText: L.t('cctv_note_hint'),
-            border: const OutlineInputBorder(),
+        if (!showForm)
+          // 목록만 보여주고, 추가는 버튼을 눌러 폼을 연다.
+          OutlinedButton.icon(
+            onPressed: () => setState(() => _showAddForm = true),
+            icon: const Icon(Icons.add),
+            label: Text(L.t('cctv_add')),
+          )
+        else ...[
+          Row(
+            children: [
+              Expanded(
+                child: Text(L.t('cctv_add'),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.white70)),
+              ),
+              // 목록이 있을 때만: 폼 닫기(취소).
+              if (_saved.isNotEmpty)
+                TextButton(
+                  onPressed: () => setState(() => _showAddForm = false),
+                  child: Text(L.t('cancel')),
+                ),
+            ],
           ),
-        ),
-        const SizedBox(height: 4),
-        TextField(
-          controller: _codeCtrl,
-          decoration: InputDecoration(
-            labelText: L.t('cctv_code'),
-            hintText: 'abc-def-hij',
-            border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              icon: const Icon(Icons.qr_code_scanner),
-              tooltip: L.t('scan_qr'),
-              onPressed: _scan,
+          const SizedBox(height: 10),
+          TextField(
+            controller: _noteCtrl,
+            maxLength: 40,
+            decoration: InputDecoration(
+              labelText: L.t('cctv_note'),
+              hintText: L.t('cctv_note_hint'),
+              border: const OutlineInputBorder(),
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _pinCtrl,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: L.t('cctv_password'),
-            border: const OutlineInputBorder(),
+          const SizedBox(height: 4),
+          TextField(
+            controller: _codeCtrl,
+            decoration: InputDecoration(
+              labelText: L.t('cctv_code'),
+              hintText: 'abc-def-hij',
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: const Icon(Icons.qr_code_scanner),
+                tooltip: L.t('scan_qr'),
+                onPressed: _scan,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 16),
-        FilledButton.icon(
-          onPressed: _addAndView,
-          icon: const Icon(Icons.add),
-          label: Text(L.t('cctv_add_view')),
-        ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _pinCtrl,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: L.t('cctv_password'),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: _addAndView,
+            icon: const Icon(Icons.add),
+            label: Text(L.t('cctv_add_view')),
+          ),
+        ],
       ],
     );
   }
@@ -534,14 +725,33 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
       children: [
         Card(
           child: ListTile(
-            leading: const Icon(Icons.cast, size: 30),
+            leading: const Icon(Icons.videocam, size: 30),
             title: Text(L.t('cctv_share')),
             subtitle: Text(L.t('cctv_share_desc')),
-            onTap: () async {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const CctvShareScreen()),
-              );
-            },
+            onTap: _startShare,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // 송출 유지 조건 안내(백그라운드로 가면 멈춤).
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1A1F27),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.info_outline, size: 18, color: Colors.white54),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  L.t('cctv_share_fg_notice'),
+                  style: const TextStyle(fontSize: 12, color: Colors.white60),
+                ),
+              ),
+            ],
           ),
         ),
         if (AppConfig.supportsDeviceFeatures)

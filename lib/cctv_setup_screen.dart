@@ -58,10 +58,11 @@ class _CctvSetupScreenState extends State<CctvSetupScreen> {
     if (groups.isEmpty) {
       await CctvStore.addShareGroup(L.t('cctv_code_default'), pin);
     }
-    // 이름을 디렉터리에 게시 → 다른 기기가 코드로 추가할 때 이 이름이 보인다.
+    // 이름·비번을 디렉터리에 게시 → 코드 추가 시 이름 표시 + 원격 깨우기 비번 대조.
     try {
       final (code, _) = await CctvStore.myShareCredentials();
-      await DirectoryService.setCctvName(code, name);
+      final pins = await CctvStore.enabledSharePins();
+      await DirectoryService.updateCctvPins(code, pins, name: name);
     } catch (_) {}
     // Firestore 기기 등록 이름 갱신(원격 켜기/시청자 표시용).
     try {

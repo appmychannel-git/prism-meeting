@@ -36,6 +36,12 @@ class AppSettings {
   static bool _camAttemptPending = false;
   static bool get camAttemptPending => _camAttemptPending;
 
+  // CCTV 송출 전용 카메라 켜기 멈춤 감지 플래그(미팅의 camAttemptPending 와 분리 —
+  // CCTV에서 멈춰도 미팅 카메라 설정에 영향 주지 않도록).
+  static const _kCctvCamAttemptPending = 'cctv_camera_attempt_pending';
+  static bool _cctvCamAttemptPending = false;
+  static bool get cctvCamAttemptPending => _cctvCamAttemptPending;
+
   static Future<void> load() async {
     final sp = await SharedPreferences.getInstance();
     _requireAccept = sp.getBool(_kRequireAccept) ?? false;
@@ -43,6 +49,7 @@ class AppSettings {
     // 저장값 없으면 기기 자동 판정값을 기본으로.
     _cameraFlip180 = sp.getBool(_kCameraFlip180) ?? DeviceQuirks.cameraFlip180;
     _camAttemptPending = sp.getBool(_kCamAttemptPending) ?? false;
+    _cctvCamAttemptPending = sp.getBool(_kCctvCamAttemptPending) ?? false;
   }
 
   static Future<void> setRequireAccept(bool v) async {
@@ -67,5 +74,11 @@ class AppSettings {
     _camAttemptPending = v;
     final sp = await SharedPreferences.getInstance();
     await sp.setBool(_kCamAttemptPending, v);
+  }
+
+  static Future<void> setCctvCamAttemptPending(bool v) async {
+    _cctvCamAttemptPending = v;
+    final sp = await SharedPreferences.getInstance();
+    await sp.setBool(_kCctvCamAttemptPending, v);
   }
 }
