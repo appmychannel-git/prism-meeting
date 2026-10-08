@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import 'cctv_share_screen.dart';
@@ -16,6 +17,7 @@ import 'fullscreen_perm.dart';
 import 'l10n.dart';
 import 'scan_screen.dart';
 import 'share_qr.dart';
+import 'supported_devices.dart';
 
 /// CCTV 허브 — 내 CCTV(저장) 시청 / 새 CCTV 추가 / 이 기기 공유.
 class CctvHubScreen extends StatefulWidget {
@@ -305,35 +307,57 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     await _load();
   }
 
+  // 좌측 햄버거 드로어(CCTV 전용 모드): 앱 언어 · 앱 공유.
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: SafeArea(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: Text(L.t('app_language')),
+              onTap: () {
+                Navigator.pop(context);
+                showAppLanguagePicker(context);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.ios_share),
+              title: Text(L.t('menu_share_app')),
+              onTap: () {
+                Navigator.pop(context);
+                showShareLinkQrDialog(
+                  context,
+                  title: L.t('share_app_title'),
+                  message: L.t('share_app_msg', {'app': AppConfig.appBrand}),
+                  targetUrl: AppConfig.apkUrl,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
+        // CCTV 전용 모드(홈)에선 좌측 햄버거 드로어로 앱 언어·앱 공유 제공(미팅과 통일).
+        drawer: AppConfig.cctvOnly ? _buildDrawer(context) : null,
         appBar: AppBar(
+          centerTitle: true,
           title: Text(L.t('menu_cctv')),
-          // CCTV 전용 모드(홈)에선 회의쪽 드로어가 없으므로, 앱 언어·앱 공유를 여기서 제공.
-          actions: [
-            if (AppConfig.cctvOnly)
-              PopupMenuButton<String>(
-                onSelected: (v) {
-                  if (v == 'lang') {
-                    showAppLanguagePicker(context);
-                  } else if (v == 'share') {
-                    showShareLinkQrDialog(
-                      context,
-                      title: L.t('share_app_title'),
-                      message: L.t('share_app_msg', {'app': AppConfig.appBrand}),
-                      targetUrl: AppConfig.apkUrl,
-                    );
-                  }
-                },
-                itemBuilder: (_) => [
-                  PopupMenuItem(value: 'lang', child: Text(L.t('app_language'))),
-                  PopupMenuItem(
-                      value: 'share', child: Text(L.t('menu_share_app'))),
-                ],
-              ),
+          // 우측 상단: 앱 버전(5번 누르면 지원 기기 안내).
+          actions: const [
+            Padding(
+              padding: EdgeInsets.only(right: 14),
+              child: Center(child: VersionBadge()),
+            ),
           ],
           bottom: TabBar(
             tabs: [
@@ -519,13 +543,19 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
   }
 
   Widget _groupTile(CctvShareGroup g) {
+    // 첫(기본) 코드는 비활성·삭제 불가(항상 최소 1개 활성 유지).
+    final isDefault = _groups.isNotEmpty && _groups.first.id == g.id;
+    final active = isDefault || g.enabled;
     final tile = Card(
       child: ListTile(
         leading: Icon(Icons.vpn_key,
-            color: g.enabled ? const Color(0xFF4ADE80) : Colors.white30),
+            color: active ? const Color(0xFF4ADE80) : Colors.white30),
+        // 이름만 표시(비번은 QR 보기·편집에서 확인).
         title: Text(g.name),
-        subtitle: Text('${L.t('cctv_password')}: ${g.pin}',
-            style: const TextStyle(fontSize: 12)),
+        subtitle: isDefault
+            ? Text(L.t('cctv_default_badge'),
+                style: const TextStyle(fontSize: 11, color: Colors.white38))
+            : null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -540,21 +570,28 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
               onPressed: () => _editCode(g),
             ),
             Switch(
-              value: g.enabled,
-              onChanged: (v) async {
-                await CctvStore.updateShareGroup(g.id, enabled: v);
-                await _load();
-              },
+              value: active,
+              // 기본 코드는 토글 비활성(항상 켜짐).
+              onChanged: isDefault
+                  ? null
+                  : (v) async {
+                      await CctvStore.updateShareGroup(g.id, enabled: v);
+                      await _load();
+                    },
             ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: () => _deleteCode(g),
-            ),
+            // 기본 코드는 삭제 버튼 숨김(자리 맞춤용 빈 공간).
+            if (!isDefault)
+              IconButton(
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _deleteCode(g),
+              )
+            else
+              const SizedBox(width: 48),
           ],
         ),
       ),
     );
-    return g.enabled ? tile : Opacity(opacity: 0.55, child: tile);
+    return active ? tile : Opacity(opacity: 0.55, child: tile);
   }
 
   // 코드(그룹) 추가/편집 공용 다이얼로그. [g] 가 있으면 편집.
@@ -588,8 +625,10 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               obscureText: true,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 labelText: L.t('cctv_password'),
+                hintText: L.t('cctv_pw_hint6'),
                 border: const OutlineInputBorder(),
                 counterText: '',
                 isDense: true,
@@ -612,10 +651,12 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     final pin = pinCtrl.text.trim();
     nameCtrl.dispose();
     pinCtrl.dispose();
-    if (saved != true || pin.isEmpty) {
-      if (saved == true && pin.isEmpty && mounted) {
+    if (saved != true) return;
+    // 비밀번호는 숫자 6자리 고정.
+    if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+      if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(L.t('cctv_need_password'))));
+            .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_6digit'))));
       }
       return;
     }
@@ -640,15 +681,18 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
     await _load();
   }
 
-  // 그룹 QR(코드+비번 내장) 보기.
+  // 그룹 QR(코드+비번 내장) 보기. 하단 바에 가리지 않도록 스크롤 + 넉넉한 하단 여백.
   void _showGroupQr(CctvShareGroup g) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0E1116),
       showDragHandle: true,
-      builder: (_) => SafeArea(
+      isScrollControlled: true,
+      builder: (ctx) => SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          // 하단 시스템바/네비게이션바 높이 + 여유를 더해 내용이 가리지 않게 한다.
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.of(ctx).viewPadding.bottom + 56),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -665,8 +709,8 @@ class _CctvHubScreenState extends State<CctvHubScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: SizedBox(
-                  width: 180,
-                  height: 180,
+                  width: 170,
+                  height: 170,
                   child: PrettyQrView.data(
                     data: AppConfig.cctvLink(_myCode, pin: g.pin),
                     decoration: const PrettyQrDecoration(

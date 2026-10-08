@@ -33,6 +33,12 @@ build_one() {
   local base_url; base_url="$(brand_base_url "$brand")"
   local invite_url="$base_url"
   local share_url="${base_url}share/"
+  # 인증 기기 API 파라미터(브랜드 슬러그 + 앱 종류). URL 에 & 를 직접 안 넣는다.
+  local cert_brand cert_app
+  case "$brand" in
+    *cctv) cert_brand="${brand%cctv}"; cert_app="cctv" ;;
+    *)     cert_brand="$brand";        cert_app="meeting" ;;
+  esac
   # 산출물 이름: 미팅=Meeting-<brand>.apk, CCTV전용=CCTV-<브랜드명>.apk (예: gbledcctv→CCTV-gbled.apk)
   local apk_name
   if [ "${CCTV_ONLY:-false}" = "true" ]; then apk_name="CCTV-${brand%cctv}.apk"; else apk_name="Meeting-${brand}.apk"; fi
@@ -55,6 +61,8 @@ build_one() {
     --dart-define=DEFAULT_LANG=${DEFAULT_LANG:-} \
     --dart-define=INVITE_BASE_URL=$invite_url \
     --dart-define=SHARE_BASE_URL=$share_url \
+    --dart-define=CERT_BRAND=$cert_brand \
+    --dart-define=CERT_APP=$cert_app \
     --dart-define=APK_URL=$apk_url
   mkdir -p dist
   cp "build/app/outputs/flutter-apk/app-${brand}-release.apk" "dist/${apk_name}"

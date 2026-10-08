@@ -47,6 +47,8 @@ build_web_one() {
     --dart-define=SPLASH_BG=${SPLASH_BG:-} \
     --dart-define=SERVER_STT=${SERVER_STT:-false} \
     --dart-define=SHARE_BASE_URL="${base}share/" \
+    --dart-define=CERT_BRAND="${brand%cctv}" \
+    --dart-define=CERT_APP="$([ "${CCTV_ONLY:-false}" = "true" ] && echo cctv || echo meeting)" \
     --dart-define=APK_URL="${base}download/${apk_name}"
 
   local out="dist/web/${brand}"

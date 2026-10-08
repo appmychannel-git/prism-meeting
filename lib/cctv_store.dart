@@ -181,12 +181,16 @@ class CctvStore {
   }
 
   /// 현재 "활성" 그룹들의 비번(송출 시 서버로 보낼 유효 비번 집합).
+  /// 첫(기본) 그룹은 비활성/삭제가 불가하므로 항상 포함한다.
   static Future<List<String>> enabledSharePins() async {
     final gs = await shareGroups();
-    return gs
-        .where((g) => g.enabled && g.pin.isNotEmpty)
-        .map((g) => g.pin)
-        .toList();
+    final pins = <String>[];
+    for (var i = 0; i < gs.length; i++) {
+      final g = gs[i];
+      if (g.pin.isEmpty) continue;
+      if (i == 0 || g.enabled) pins.add(g.pin); // 기본(첫) 그룹은 항상 포함
+    }
+    return pins;
   }
 
   // ── 시청 목록 ──

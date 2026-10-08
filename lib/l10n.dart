@@ -308,6 +308,21 @@ class L {
     'unblock': {'ko': '차단 해제', 'en': 'Unblock'},
     'blocked_list': {'ko': '차단 목록', 'en': 'Blocked'},
     'blocked_empty': {'ko': '차단한 사람이 없습니다.', 'en': 'No blocked people.'},
+    // ── 인증(검증) 기기 안내 (버전 5탭) ──
+    'dev_support_title': {'ko': '기기 검증 여부', 'en': 'Device verification'},
+    'dev_this': {'ko': '이 기기', 'en': 'This device'},
+    'dev_supported': {'ko': '검증된 기기입니다', 'en': 'This device is verified'},
+    'dev_unverified': {
+      'ko': '검증되지 않은 기기입니다',
+      'en': 'Not a verified device',
+    },
+    'dev_unverified_sub': {
+      'ko': '사용은 가능하지만 일부 기능(카메라 등)이 동작하지 않을 수 있습니다.',
+      'en': 'You can still use it, but some features (e.g. camera) may not work.',
+    },
+    'dev_list_btn': {'ko': '검증 기기 목록', 'en': 'Verified devices'},
+    'dev_list_title': {'ko': '검증 기기 목록', 'en': 'Verified devices'},
+    'dev_this_badge': {'ko': '현재 기기', 'en': 'This device'},
     'show_blocked': {'ko': '차단 포함', 'en': 'Show blocked'},
     'blocked_label': {'ko': '차단됨', 'en': 'Blocked'},
     'blocked_snack': {'ko': '차단했습니다', 'en': 'Blocked'},
@@ -352,6 +367,15 @@ class L {
       'en': 'No codes added yet.',
     },
     'cctv_add_code': {'ko': '코드 추가', 'en': 'Add code'},
+    'cctv_default_badge': {
+      'ko': '기본 (끌 수 없음)',
+      'en': 'Default (always on)',
+    },
+    'cctv_pw_hint6': {'ko': '숫자 6자리', 'en': '6 digits'},
+    'cctv_pw_6digit': {
+      'ko': '비밀번호는 숫자 6자리로 입력해 주세요.',
+      'en': 'Password must be exactly 6 digits.',
+    },
     'cctv_code_name': {'ko': '코드 이름', 'en': 'Code name'},
     'cctv_code_name_hint': {'ko': '예: 가족, 매장직원', 'en': 'e.g. Family, Staff'},
     'cctv_code_default': {'ko': '기본', 'en': 'Default'},

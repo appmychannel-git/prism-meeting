@@ -13,6 +13,7 @@ import 'cctv_hub_screen.dart';
 import 'cctv_store.dart';
 import 'cctv_view_screen.dart';
 import 'config.dart';
+import 'supported_devices.dart';
 import 'confirm_dialog.dart';
 import 'device_id.dart';
 import 'directory.dart';
@@ -948,15 +949,9 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
               top: 0,
               right: 0,
               child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8, right: 14),
-                  child: Text(
-                    'v${AppConfig.appVersion}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.white.withValues(alpha: 0.45),
-                    ),
-                  ),
+                child: const Padding(
+                  padding: EdgeInsets.only(top: 8, right: 14),
+                  child: VersionBadge(),
                 ),
               ),
             ),

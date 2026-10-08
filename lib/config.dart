@@ -20,7 +20,7 @@ import 'package:flutter/foundation.dart'
 class AppConfig {
   /// 앱 표시 버전. 입장 화면 우측 상단에 노출한다.
   /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
-  static const String appVersion = '1.0.11';
+  static const String appVersion = '1.0.12';
 
   /// 앱 표시 브랜드명(브라우저 타이틀 + 입장화면 제목).
   /// 기본 'Prism Meeting'. 거래처 시연 등 브랜드를 숨길 땐
@@ -274,6 +274,23 @@ class AppConfig {
     defaultValue:
         'https://androidtv.mychannel.co.kr/apps/meeting/mychannel/download/Meeting-mychannel.apk',
   );
+
+  /// 인증(검증) 기기 목록 API. brand·app 파라미터로 받아온다.
+  /// URL 에 '&' 를 직접 넣으면 Windows flutter.bat 명령 파싱이 깨지므로,
+  /// base·brand·app 을 각각 dart-define 으로 받아 앱에서 조립한다.
+  static const String certApiBase = String.fromEnvironment(
+    'CERT_API_BASE',
+    defaultValue:
+        'https://platformtvapi.mychannel.co.kr/gbled/appinterface/tv/1.0/certified-devices.asp',
+  );
+  static const String certBrand =
+      String.fromEnvironment('CERT_BRAND', defaultValue: 'viewplus');
+  static const String certApp =
+      String.fromEnvironment('CERT_APP', defaultValue: 'meeting');
+
+  /// 인증 기기 목록 JSON 주소(실패/빈 목록이면 앱 내 하드코딩 Gm81·D23 폴백).
+  static String get certifiedDevicesUrl =>
+      '$certApiBase?brand=$certBrand&app=$certApp';
 
   /// 공유 페이지 URL 생성: 제목(t)·메시지(m)·대상링크(u)를 쿼리로 실어 보낸다.
   /// 이 URL을 QR로 만들어 두면, 휴대폰이 찍었을 때 공유 페이지가 열려

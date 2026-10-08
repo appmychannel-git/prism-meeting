@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 import 'package:livekit_client/livekit_client.dart';
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 import 'package:screen_brightness/screen_brightness.dart';
@@ -158,9 +159,10 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               obscureText: true,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
                 labelText: L.t('cctv_password'),
-                hintText: L.t('cctv_password_new_hint'),
+                hintText: L.t('cctv_pw_hint6'),
                 border: const OutlineInputBorder(),
                 counterText: '',
                 isDense: true,
@@ -184,7 +186,8 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     final pin = pinCtrl.text.trim();
     nameCtrl.dispose();
     pinCtrl.dispose();
-    if (ok == true && pin.isNotEmpty) {
+    // 비밀번호는 숫자 6자리 고정.
+    if (ok == true && RegExp(r'^\d{6}$').hasMatch(pin)) {
       await CctvStore.addShareGroup(
           name.isNotEmpty ? name : L.t('cctv_code_default'), pin);
     }
@@ -393,35 +396,33 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
     );
   }
 
-  // 활성 그룹(코드)별 QR을 하단 시트로 표시(각 QR에 그 그룹 비번 내장 → 스캔 시 바로 접속).
+  // 송출 화면 QR 버튼: 기본(첫 활성) 코드의 QR만 보여준다.
+  // (그룹별 QR 전체 관리는 홈의 'QR목록' 탭에서)
   Future<void> _showShareInfo() async {
     final groups = (await CctvStore.shareGroups())
         .where((g) => g.enabled && g.pin.isNotEmpty)
         .toList();
-    if (!mounted) return;
+    if (!mounted || groups.isEmpty) return;
+    final g = groups.first; // 기본 QR
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: const Color(0xFF0E1116),
       showDragHandle: true,
-      isScrollControlled: true, // 내용이 길면 화면 높이만큼 확장
-      builder: (_) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('${L.t('cctv_code')}: $_code',
-                    style: const TextStyle(color: Colors.white54)),
-                const SizedBox(height: 14),
-                for (final g in groups) _groupQrCard(g),
-                Text(
-                  L.t('cctv_share_hint'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: Colors.white70),
-                ),
-              ],
-            ),
+      isScrollControlled: true,
+      builder: (ctx) => SingleChildScrollView(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+              20, 0, 20, MediaQuery.of(ctx).viewPadding.bottom + 56),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _groupQrCard(g),
+              Text(
+                L.t('cctv_share_hint'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+              ),
+            ],
           ),
         ),
       ),
