@@ -6,6 +6,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'config.dart';
 import 'connection_service.dart';
+import 'device_id.dart';
 import 'device_quirks.dart';
 import 'directory.dart';
 import 'l10n.dart';
@@ -30,6 +31,9 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   bool _leaving = false; // 사용자가 직접 닫는 중(정상 종료)
   bool _popped = false; // pop 중복 방지
   bool _connected = false; // 방 접속 성공 여부
+  // 시청자 identity — 기기별 고정값. 재시도/재진입 때 같은 identity 로 접속해야
+  // LiveKit 이 이전 세션을 즉시 교체해 유령 참가자(시청자 2명 표시)가 안 생긴다.
+  String _identity = 'viewer';
   bool _sawVideo = false; // 호스트 영상을 한 번이라도 받았는지
   Timer? _continueTimer;
 
@@ -51,6 +55,10 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
   }
 
   Future<void> _init() async {
+    // 기기별 고정 identity(재시도/재진입 시 이전 세션 교체 → 유령 참가자 방지).
+    try {
+      _identity = 'viewer-${await DeviceId.uuid()}';
+    } catch (_) {}
     // E2EE(옵션): 비밀번호를 공유키로 사용(회의/CCTV 당사자만 복호화).
     final e2ee = (AppConfig.e2ee && widget.pin.isNotEmpty)
         ? await E2EEOptions.sharedKey('${widget.roomId}:${widget.pin}')
@@ -256,7 +264,7 @@ class _CctvViewScreenState extends State<CctvViewScreen> {
         tokenServerUrl: AppConfig.tokenServerUrl,
         roomName: widget.roomId,
         participantName: 'Viewer',
-        identity: 'viewer-${DateTime.now().millisecondsSinceEpoch}',
+        identity: _identity, // 기기별 고정(유령 참가자 방지)
         pin: widget.pin,
         create: false, // 방을 새로 만들지 않음(방없음/비번무효 구분 위해)
       );
