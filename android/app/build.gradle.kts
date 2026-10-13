@@ -69,7 +69,7 @@ android {
         create("gbled") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.gbled"
-            manifestPlaceholders["appLabel"] = "글로벌미팅"
+            manifestPlaceholders["appLabel"] = "Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/gbled/"
         }
         create("viewplus") {
@@ -101,7 +101,7 @@ android {
         create("gbledcctv") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.cctv.gbled"
-            manifestPlaceholders["appLabel"] = "글로벌 CCTV"
+            manifestPlaceholders["appLabel"] = "CCTV"
             manifestPlaceholders["deepLinkPath"] = "/apps/cctv/gbled/"
         }
         create("viewpluscctv") {
