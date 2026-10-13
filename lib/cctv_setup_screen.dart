@@ -53,10 +53,14 @@ class _CctvSetupScreenState extends State<CctvSetupScreen> {
     final name = _nameCtrl.text.trim();
     final pin = _pinCtrl.text.trim();
     await DeviceId.setName(name);
-    // 기본 공유 그룹이 아직 없으면 생성(이후 송출 시 바로 사용).
+    // 입력한 기본 비번을 항상 적용한다. 그룹이 없으면 "기본" 그룹 생성,
+    // 이미 있으면(예: 구버전 자동 pin 마이그레이션) 첫(기본) 그룹의 비번을 입력값으로 갱신.
+    // (이 갱신을 빼면 구버전 잔존 비번이 유지돼 입력값이 무시되는 버그가 난다)
     final groups = await CctvStore.shareGroups();
     if (groups.isEmpty) {
       await CctvStore.addShareGroup(L.t('cctv_code_default'), pin);
+    } else {
+      await CctvStore.updateShareGroup(groups.first.id, pin: pin);
     }
     // 이름·비번을 디렉터리에 게시 → 코드 추가 시 이름 표시 + 원격 깨우기 비번 대조.
     try {
