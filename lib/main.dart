@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'app_settings.dart';
 import 'cctv_hub_screen.dart';
@@ -226,6 +227,9 @@ class _IdSetupGateState extends State<_IdSetupGate> {
       final groups = await CctvStore.shareGroups();
       if (groups.isEmpty) need = true;
     }
+    // 웹은 설치형 기기가 아니라 시청/참여만 한다(송출 불가). 첫 실행 이름·비번 설정이
+    // 불필요하므로 설정 화면을 건너뛰고 바로 홈으로 간다.
+    if (kIsWeb) need = false;
     if (!mounted) return;
     setState(() {
       _needSetup = need;

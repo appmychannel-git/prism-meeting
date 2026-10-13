@@ -53,7 +53,8 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this);
+    // 웹은 시청 탭 1개만, 앱은 4개(시청/녹화/친구목록/QR목록).
+    _tabs = TabController(length: kIsWeb ? 1 : 4, vsync: this);
     // 친구목록 탭으로 전환할 때마다 시청자 목록을 새로고침.
     _tabs.addListener(() {
       if (!_tabs.indexIsChanging && _tabs.index == _friendsTabIndex) {
@@ -567,30 +568,39 @@ class _CctvHubScreenState extends State<CctvHubScreen>
             child: Center(child: VersionBadge()),
           ),
         ],
+        // 웹은 시청(보기) 전용 → 탭바는 유지하되 "시청" 탭 1개만.
+        // (송출·친구목록·QR목록은 앱 전용 호스트 기능이라 웹에선 숨김)
         bottom: TabBar(
           controller: _tabs,
           isScrollable: true,
           tabAlignment: TabAlignment.center,
-          tabs: [
-            Tab(icon: const Icon(Icons.play_circle_outline),
-                text: L.t('cctv_tab_view')),
-            Tab(icon: const Icon(Icons.videocam),
-                text: L.t('cctv_tab_share')),
-            Tab(icon: const Icon(Icons.people_outline),
-                text: L.t('cctv_tab_friends')),
-            Tab(icon: const Icon(Icons.qr_code_2),
-                text: L.t('cctv_tab_qrlist')),
-          ],
+          tabs: kIsWeb
+              ? [
+                  Tab(icon: const Icon(Icons.play_circle_outline),
+                      text: L.t('cctv_tab_view')),
+                ]
+              : [
+                  Tab(icon: const Icon(Icons.play_circle_outline),
+                      text: L.t('cctv_tab_view')),
+                  Tab(icon: const Icon(Icons.videocam),
+                      text: L.t('cctv_tab_share')),
+                  Tab(icon: const Icon(Icons.people_outline),
+                      text: L.t('cctv_tab_friends')),
+                  Tab(icon: const Icon(Icons.qr_code_2),
+                      text: L.t('cctv_tab_qrlist')),
+                ],
         ),
       ),
       body: TabBarView(
         controller: _tabs,
-        children: [
-          _viewTab(),
-          _shareTab(),
-          _friendsTab(),
-          _qrListTab(),
-        ],
+        children: kIsWeb
+            ? [_viewTab()]
+            : [
+                _viewTab(),
+                _shareTab(),
+                _friendsTab(),
+                _qrListTab(),
+              ],
       ),
     );
   }
@@ -720,6 +730,47 @@ class _CctvHubScreenState extends State<CctvHubScreen>
 
   // 송출 탭: 이 기기 공유 + 대기 중 원격 켜기.
   Widget _shareTab() {
+    // 웹(브라우저)에서는 CCTV 송출을 지원하지 않는다 → 버튼 비활성 + 안내만.
+    if (kIsWeb) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Opacity(
+            opacity: 0.6,
+            child: Card(
+              child: ListTile(
+                enabled: false,
+                leading: const Icon(Icons.videocam_off, size: 30),
+                title: Text(L.t('cctv_share')),
+                subtitle: Text(L.t('cctv_share_web_na')),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1F27),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white12),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline, size: 18, color: Colors.white54),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    L.t('cctv_share_web_na_desc'),
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [

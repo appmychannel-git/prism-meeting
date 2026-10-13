@@ -42,6 +42,7 @@ build_web_one() {
     --dart-define=SHOW_TRANSLATION=$TRANSLATION \
     --dart-define=START_CAMERA=$START_CAMERA \
     --dart-define=ENABLE_E2EE=$E2EE \
+    --dart-define=CCTV_ONLY=${CCTV_ONLY:-false} \
     --dart-define=DEFAULT_LANG=${DEFAULT_LANG:-} \
     --dart-define=SPLASH_IMAGE=${SPLASH_IMAGE:-} \
     --dart-define=SPLASH_BG=${SPLASH_BG:-} \

@@ -380,6 +380,14 @@ class L {
       'en': 'Going back will stop CCTV sharing. Continue?',
     },
     'cctv_share_exit_ok': {'ko': '공유 중단', 'en': 'Stop sharing'},
+    'cctv_share_web_na': {
+      'ko': '웹에서는 송출할 수 없습니다 (앱 전용)',
+      'en': 'Broadcasting isn\'t available on web (app only)',
+    },
+    'cctv_share_web_na_desc': {
+      'ko': 'CCTV 송출(촬영)은 앱에서만 가능합니다. 웹에서는 시청만 지원됩니다.',
+      'en': 'CCTV broadcasting is available only in the app. The web supports viewing only.',
+    },
     'cctv_share_fg_notice': {
       'ko': 'CCTV 송출은 송출 화면이 켜져 있는 동안 동작합니다. 다른 앱으로 전환하거나 홈으로 나가면 송출이 중단됩니다. 계속 송출하려면 송출 화면을 그대로 두세요.',
       'en': 'CCTV broadcasting works only while the broadcast screen is open. Switching apps or going to the home screen stops it. Keep the broadcast screen open to keep broadcasting.',
