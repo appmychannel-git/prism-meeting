@@ -338,6 +338,11 @@ class L {
     'cctv_tab_view': {'ko': '시청', 'en': 'View'},
     'cctv_tab_share': {'ko': '녹화', 'en': 'Record'},
     'cctv_code': {'ko': '코드', 'en': 'Code'},
+    'cctv_code_enter': {'ko': '코드 입력', 'en': 'Enter code'},
+    'cctv_code_enter_hint': {
+      'ko': '영문·숫자 9자리를 입력하세요(- 없이).',
+      'en': 'Enter 9 letters/digits (no dashes).'
+    },
     'cctv_password': {'ko': '비밀번호', 'en': 'Password'},
     'cctv_enter_pin': {'ko': 'CCTV 비밀번호 입력', 'en': 'Enter CCTV password'},
     'cctv_set_password': {'ko': 'CCTV 비밀번호 설정', 'en': 'Set CCTV password'},

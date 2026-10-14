@@ -3,7 +3,11 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show FilteringTextInputFormatter;
+import 'package:flutter/services.dart'
+    show
+        FilteringTextInputFormatter,
+        LengthLimitingTextInputFormatter,
+        TextInputFormatter;
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
 import 'cctv_share_screen.dart';
@@ -198,6 +202,145 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     );
     ctrl.dispose();
     return pin;
+  }
+
+  /// 코드 입력 팝업 — 코드는 항상 3-3-3(영문·숫자 9자리) 고정 형식이라, 칸을 나눈
+  /// 박스에 영문·숫자 9자만 입력받고 '-'는 자동으로 보여준다(키보드에서 특수문자로
+  /// '-' 를 찾아 넣을 필요 없음). 백스페이스로 한 글자씩 지운다.
+  /// 확인 시 'xxx-xxx-xxx' 반환, 취소/미완성이면 null.
+  Future<String?> _promptCode({String initial = ''}) async {
+    final ctrl = TextEditingController(
+        text: initial.replaceAll('-', '').toLowerCase());
+    ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length);
+    final focus = FocusNode();
+    String dashed(String r) {
+      final b = StringBuffer();
+      for (var i = 0; i < r.length; i++) {
+        if (i == 3 || i == 6) b.write('-');
+        b.write(r[i]);
+      }
+      return b.toString();
+    }
+
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final raw = ctrl.text;
+          Widget boxAt(int i) {
+            final ch = i < raw.length ? raw[i] : '';
+            final active = i == raw.length; // 다음 입력 칸 강조
+            return Container(
+              width: 30,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1F27),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: active ? const Color(0xFF5B8DEF) : Colors.white24,
+                  width: active ? 2 : 1,
+                ),
+              ),
+              child: Text(ch,
+                  style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white)),
+            );
+          }
+
+          const dash = Padding(
+            padding: EdgeInsets.symmetric(horizontal: 5),
+            child:
+                Text('-', style: TextStyle(fontSize: 22, color: Colors.white38)),
+          );
+          final cells = <Widget>[];
+          for (var i = 0; i < 9; i++) {
+            if (i == 3 || i == 6) cells.add(dash);
+            cells.add(boxAt(i));
+            if (i != 2 && i != 5 && i != 8) {
+              cells.add(const SizedBox(width: 4));
+            }
+          }
+          return AlertDialog(
+            title: Text(L.t('cctv_code_enter')),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(L.t('cctv_code_enter_hint'),
+                    textAlign: TextAlign.center,
+                    style:
+                        const TextStyle(fontSize: 12, color: Colors.white54)),
+                const SizedBox(height: 16),
+                // 보이는 박스(아래) + 그 위에 투명 입력 필드(탭/오토포커스로 키보드).
+                SizedBox(
+                  height: 46,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      IgnorePointer(
+                        child: Row(
+                            mainAxisSize: MainAxisSize.min, children: cells),
+                      ),
+                      Positioned.fill(
+                        child: Opacity(
+                          opacity: 0,
+                          child: TextField(
+                            controller: ctrl,
+                            focusNode: focus,
+                            autofocus: true,
+                            showCursor: false,
+                            enableSuggestions: false,
+                            autocorrect: false,
+                            keyboardType: TextInputType.visiblePassword,
+                            textInputAction: TextInputAction.done,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'[A-Za-z0-9]')),
+                              LengthLimitingTextInputFormatter(9),
+                              TextInputFormatter.withFunction((o, n) =>
+                                  n.copyWith(text: n.text.toLowerCase())),
+                            ],
+                            onChanged: (_) => setD(() {}),
+                            onSubmitted: (_) {
+                              if (ctrl.text.length == 9) {
+                                Navigator.pop(ctx, dashed(ctrl.text));
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 22),
+                // 버튼을 content 안에 넣는다(AlertDialog actions 로 두면 키보드에
+                // 눌릴 때 박스와 겹치는 문제가 있어 세로로 순차 배치).
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text(L.t('cancel'))),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: raw.length == 9
+                          ? () => Navigator.pop(ctx, dashed(raw))
+                          : null,
+                      child: Text(L.t('ok')),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+    ctrl.dispose();
+    focus.dispose();
+    return result;
   }
 
   Future<void> _load() async {
@@ -735,6 +878,14 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           const SizedBox(height: 4),
           TextField(
             controller: _codeCtrl,
+            // 코드는 3-3-3 고정 형식 → 탭하면 전용 입력 팝업을 띄워 영문·숫자 9자만
+            // 받고 '-' 는 자동 처리(키보드에서 '-' 특수문자 찾는 불편 제거).
+            readOnly: true,
+            showCursor: false,
+            onTap: () async {
+              final c = await _promptCode(initial: _codeCtrl.text);
+              if (c != null && mounted) setState(() => _codeCtrl.text = c);
+            },
             decoration: InputDecoration(
               labelText: L.t('cctv_code'),
               hintText: 'abc-def-hij',
