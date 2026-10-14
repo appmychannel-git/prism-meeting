@@ -42,6 +42,9 @@ build_one() {
   # 산출물 이름: 미팅=Meeting-<brand>.apk, CCTV전용=CCTV-<브랜드명>.apk (예: gbledcctv→CCTV-gbled.apk)
   local apk_name
   if [ "${CCTV_ONLY:-false}" = "true" ]; then apk_name="CCTV-${brand%cctv}.apk"; else apk_name="Meeting-${brand}.apk"; fi
+  # 제조사 플랫폼 키 서명(선탑재 기기)이면 파일명에 꼬리표(서명 다른 APK 구분, R5).
+  # PLATFORM_SIGN 환경변수는 flutter build → gradle 로 전달돼 플랫폼 키로 서명된다.
+  if [ -n "${PLATFORM_SIGN:-}" ]; then apk_name="${apk_name%.apk}-platform-${PLATFORM_SIGN}.apk"; fi
   local apk_url="${base_url}download/${apk_name}"
   echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE cctvOnly=${CCTV_ONLY:-false}"
   echo "   base=$base_url"

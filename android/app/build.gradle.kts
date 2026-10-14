@@ -18,6 +18,29 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+// 제조사 플랫폼 키 서명(선탑재 기기용) — 옵트인. 기본 빌드는 절대 이 키를 쓰지 않는다.
+//   PLATFORM_SIGN=cubot ./scripts/build_brand.sh gbled   (또는 gradle -PplatformSign=cubot)
+// 서브앱 서명 키 = 그 기기의 마켓앱 서명 키여야 로그인 세션을 읽는다(signature 권한).
+// 규칙: md/platform-signing-build-rules-2026-10-14.md. 키 파일/비번은 커밋 금지.
+val platformKeyId: String =
+    ((project.findProperty("platformSign") ?: System.getenv("PLATFORM_SIGN")) ?: "")
+        .toString().trim()
+val usePlatformSign: Boolean =
+    platformKeyId.isNotEmpty() || project.hasProperty("platformSign")
+if (usePlatformSign && platformKeyId.isEmpty()) {
+    throw GradleException("platformSign 에 제조사 이름을 주세요. 예: PLATFORM_SIGN=cubot")
+}
+val platformProperties = Properties().apply {
+    if (usePlatformSign) {
+        val f = rootProject.file("platform-key-$platformKeyId.properties")
+        if (!f.exists()) {
+            throw GradleException(
+                "android/${f.name} 이 없습니다(플랫폼 키 설정 파일).")
+        }
+        load(FileInputStream(f))
+    }
+}
+
 android {
     namespace = "kr.co.mychannel.meeting.prism"
     compileSdk = flutter.compileSdkVersion
@@ -129,12 +152,24 @@ android {
                 storePassword = keystoreProperties["storePassword"] as String
             }
         }
+        // 선탑재 기기용 플랫폼 키(옵트인일 때만 생성).
+        if (usePlatformSign) {
+            create("platform") {
+                storeFile = file(platformProperties["storeFile"] as String)
+                storePassword = platformProperties["storePassword"] as String
+                keyAlias = platformProperties["keyAlias"] as String
+                keyPassword = platformProperties["keyPassword"] as String
+                (platformProperties["storeType"] as String?)?.let { storeType = it }
+            }
+        }
     }
 
     buildTypes {
         release {
-            // key.properties 있으면 릴리즈 키로 서명, 없으면 기존 debug 키(테스트용)
-            signingConfig = if (keystorePropertiesFile.exists()) {
+            // 옵트인이면 플랫폼 키, 아니면 릴리즈 키(없으면 debug 테스트용).
+            signingConfig = if (usePlatformSign) {
+                signingConfigs.getByName("platform")
+            } else if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
