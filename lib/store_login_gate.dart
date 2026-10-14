@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'access.dart';
 import 'config.dart';
+import 'mobile_auth.dart';
 import 'store_login.dart';
 
 /// 홈 화면 앞단의 "로그인/권한 게이트".
@@ -60,9 +61,9 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     final info = await StoreLogin.read();
     if (!mounted) return;
 
-    // 마켓앱 없음(모바일/웹) → 제한 티어로 실행(Phase 2: 자체 로그인).
+    // 마켓앱 없음(모바일/웹) → 자체 로그인 세션이 있으면 그 계정 티어로.
     if (info == null) {
-      Access.set(AccessLevel.limited);
+      await _applyMobileSession();
       _done();
       return;
     }
@@ -96,11 +97,28 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     if (!AppConfig.useStoreLogin) return;
     final info = await StoreLogin.read();
     if (!mounted) return;
-    if (info == null || !info.isValid) {
+    if (info == null) {
+      await _applyMobileSession(); // 모바일: 자체 로그인 세션 재확인
+    } else if (!info.isValid) {
       Access.set(AccessLevel.limited);
     } else {
       Access.set(info.registered ? AccessLevel.full : AccessLevel.limited);
     }
+  }
+
+  // 모바일(마켓앱 없음): viewplus 자체 로그인 세션이 있으면 me 로 티어 판정.
+  Future<void> _applyMobileSession() async {
+    try {
+      if (await MobileAuth.instance.hasSession()) {
+        final u = await MobileAuth.instance.me();
+        if (!mounted) return;
+        Access.set((u?.registered ?? false)
+            ? AccessLevel.full
+            : AccessLevel.limited);
+        return;
+      }
+    } catch (_) {}
+    Access.set(AccessLevel.limited);
   }
 
   void _done() {

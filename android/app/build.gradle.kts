@@ -156,4 +156,6 @@ flutter {
 dependencies {
     // 코어 라이브러리 디슈가링(flutter_local_notifications 요구).
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    // 카카오 로그인(모바일 자체 로그인). access_token 을 받아 서버로 전달.
+    implementation("com.kakao.sdk:v2-user:2.20.6")
 }

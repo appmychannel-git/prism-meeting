@@ -17,6 +17,11 @@ import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.WindowManager
+import com.kakao.sdk.auth.model.OAuthToken
+import com.kakao.sdk.common.KakaoSdk
+import com.kakao.sdk.common.model.ClientError
+import com.kakao.sdk.common.model.ClientErrorCause
+import com.kakao.sdk.user.UserApiClient
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -39,6 +44,10 @@ class MainActivity : FlutterActivity() {
     private val verifyUrl = "https://viewplus.co.kr/api/tv/session"
     private var storeChannel: MethodChannel? = null
     private var sessionObserver: ContentObserver? = null
+
+    // ===== 카카오 로그인(모바일 자체 로그인) =====
+    private val kakaoNativeKey = "bd28f3b76080e0b4d64865386a35319d"
+    private var kakaoInited = false
 
     // 수신 통화(풀스크린 인텐트)가 잠금화면 위로 뜨고 화면을 켜도록.
     // 매니페스트의 showWhenLocked/turnScreenOn(API 27+)에 더해, 구버전(23~26)은
@@ -187,6 +196,78 @@ class MainActivity : FlutterActivity() {
                 "stopObserve" -> result.success(stopObserve())
                 else -> result.notImplemented()
             }
+        }
+
+        // 카카오 로그인: access_token 을 받아 Dart(서버)로 넘긴다.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app/kakao")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "login" -> kakaoLogin(result)
+                    else -> result.notImplemented()
+                }
+            }
+    }
+
+    // 카카오톡(설치 시) → 카카오계정 폴백. 성공 시 access_token, 취소 시 "cancelled".
+    private fun kakaoLogin(result: MethodChannel.Result) {
+        try {
+            if (!kakaoInited) {
+                KakaoSdk.init(this, kakaoNativeKey)
+                kakaoInited = true
+            }
+        } catch (e: Exception) {
+            result.error("kakao", "init failed: ${e.message}", null)
+            return
+        }
+        val resolved = AtomicBoolean(false)
+        fun ok(token: String) {
+            if (resolved.compareAndSet(false, true)) result.success(token)
+        }
+        fun cancelled() {
+            if (resolved.compareAndSet(false, true)) {
+                result.error("cancelled", "user cancelled", null)
+            }
+        }
+        fun fail(msg: String?) {
+            if (resolved.compareAndSet(false, true)) {
+                result.error("kakao", msg ?: "login failed", null)
+            }
+        }
+
+        val accountCb: (OAuthToken?, Throwable?) -> Unit = { token, error ->
+            when {
+                error != null -> {
+                    if (error is ClientError &&
+                        error.reason == ClientErrorCause.Cancelled) {
+                        cancelled()
+                    } else {
+                        fail(error.message)
+                    }
+                }
+                token != null -> ok(token.accessToken)
+                else -> fail("no token")
+            }
+        }
+
+        if (UserApiClient.instance.isKakaoTalkLoginAvailable(this)) {
+            UserApiClient.instance.loginWithKakaoTalk(this) { token, error ->
+                if (error != null) {
+                    if (error is ClientError &&
+                        error.reason == ClientErrorCause.Cancelled) {
+                        cancelled()
+                    } else {
+                        // 카카오톡 로그인 실패 → 카카오계정(웹)으로 폴백
+                        UserApiClient.instance
+                            .loginWithKakaoAccount(this, callback = accountCb)
+                    }
+                } else if (token != null) {
+                    ok(token.accessToken)
+                } else {
+                    fail("no token")
+                }
+            }
+        } else {
+            UserApiClient.instance.loginWithKakaoAccount(this, callback = accountCb)
         }
     }
 

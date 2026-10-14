@@ -93,6 +93,52 @@ class L {
       'ko': '로그인·기기 인증을 하면 CCTV 송출(이 기기 공유)을 쓸 수 있어요.',
       'en': 'Sign in and verify your device to broadcast this device as CCTV.'
     },
+    // 모바일 로그인 화면
+    'login_title': {'ko': '로그인', 'en': 'Sign in'},
+    'login_email': {'ko': '이메일', 'en': 'Email'},
+    'login_password': {'ko': '비밀번호', 'en': 'Password'},
+    'login_or': {'ko': '또는', 'en': 'or'},
+    'login_google': {'ko': 'Google로 계속하기', 'en': 'Continue with Google'},
+    'login_kakao': {'ko': '카카오로 계속하기', 'en': 'Continue with Kakao'},
+    'login_enter_both': {
+      'ko': '이메일과 비밀번호를 입력하세요.',
+      'en': 'Enter your email and password.'
+    },
+    'login_signup_notice': {
+      'ko': '회원가입·비밀번호 찾기는 viewplus.co.kr 에서 할 수 있어요.',
+      'en': 'Sign up or reset your password at viewplus.co.kr.'
+    },
+    'login_ok_unverified': {
+      'ko': '로그인됐어요. 기기 인증(TV 시리얼 등록) 후 모든 기능을 쓸 수 있어요.',
+      'en': 'Signed in. Verify your device (TV serial) to unlock all features.'
+    },
+    'login_err_credential': {
+      'ko': '이메일 또는 비밀번호를 확인하세요.',
+      'en': 'Check your email or password.'
+    },
+    'login_err_forbidden': {
+      'ko': '로그인이 제한된 계정입니다.',
+      'en': 'This account is restricted.'
+    },
+    'login_err_rate': {
+      'ko': '잠시 후 다시 시도해 주세요.',
+      'en': 'Please try again shortly.'
+    },
+    'login_err_network': {
+      'ko': '네트워크 연결을 확인해 주세요.',
+      'en': 'Check your network connection.'
+    },
+    'login_err_generic': {
+      'ko': '로그인에 실패했어요. 잠시 후 다시 시도해 주세요.',
+      'en': 'Sign-in failed. Please try again.'
+    },
+    'onboarding_title': {'ko': '약관 동의', 'en': 'Terms of service'},
+    'onboarding_body': {
+      'ko': '서비스 이용약관과 개인정보 처리방침에 동의하시면 가입이 완료됩니다.',
+      'en': 'Agree to the Terms of Service and Privacy Policy to finish signing up.'
+    },
+    'onboarding_agree': {'ko': '동의하고 시작', 'en': 'Agree and continue'},
+    'logout': {'ko': '로그아웃', 'en': 'Sign out'},
     'skip': {'ko': '건너뛰기', 'en': 'Skip'},
     'random': {'ko': '랜덤', 'en': 'Random'},
     'end': {'ko': '종료', 'en': 'End'},

@@ -63,6 +63,10 @@ dependencies:
   vibration: ^3.2.0
   screen_brightness: ^2.1.11
   flutter_callkit_incoming: ^3.1.5
+  # 모바일 자체 로그인(viewplus): 구글 소셜(Flutter 플러그인) + refreshToken 보안저장.
+  # 카카오는 pub(pointycastle)이 livekit 과 충돌 → 네이티브(MethodChannel)로 처리.
+  google_sign_in: ^6.2.1
+  flutter_secure_storage: ^9.2.2
 
 dev_dependencies:
   flutter_test:

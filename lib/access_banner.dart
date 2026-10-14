@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'l10n.dart';
+import 'login_screen.dart';
 import 'store_login.dart';
 
 /// 제한(limited) 티어 안내 배너 — "로그인·기기 인증하면 전체 기능".
@@ -12,12 +13,13 @@ class AccessUpgradeBanner extends StatelessWidget {
   final String message;
 
   Future<void> _login(BuildContext context) async {
-    final ok = await StoreLogin.openStoreLogin(); // TV: 마켓 로그인 / 그 외: false
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(L.t('access_login_na'))),
-      );
-    }
+    // TV(마켓앱)면 마켓 로그인 화면을 연다.
+    final ok = await StoreLogin.openStoreLogin();
+    if (ok || !context.mounted) return;
+    // 모바일/웹: 자체 로그인 화면(로그인 성공 시 Access 티어가 갱신되어 배너가 사라짐).
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+    );
   }
 
   @override

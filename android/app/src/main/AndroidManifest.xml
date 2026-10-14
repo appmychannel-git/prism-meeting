@@ -31,6 +31,8 @@
             <action android:name="android.intent.action.VIEW"/>
             <data android:scheme="viewplus"/>
         </intent>
+        <!-- 카카오톡 로그인 가시성 -->
+        <package android:name="com.kakao.talk"/>
     </queries>
 
     <!-- ===== 안드로이드TV/디스플레이/태블릿에도 설치되도록 하드웨어 요구를 선택으로 ===== -->
@@ -99,6 +101,19 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
+        <!-- 카카오 로그인 리다이렉트 처리(scheme = kakao{네이티브앱키}) -->
+        <activity
+            android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:host="oauth"
+                    android:scheme="kakaobd28f3b76080e0b4d64865386a35319d" />
+            </intent-filter>
+        </activity>
     </application>
 
     <queries>
