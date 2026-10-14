@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'access.dart';
+import 'access_banner.dart';
 import 'call.dart';
 import 'call_history_screen.dart';
 import 'cctv_hub_screen.dart';
@@ -64,6 +66,9 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // 권한 티어: 제한(limited)이면 "방 참여"만 가능 → 기본 탭을 참여로.
+    if (Access.isLimited) _tab = _Tab.join;
+    Access.levelListenable.addListener(_onAccessChanged);
     // 방 만들기/참여하기의 "내 이름" 기본값 = 내 아이디에서 설정한 이름(수정 가능).
     DeviceId.name().then((n) {
       if (mounted && n.isNotEmpty && _nameCtrl.text.isEmpty) {
@@ -258,7 +263,8 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
   // 내 ID 링크(딥링크)로 앱이 열렸을 때: 친구추가 + 통화 옵션 시트.
   Future<void> _handleIdLink(String uid, String name) async {
-    if (!AppConfig.friendsEnabled) return; // 친구 기능 없는 브랜드는 무시
+    // 친구 기능 없는 브랜드 또는 제한 티어(미로그인/미인증)면 무시.
+    if (!AppConfig.friendsEnabled || !Access.canUseFriends) return;
     final myUuid = await DeviceId.uuid();
     if (uid == myUuid) return; // 내 QR
     final myName = await DeviceId.name();
@@ -406,6 +412,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    Access.levelListenable.removeListener(_onAccessChanged);
     _linkSub?.cancel();
     _nameCtrl.dispose();
     _codeCtrl.dispose();
@@ -509,8 +516,9 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
   // 좌측 햄버거 Drawer: 앱 언어 + (기능 켜진 경우) 내 ID·친구.
   Widget _buildDrawer(BuildContext context) {
+    // 친구·통화 메뉴는 브랜드 플래그 + 권한 티어(full)일 때만.
     final showFriendMenu =
-        AppConfig.friendsEnabled || AppConfig.callEnabled;
+        (AppConfig.friendsEnabled || AppConfig.callEnabled) && Access.isFull;
     return Drawer(
       child: SafeArea(
         child: ListView(
@@ -623,18 +631,27 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
     Navigator.of(context).push(MaterialPageRoute(builder: (_) => screen));
   }
 
+  // 권한 티어 변경(로그인/시리얼 인증) 시: 화면 갱신 + 제한이면 참여 탭으로.
+  void _onAccessChanged() {
+    if (!mounted) return;
+    setState(() {
+      if (Access.isLimited && _tab == _Tab.create) _tab = _Tab.join;
+    });
+  }
+
   // 홈 화면 "자주 쓰는 기능" 바로가기 버튼들. 브랜드 기능 플래그에 따라 노출.
   Widget _quickActions(bool landscape) {
     final tiles = <Widget>[];
-    if (AppConfig.friendsEnabled) {
+    // 친구·통화 바로가기는 권한 티어(full)일 때만(제한 티어는 방 참여만).
+    if (AppConfig.friendsEnabled && Access.canUseFriends) {
       tiles.add(_actionTile(Icons.people_outline, L.t('menu_friends'),
           () => _push(const FriendsScreen())));
     }
-    if (AppConfig.callEnabled) {
+    if (AppConfig.callEnabled && Access.canCall) {
       tiles.add(_actionTile(Icons.history, L.t('menu_history'),
           () => _push(const CallHistoryScreen())));
     }
-    if (AppConfig.friendsEnabled) {
+    if (AppConfig.friendsEnabled && Access.canUseFriends) {
       tiles.add(_actionTile(Icons.qr_code_2, L.t('menu_my_id'),
           () => _push(const MyIdScreen())));
     }
@@ -796,27 +813,33 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
                       ],
                       SizedBox(height: landscape ? 16 : 24),
 
-                      // 참여 / 만들기 탭
-                      SegmentedButton<_Tab>(
-                        segments: [
-                          ButtonSegment(
-                            value: _Tab.join,
-                            label: Text(L.t('tab_join')),
-                            icon: const Icon(Icons.login),
-                          ),
-                          ButtonSegment(
-                            value: _Tab.create,
-                            label: Text(L.t('tab_create')),
-                            icon: const Icon(Icons.add_circle_outline),
-                          ),
-                        ],
-                        selected: {_tab},
-                        onSelectionChanged: (s) => setState(() {
-                          _tab = s.first;
-                          _pinCtrl.clear(); // 탭 바꾸면 입장코드 초기화(잔상 방지)
-                        }),
-                      ),
-                      SizedBox(height: gap),
+                      // 권한 제한(로그인/인증 전): 방 참여만 가능 → 안내 배너.
+                      if (Access.isLimited)
+                        AccessUpgradeBanner(
+                            message: L.t('access_limited_meeting')),
+                      // 참여 / 만들기 탭 — 제한 티어는 "만들기"가 없어 토글을 숨긴다.
+                      if (Access.isFull) ...[
+                        SegmentedButton<_Tab>(
+                          segments: [
+                            ButtonSegment(
+                              value: _Tab.join,
+                              label: Text(L.t('tab_join')),
+                              icon: const Icon(Icons.login),
+                            ),
+                            ButtonSegment(
+                              value: _Tab.create,
+                              label: Text(L.t('tab_create')),
+                              icon: const Icon(Icons.add_circle_outline),
+                            ),
+                          ],
+                          selected: {_tab},
+                          onSelectionChanged: (s) => setState(() {
+                            _tab = s.first;
+                            _pinCtrl.clear(); // 탭 바꾸면 입장코드 초기화(잔상 방지)
+                          }),
+                        ),
+                        SizedBox(height: gap),
+                      ],
 
                       // 방 코드/이름 — 영문·숫자·하이픈만 (한글 불가)
                       if (isJoin)

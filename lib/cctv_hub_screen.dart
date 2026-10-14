@@ -10,6 +10,8 @@ import 'package:flutter/services.dart'
         TextInputFormatter;
 import 'package:pretty_qr_code/pretty_qr_code.dart';
 
+import 'access.dart';
+import 'access_banner.dart';
 import 'cctv_share_screen.dart';
 import 'cctv_store.dart';
 import 'cctv_view_screen.dart';
@@ -31,7 +33,9 @@ class CctvHubScreen extends StatefulWidget {
 }
 
 class _CctvHubScreenState extends State<CctvHubScreen>
-    with SingleTickerProviderStateMixin {
+    // 권한 티어 변경 시 TabController 를 재생성하므로(옛 것 정리 전 새 티커 필요)
+    // SingleTicker 가 아니라 다중 티커 믹스인을 쓴다.
+    with TickerProviderStateMixin {
   final _noteCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   final _pinCtrl = TextEditingController();
@@ -47,10 +51,13 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   bool _viewersLoading = false;
 
   static const int _friendsTabIndex = 2; // 시청/녹화/친구목록(…/QR목록)
-  late final TabController _tabs;
+  late TabController _tabs;
 
-  // 표시할 탭 수: 웹=1(시청만), 심플=3(시청/녹화/친구목록), 풀=4(+QR목록).
-  int get _tabCount => kIsWeb ? 1 : (AppConfig.cctvSimple ? 3 : 4);
+  // 송출(녹화·친구목록·QR목록) 탭 노출 조건: 웹 아님 + 권한 티어 full(시리얼 인증).
+  bool get _shareTabs => !kIsWeb && Access.canShareCctv;
+
+  // 표시할 탭 수: 송출 불가(웹/제한)=1(시청만), 심플=3(시청/녹화/친구목록), 풀=4(+QR목록).
+  int get _tabCount => !_shareTabs ? 1 : (AppConfig.cctvSimple ? 3 : 4);
 
   // CCTV 전용 모드에서 홈이 이 화면이라, 들어오는 CCTV 딥링크(?cctv=)를 여기서 처리.
   AppLinks? _appLinks;
@@ -60,14 +67,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   @override
   void initState() {
     super.initState();
-    // 탭 수: 웹=시청 1개 / 심플=시청·녹화·친구목록 3개 / 풀=+QR목록 4개.
-    _tabs = TabController(length: _tabCount, vsync: this);
-    // 친구목록 탭으로 전환할 때마다 시청자 목록을 새로고침.
-    _tabs.addListener(() {
-      if (!_tabs.indexIsChanging && _tabs.index == _friendsTabIndex) {
-        _loadViewers();
-      }
-    });
+    _setupTabs();
+    // 로그인/시리얼 인증 티어가 바뀌면 탭 구성(개수)이 달라진다 → 컨트롤러 재생성.
+    Access.levelListenable.addListener(_onAccessChanged);
     _load().then((_) async {
       // 이름·비번을 디렉터리에 1회 게시(기존 사용자·코드 추가 시 이름 조회 +
       // 원격 깨우기 비번 대조 보장).
@@ -87,6 +89,28 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         (_) => _maybePromptFullScreen(),
       );
     }
+  }
+
+  // 탭 컨트롤러 생성 + 친구목록 탭 전환 시 시청자 목록 새로고침 리스너.
+  void _setupTabs() {
+    _tabs = TabController(length: _tabCount, vsync: this);
+    _tabs.addListener(() {
+      if (_shareTabs &&
+          !_tabs.indexIsChanging &&
+          _tabs.index == _friendsTabIndex) {
+        _loadViewers();
+      }
+    });
+  }
+
+  // 로그인/인증 티어 변경 → 탭 개수가 바뀔 수 있으므로 컨트롤러를 재생성한다.
+  void _onAccessChanged() {
+    if (!mounted) return;
+    final old = _tabs;
+    if (old.length == _tabCount) return; // 개수 그대로면 유지
+    setState(_setupTabs);
+    // 옛 컨트롤러는 현재 프레임이 끝난 뒤(위젯트리에서 빠진 뒤) 정리.
+    WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
   }
 
   // 전체화면 알림 권한이 없으면(대기모드에서 원격 켜기가 화면을 못 깨움) 설정으로 안내.
@@ -114,6 +138,7 @@ class _CctvHubScreenState extends State<CctvHubScreen>
 
   @override
   void dispose() {
+    Access.levelListenable.removeListener(_onAccessChanged);
     _tabs.dispose();
     _linkSub?.cancel();
     _noteCtrl.dispose();
@@ -838,7 +863,7 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         text: L.t('cctv_tab_view'),
       ),
     ];
-    if (!kIsWeb) {
+    if (_shareTabs) {
       t.add(Tab(icon: const Icon(Icons.videocam), text: L.t('cctv_tab_share')));
       t.add(
         Tab(
@@ -857,7 +882,7 @@ class _CctvHubScreenState extends State<CctvHubScreen>
 
   List<Widget> _buildTabViews() {
     final v = <Widget>[_viewTab()];
-    if (!kIsWeb) {
+    if (_shareTabs) {
       v.add(_shareTab());
       v.add(_friendsTab());
       if (!AppConfig.cctvSimple) v.add(_qrListTab());
@@ -879,6 +904,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         MediaQuery.of(context).viewPadding.bottom + 32,
       ),
       children: [
+        // 제한 티어(미로그인/미인증) 안내 — 송출은 로그인·인증 후. 시청은 가능.
+        if (Access.isLimited && !kIsWeb)
+          AccessUpgradeBanner(message: L.t('access_limited_cctv')),
         if (_saved.isNotEmpty) ...[
           Text(
             L.t('cctv_my_list'),

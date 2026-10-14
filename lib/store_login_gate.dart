@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 
+import 'access.dart';
 import 'config.dart';
-import 'l10n.dart';
 import 'store_login.dart';
 
-/// 홈 화면 앞단의 "마켓앱 로그인 게이트"(안드로이드TV).
+/// 홈 화면 앞단의 "로그인/권한 게이트".
 ///
-/// Phase 1 — TV 경로만 게이팅한다.
-///   • 마켓앱 없음(모바일/웹)      → 기존대로 실행(차단 안 함)
-///   • 마켓앱 있음 + 로그인됨        → 실행(서버 검증은 백그라운드, 401이면 차단)
-///   • 마켓앱 있음 + 로그아웃/만료   → 경고 화면(마켓 로그인 유도), 실행 차단
+/// Phase 1 — **차단하지 않는다.** 로그인·기기시리얼 인증(registered) 여부를 읽어
+/// [Access] 티어만 정하고 항상 홈([child])을 띄운다. 제한 티어에서도 방 참여·CCTV
+/// 시청은 가능하고, 방 생성·친구·통화·CCTV 송출만 막힌다(UI에서 [Access]로 게이트).
 ///
-/// [AppConfig.useStoreLogin]가 false이거나 안드로이드가 아니면 항상 통과한다.
+///   • 마켓앱 없음(모바일/웹)        → limited (Phase 2에서 자체 로그인으로 full 가능)
+///   • 마켓앱 있음 + 로그아웃/만료     → limited
+///   • 마켓앱 있음 + 로그인 + 인증O    → full
+///   • 마켓앱 있음 + 로그인 + 인증X    → limited
+///
+/// [AppConfig.useStoreLogin]가 false면 게이팅 없이 full.
 class StoreLoginGate extends StatefulWidget {
   const StoreLoginGate({super.key, required this.child});
 
@@ -21,11 +25,9 @@ class StoreLoginGate extends StatefulWidget {
   State<StoreLoginGate> createState() => _StoreLoginGateState();
 }
 
-enum _GateStatus { loading, ok, blocked }
-
 class _StoreLoginGateState extends State<StoreLoginGate>
     with WidgetsBindingObserver {
-  _GateStatus _status = _GateStatus.loading;
+  bool _loaded = false; // 최초 티어 판정 완료 여부(짧은 스플래시 1회)
   bool _observing = false;
 
   @override
@@ -44,180 +46,75 @@ class _StoreLoginGateState extends State<StoreLoginGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // 마켓 로그인 화면에 다녀온 뒤(복귀) 차단 상태면 다시 확인한다.
-    if (state == AppLifecycleState.resumed && _status == _GateStatus.blocked) {
-      _check();
-    }
+    // 마켓 로그인/시리얼 등록을 하고 돌아오면 티어가 올라갈 수 있다 → 조용히 재판정.
+    if (state == AppLifecycleState.resumed && _loaded) _refresh();
   }
 
   Future<void> _check() async {
     if (!AppConfig.useStoreLogin) {
-      _set(_GateStatus.ok);
+      Access.set(AccessLevel.full); // 계정 게이팅 미사용 빌드 → 전체 허용
+      _done();
       return;
     }
-    _set(_GateStatus.loading);
 
     final info = await StoreLogin.read();
     if (!mounted) return;
 
-    // 마켓앱 없음(또는 서명키 불일치) = 모바일 경로 → 기존대로 실행.
+    // 마켓앱 없음(모바일/웹) → 제한 티어로 실행(Phase 2: 자체 로그인).
     if (info == null) {
-      _set(_GateStatus.ok);
+      Access.set(AccessLevel.limited);
+      _done();
       return;
     }
 
-    // 여기부터 TV 경로(마켓앱 있음).
+    // TV 경로 — 마켓 로그아웃 변경 감지.
     if (!_observing) {
       _observing = true;
       StoreLogin.observe(_onSessionChanged);
     }
 
     if (!info.isValid) {
-      _set(_GateStatus.blocked);
+      Access.set(AccessLevel.limited); // 로그아웃(차단하지 않음)
+      _done();
       return;
     }
 
-    // provider 토큰이 있으면 일단 실행하고, 서버 검증은 백그라운드로(네트워크 관대).
-    _set(_GateStatus.ok);
+    // 로그인됨 → 시리얼 인증(registered)이면 full, 아니면 limited.
+    Access.set(info.registered ? AccessLevel.full : AccessLevel.limited);
+    _done();
+
+    // 서버 검증은 백그라운드(네트워크 관대). 명시적 401이면 로그아웃 취급 → 제한.
     final code = await StoreLogin.verify(info.sessionToken);
     if (!mounted) return;
-    if (code == 401) {
-      _set(_GateStatus.blocked); // 명시적 401일 때만 차단(네트워크 오류 -1은 유지)
-    }
+    if (code == 401) Access.set(AccessLevel.limited);
   }
 
-  // 마켓앱 로그아웃/로그인 변경 감지 시.
-  Future<void> _onSessionChanged() async {
+  // 마켓앱 로그아웃/로그인 변경 감지 시 티어 재설정.
+  Future<void> _onSessionChanged() => _refresh();
+
+  Future<void> _refresh() async {
+    if (!AppConfig.useStoreLogin) return;
     final info = await StoreLogin.read();
     if (!mounted) return;
     if (info == null || !info.isValid) {
-      _set(_GateStatus.blocked);
+      Access.set(AccessLevel.limited);
     } else {
-      _set(_GateStatus.ok);
+      Access.set(info.registered ? AccessLevel.full : AccessLevel.limited);
     }
   }
 
-  void _set(_GateStatus s) {
-    if (_status != s && mounted) setState(() => _status = s);
+  void _done() {
+    if (!_loaded && mounted) setState(() => _loaded = true);
   }
 
   @override
   Widget build(BuildContext context) {
-    switch (_status) {
-      case _GateStatus.ok:
-        return widget.child;
-      case _GateStatus.loading:
-        return const Scaffold(
-          backgroundColor: Color(0xFF0E1116),
-          body: Center(child: CircularProgressIndicator()),
-        );
-      case _GateStatus.blocked:
-        return _BlockedScreen(onLogin: _openLogin, onRetry: _check);
-    }
-  }
-
-  Future<void> _openLogin() async {
-    final ok = await StoreLogin.openStoreLogin();
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_tr('openFail'))),
+    if (!_loaded) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF0E1116),
+        body: Center(child: CircularProgressIndicator()),
       );
     }
+    return widget.child;
   }
-}
-
-/// 마켓 로그인 필요 안내 화면(실행 차단). 다국어: ko / ru / 그 외 en.
-class _BlockedScreen extends StatelessWidget {
-  const _BlockedScreen({required this.onLogin, required this.onRetry});
-
-  final VoidCallback onLogin;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0E1116),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.lock_outline, size: 64, color: Colors.white70),
-                const SizedBox(height: 20),
-                Text(
-                  _tr('title'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _tr('body'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 15, color: Colors.white70),
-                ),
-                const SizedBox(height: 28),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: onLogin,
-                    icon: const Icon(Icons.login),
-                    label: Text(_tr('login')),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton(
-                    onPressed: onRetry,
-                    child: Text(_tr('retry')),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 게이트 전용 짧은 다국어 문구(l10n 키 추가 없이 로컬 처리).
-String _tr(String key) {
-  final lang = L.lang;
-  const ko = {
-    'title': '마켓앱 로그인이 필요합니다',
-    'body': '이 앱을 사용하려면 마켓앱에서 먼저 로그인해 주세요.\n'
-        '로그인 후 자동으로 돌아옵니다.',
-    'login': '마켓 로그인 열기',
-    'retry': '다시 확인',
-    'openFail': '마켓앱을 열 수 없습니다. 설치 상태를 확인해 주세요.',
-  };
-  const ru = {
-    'title': 'Требуется вход через магазин',
-    'body': 'Чтобы пользоваться приложением, войдите в приложении магазина.\n'
-        'После входа вы вернётесь автоматически.',
-    'login': 'Открыть вход в магазин',
-    'retry': 'Проверить снова',
-    'openFail': 'Не удалось открыть приложение магазина.',
-  };
-  const en = {
-    'title': 'Store sign-in required',
-    'body': 'Please sign in from the store app to use this app.\n'
-        "You'll return here automatically after signing in.",
-    'login': 'Open store sign-in',
-    'retry': 'Check again',
-    'openFail': 'Could not open the store app.',
-  };
-  final table = lang == 'ko' ? ko : (lang == 'ru' ? ru : en);
-  return table[key] ?? en[key] ?? key;
 }

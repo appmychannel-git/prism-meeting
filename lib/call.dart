@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import 'access.dart';
 import 'call_log.dart';
 import 'call_screen.dart';
 import 'call_signaling.dart';
@@ -25,6 +26,13 @@ Future<void> startDmCall(
   required Friend friend,
   required bool video,
 }) async {
+  // 권한 티어: 제한(미로그인/미인증)은 통화 불가(방어적 — UI에서도 진입점을 숨김).
+  if (!Access.canCall) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(L.t('access_limited_meeting'))));
+    return;
+  }
   // 상대가 통화 중이면 헛걸기 방지(오프라인은 FCM으로 울리므로 허용).
   final st = await DirectoryService.status(friend.uuid);
   if (st != null && st.busy) {

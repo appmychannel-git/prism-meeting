@@ -79,6 +79,20 @@ class L {
     'ok': {'ko': '확인', 'en': 'OK'},
     'cancel': {'ko': '취소', 'en': 'Cancel'},
     'close': {'ko': '닫기', 'en': 'Close'},
+    // 로그인/권한 티어
+    'login': {'ko': '로그인', 'en': 'Sign in'},
+    'access_login_na': {
+      'ko': '모바일 로그인은 준비 중입니다.',
+      'en': 'Mobile sign-in is coming soon.'
+    },
+    'access_limited_meeting': {
+      'ko': '로그인·기기 인증을 하면 방 만들기·친구·통화를 쓸 수 있어요.',
+      'en': 'Sign in and verify your device to create rooms, add friends, and call.'
+    },
+    'access_limited_cctv': {
+      'ko': '로그인·기기 인증을 하면 CCTV 송출(이 기기 공유)을 쓸 수 있어요.',
+      'en': 'Sign in and verify your device to broadcast this device as CCTV.'
+    },
     'skip': {'ko': '건너뛰기', 'en': 'Skip'},
     'random': {'ko': '랜덤', 'en': 'Random'},
     'end': {'ko': '종료', 'en': 'End'},
