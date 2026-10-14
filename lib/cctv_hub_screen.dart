@@ -50,8 +50,7 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   late final TabController _tabs;
 
   // 표시할 탭 수: 웹=1(시청만), 심플=3(시청/녹화/친구목록), 풀=4(+QR목록).
-  int get _tabCount =>
-      kIsWeb ? 1 : (AppConfig.cctvSimple ? 3 : 4);
+  int get _tabCount => kIsWeb ? 1 : (AppConfig.cctvSimple ? 3 : 4);
 
   // CCTV 전용 모드에서 홈이 이 화면이라, 들어오는 CCTV 딥링크(?cctv=)를 여기서 처리.
   AppLinks? _appLinks;
@@ -84,8 +83,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
       // Android 14+ 전체화면 인텐트 권한 안내(1회). 이 권한이 없으면 대기모드에서
       // 시청자가 재생을 눌러도 원격 켜기 알림이 화면을 깨우지 못하고 소리만 난다.
       // (미팅앱은 join_screen 에서 안내하지만 CCTV 전용 앱은 홈이 이 화면이라 여기서.)
-      WidgetsBinding.instance
-          .addPostFrameCallback((_) => _maybePromptFullScreen());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybePromptFullScreen(),
+      );
     }
   }
 
@@ -144,7 +144,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     if (key == _lastLink) return; // 중복 처리 방지
     _lastLink = key;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _openByCode(code.trim(), pin: pin?.trim(), name: name?.trim());
+      if (mounted) {
+        _openByCode(code.trim(), pin: pin?.trim(), name: name?.trim());
+      }
     });
   }
 
@@ -186,17 +188,22 @@ class _CctvHubScreenState extends State<CctvHubScreen>
             border: const OutlineInputBorder(),
             counterText: '',
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 14,
+            ),
           ),
           onSubmitted: (v) => Navigator.pop(ctx, v),
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: Text(L.t('cancel'))),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(L.t('cancel')),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, ctrl.text),
-              child: Text(L.t('ok'))),
+            onPressed: () => Navigator.pop(ctx, ctrl.text),
+            child: Text(L.t('ok')),
+          ),
         ],
       ),
     );
@@ -210,7 +217,8 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   /// 확인 시 'xxx-xxx-xxx' 반환, 취소/미완성이면 null.
   Future<String?> _promptCode({String initial = ''}) async {
     final ctrl = TextEditingController(
-        text: initial.replaceAll('-', '').toLowerCase());
+      text: initial.replaceAll('-', '').toLowerCase(),
+    );
     ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length);
     final focus = FocusNode();
     String dashed(String r) {
@@ -242,18 +250,23 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                   width: active ? 2 : 1,
                 ),
               ),
-              child: Text(ch,
-                  style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white)),
+              child: Text(
+                ch,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
             );
           }
 
           const dash = Padding(
             padding: EdgeInsets.symmetric(horizontal: 5),
-            child:
-                Text('-', style: TextStyle(fontSize: 22, color: Colors.white38)),
+            child: Text(
+              '-',
+              style: TextStyle(fontSize: 22, color: Colors.white38),
+            ),
           );
           final cells = <Widget>[];
           for (var i = 0; i < 9; i++) {
@@ -263,76 +276,101 @@ class _CctvHubScreenState extends State<CctvHubScreen>
               cells.add(const SizedBox(width: 4));
             }
           }
-          return AlertDialog(
-            title: Text(L.t('cctv_code_enter')),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(L.t('cctv_code_enter_hint'),
-                    textAlign: TextAlign.center,
-                    style:
-                        const TextStyle(fontSize: 12, color: Colors.white54)),
-                const SizedBox(height: 16),
-                // 보이는 박스(아래) + 그 위에 투명 입력 필드(탭/오토포커스로 키보드).
-                SizedBox(
-                  height: 46,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      IgnorePointer(
-                        child: Row(
-                            mainAxisSize: MainAxisSize.min, children: cells),
-                      ),
-                      Positioned.fill(
-                        child: Opacity(
-                          opacity: 0,
-                          child: TextField(
-                            controller: ctrl,
-                            focusNode: focus,
-                            autofocus: true,
-                            showCursor: false,
-                            enableSuggestions: false,
-                            autocorrect: false,
-                            keyboardType: TextInputType.visiblePassword,
-                            textInputAction: TextInputAction.done,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.allow(
-                                  RegExp(r'[A-Za-z0-9]')),
-                              LengthLimitingTextInputFormatter(9),
-                              TextInputFormatter.withFunction((o, n) =>
-                                  n.copyWith(text: n.text.toLowerCase())),
-                            ],
-                            onChanged: (_) => setD(() {}),
-                            onSubmitted: (_) {
-                              if (ctrl.text.length == 9) {
-                                Navigator.pop(ctx, dashed(ctrl.text));
-                              }
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 22),
-                // 버튼을 content 안에 넣는다(AlertDialog actions 로 두면 키보드에
-                // 눌릴 때 박스와 겹치는 문제가 있어 세로로 순차 배치).
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+          // AlertDialog(actions) 는 키보드에 눌리면 content(박스)와 버튼이 겹치거나
+          // 배경이 버튼까지 안 그려졌다 → Dialog + 직접 배경/패딩으로 전체를 감싼다.
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 40,
+              vertical: 24,
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: Text(L.t('cancel'))),
-                    const SizedBox(width: 8),
-                    FilledButton(
-                      onPressed: raw.length == 9
-                          ? () => Navigator.pop(ctx, dashed(raw))
-                          : null,
-                      child: Text(L.t('ok')),
+                    Text(
+                      L.t('cctv_code_enter'),
+                      style: Theme.of(ctx).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      L.t('cctv_code_enter_hint'),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white54,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 보이는 박스(아래) + 그 위에 투명 입력 필드(탭/오토포커스로 키보드).
+                    SizedBox(
+                      height: 46,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          IgnorePointer(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: cells,
+                            ),
+                          ),
+                          Positioned.fill(
+                            child: Opacity(
+                              opacity: 0,
+                              child: TextField(
+                                controller: ctrl,
+                                focusNode: focus,
+                                autofocus: true,
+                                showCursor: false,
+                                enableSuggestions: false,
+                                autocorrect: false,
+                                keyboardType: TextInputType.visiblePassword,
+                                textInputAction: TextInputAction.done,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'[A-Za-z0-9]'),
+                                  ),
+                                  LengthLimitingTextInputFormatter(9),
+                                  TextInputFormatter.withFunction(
+                                    (o, n) =>
+                                        n.copyWith(text: n.text.toLowerCase()),
+                                  ),
+                                ],
+                                onChanged: (_) => setD(() {}),
+                                onSubmitted: (_) {
+                                  if (ctrl.text.length == 9) {
+                                    Navigator.pop(ctx, dashed(ctrl.text));
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: Text(L.t('cancel')),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton(
+                          onPressed: raw.length == 9
+                              ? () => Navigator.pop(ctx, dashed(raw))
+                              : null,
+                          child: Text(L.t('ok')),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
+              ),
             ),
           );
         },
@@ -396,9 +434,13 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           Row(
             children: [
               Expanded(
-                child: Text(L.t('cctv_viewers_title'),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.white70)),
+                child: Text(
+                  L.t('cctv_viewers_title'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                  ),
+                ),
               ),
               IconButton(
                 icon: const Icon(Icons.refresh),
@@ -407,8 +449,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
               ),
             ],
           ),
-          Text(L.t('cctv_viewers_sub'),
-              style: const TextStyle(fontSize: 12, color: Colors.white54)),
+          Text(
+            L.t('cctv_viewers_sub'),
+            style: const TextStyle(fontSize: 12, color: Colors.white54),
+          ),
           const SizedBox(height: 12),
           if (_viewersLoading && _viewers.isEmpty)
             const Padding(
@@ -418,9 +462,11 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           else if (_viewers.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Text(L.t('cctv_viewers_empty'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white54)),
+              child: Text(
+                L.t('cctv_viewers_empty'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white54),
+              ),
             )
           else
             for (final v in _viewers) _viewerTile(v),
@@ -433,19 +479,25 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     final label = v.name.isNotEmpty ? v.name : v.uuid;
     final tile = Card(
       child: ListTile(
-        leading: Icon(Icons.person,
-            color: v.blocked ? Colors.white30 : const Color(0xFF4ADE80)),
+        leading: Icon(
+          Icons.person,
+          color: v.blocked ? Colors.white30 : const Color(0xFF4ADE80),
+        ),
         title: Text(label),
         subtitle: v.blocked
-            ? Text(L.t('cctv_viewer_blocked'),
-                style: const TextStyle(fontSize: 12, color: Color(0xFFFF8A80)))
+            ? Text(
+                L.t('cctv_viewer_blocked'),
+                style: const TextStyle(fontSize: 12, color: Color(0xFFFF8A80)),
+              )
             : (v.lastSeen.isNotEmpty
-                ? Text(v.lastSeen, style: const TextStyle(fontSize: 11))
-                : null),
+                  ? Text(v.lastSeen, style: const TextStyle(fontSize: 11))
+                  : null),
         trailing: TextButton.icon(
           onPressed: () => _toggleBlockViewer(v),
-          icon: Icon(v.blocked ? Icons.check_circle_outline : Icons.block,
-              size: 18),
+          icon: Icon(
+            v.blocked ? Icons.check_circle_outline : Icons.block,
+            size: 18,
+          ),
           label: Text(v.blocked ? L.t('unblock') : L.t('block')),
         ),
       ),
@@ -458,16 +510,22 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     final label = v.name.isNotEmpty ? v.name : v.uuid;
     if (toBlock &&
         !await confirmDialog(
-            context, L.t('cctv_block_confirm', {'name': label}),
-            confirmLabel: L.t('block'))) {
+          context,
+          L.t('cctv_block_confirm', {'name': label}),
+          confirmLabel: L.t('block'),
+        )) {
       return;
     }
-    final ok =
-        await DirectoryService.setCctvViewerBlocked(_myCode, v.uuid, toBlock);
+    final ok = await DirectoryService.setCctvViewerBlocked(
+      _myCode,
+      v.uuid,
+      toBlock,
+    );
     if (!mounted) return;
     if (!ok) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(L.t('cctv_block_failed'))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(L.t('cctv_block_failed'))));
       return;
     }
     await _loadViewers();
@@ -494,14 +552,16 @@ class _CctvHubScreenState extends State<CctvHubScreen>
       final pin = p.trim();
       if (pin.isEmpty) {
         if (groups.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(L.t('cctv_need_password'))));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(L.t('cctv_need_password'))));
           return;
         }
       } else {
         if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_6digit'))));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(L.t('cctv_pw_6digit'))));
           return;
         }
         // 입력한 비번을 "유일한" 공유 비번으로 설정 → 이전 비번은 무효화(변경된
@@ -517,16 +577,17 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         final p = await _promptPin();
         if (p == null || !mounted) return;
         if (p.trim() != basePin) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_wrong'))));
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(L.t('cctv_pw_wrong'))));
           return;
         }
       }
     }
     if (!mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CctvShareScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const CctvShareScreen()));
     await _load();
   }
 
@@ -537,7 +598,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     final name = await DeviceId.name();
     if (on) {
       await DirectoryService.registerCctvCamera(
-          code: code, uuid: uuid, name: name.isNotEmpty ? name : 'CCTV');
+        code: code,
+        uuid: uuid,
+        name: name.isNotEmpty ? name : 'CCTV',
+      );
     } else {
       await DirectoryService.unregisterCctvCamera(code);
     }
@@ -546,9 +610,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   }
 
   Future<void> _scan() async {
-    final raw = await Navigator.of(context).push<String>(
-      MaterialPageRoute(builder: (_) => const ScanScreen()),
-    );
+    final raw = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const ScanScreen()));
     if (raw == null || !mounted) return;
     _codeCtrl.text = _extractCctvCode(raw);
     setState(() {});
@@ -590,11 +654,12 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     final myUuid = await DeviceId.uuid();
     if (!mounted) return;
     DirectoryService.registerCctvViewer(entry.code, myUuid, _myName);
-    DirectoryService.requestCctvWake(entry.code,
-        pin: entry.pin, uuid: myUuid);
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (_) => CctvViewScreen(roomId: entry.roomId, pin: entry.pin),
-    ));
+    DirectoryService.requestCctvWake(entry.code, pin: entry.pin, uuid: myUuid);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CctvViewScreen(roomId: entry.roomId, pin: entry.pin),
+      ),
+    );
   }
 
   /// 새 CCTV 추가 → 목록에 저장하고 바로 시청.
@@ -602,8 +667,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     final code = _codeCtrl.text.trim();
     final pin = _pinCtrl.text.trim();
     if (code.isEmpty || pin.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(L.t('cctv_need_code_pw'))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(L.t('cctv_need_code_pw'))));
       return;
     }
     final note = _noteCtrl.text.trim();
@@ -635,11 +701,15 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 이름·코드(보기 전용).
-            Text('${L.t('cctv_setup_name')}: ${e.name.isNotEmpty ? e.name : '-'}',
-                style: const TextStyle(fontSize: 13, color: Colors.white70)),
+            Text(
+              '${L.t('cctv_setup_name')}: ${e.name.isNotEmpty ? e.name : '-'}',
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+            ),
             const SizedBox(height: 4),
-            Text('${L.t('cctv_code')}: ${e.code}',
-                style: const TextStyle(fontSize: 13, color: Colors.white70)),
+            Text(
+              '${L.t('cctv_code')}: ${e.code}',
+              style: const TextStyle(fontSize: 13, color: Colors.white70),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: noteCtrl,
@@ -650,8 +720,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                 border: const OutlineInputBorder(),
                 counterText: '',
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -665,18 +737,23 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                 border: const OutlineInputBorder(),
                 counterText: '',
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(L.t('cancel'))),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(L.t('cancel')),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true), child: Text(L.t('ok'))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(L.t('ok')),
+          ),
         ],
       ),
     );
@@ -685,10 +762,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     noteCtrl.dispose();
     pinCtrl.dispose();
     if (saved != true) return;
-    await CctvStore.add(e.copyWith(
-      note: newNote,
-      pin: newPin.isNotEmpty ? newPin : e.pin,
-    ));
+    await CctvStore.add(
+      e.copyWith(note: newNote, pin: newPin.isNotEmpty ? newPin : e.pin),
+    );
     await _load();
   }
 
@@ -750,27 +826,30 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           tabs: _buildTabs(),
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
-        children: _buildTabViews(),
-      ),
+      body: TabBarView(controller: _tabs, children: _buildTabViews()),
     );
   }
 
   // 탭/화면 구성(순서 동일). _tabCount 와 반드시 일치해야 한다.
   List<Tab> _buildTabs() {
     final t = <Tab>[
-      Tab(icon: const Icon(Icons.play_circle_outline),
-          text: L.t('cctv_tab_view')),
+      Tab(
+        icon: const Icon(Icons.play_circle_outline),
+        text: L.t('cctv_tab_view'),
+      ),
     ];
     if (!kIsWeb) {
-      t.add(Tab(icon: const Icon(Icons.videocam),
-          text: L.t('cctv_tab_share')));
-      t.add(Tab(icon: const Icon(Icons.people_outline),
-          text: L.t('cctv_tab_friends')));
+      t.add(Tab(icon: const Icon(Icons.videocam), text: L.t('cctv_tab_share')));
+      t.add(
+        Tab(
+          icon: const Icon(Icons.people_outline),
+          text: L.t('cctv_tab_friends'),
+        ),
+      );
       if (!AppConfig.cctvSimple) {
-        t.add(Tab(icon: const Icon(Icons.qr_code_2),
-            text: L.t('cctv_tab_qrlist')));
+        t.add(
+          Tab(icon: const Icon(Icons.qr_code_2), text: L.t('cctv_tab_qrlist')),
+        );
       }
     }
     return t;
@@ -794,12 +873,20 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     return ListView(
       // 하단: 시스템 네비게이션바가 노출된 기기에서 버튼이 가리지 않도록 여백 추가.
       padding: EdgeInsets.fromLTRB(
-          16, 16, 16, MediaQuery.of(context).viewPadding.bottom + 32),
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewPadding.bottom + 32,
+      ),
       children: [
         if (_saved.isNotEmpty) ...[
-          Text(L.t('cctv_my_list'),
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, color: Colors.white70)),
+          Text(
+            L.t('cctv_my_list'),
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white70,
+            ),
+          ),
           const SizedBox(height: 8),
           for (final e in _saved)
             Card(
@@ -828,8 +915,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () async {
                         if (!await confirmDialog(
-                            context, L.t('confirm_remove_cctv'),
-                            confirmLabel: L.t('delete'))) {
+                          context,
+                          L.t('confirm_remove_cctv'),
+                          confirmLabel: L.t('delete'),
+                        )) {
                           return;
                         }
                         await CctvStore.remove(e.code);
@@ -853,9 +942,13 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           Row(
             children: [
               Expanded(
-                child: Text(L.t('cctv_add'),
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.white70)),
+                child: Text(
+                  L.t('cctv_add'),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white70,
+                  ),
+                ),
               ),
               // 목록이 있을 때만: 폼 닫기(취소).
               if (_saved.isNotEmpty)
@@ -1017,10 +1110,14 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         Card(
           child: ListTile(
             leading: const Icon(Icons.badge_outlined, size: 28),
-            title: Text('${L.t('cctv_setup_name')}: '
-                '${_myName.isNotEmpty ? _myName : '-'}'),
-            subtitle: Text(L.t('cctv_name_sub'),
-                style: const TextStyle(fontSize: 12)),
+            title: Text(
+              '${L.t('cctv_setup_name')}: '
+              '${_myName.isNotEmpty ? _myName : '-'}',
+            ),
+            subtitle: Text(
+              L.t('cctv_name_sub'),
+              style: const TextStyle(fontSize: 12),
+            ),
             trailing: IconButton(
               icon: const Icon(Icons.edit_outlined),
               tooltip: L.t('cctv_edit'),
@@ -1033,8 +1130,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
           child: ListTile(
             leading: const Icon(Icons.videocam, size: 28),
             title: Text('${L.t('cctv_my_code')}: $_myCode'),
-            subtitle: Text(L.t('cctv_qrlist_hint'),
-                style: const TextStyle(fontSize: 12)),
+            subtitle: Text(
+              L.t('cctv_qrlist_hint'),
+              style: const TextStyle(fontSize: 12),
+            ),
             // 내 코드 영역 오른쪽: 코드 재발급(새 코드로 교체, 그룹 유지).
             trailing: TextButton.icon(
               onPressed: _reissueCode,
@@ -1047,9 +1146,11 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         if (_groups.isEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 24),
-            child: Text(L.t('cctv_no_codes'),
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white54)),
+            child: Text(
+              L.t('cctv_no_codes'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.white54),
+            ),
           )
         else
           for (final g in _groups) _groupTile(g),
@@ -1069,13 +1170,17 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     final active = isDefault || g.enabled;
     final tile = Card(
       child: ListTile(
-        leading: Icon(Icons.vpn_key,
-            color: active ? const Color(0xFF4ADE80) : Colors.white30),
+        leading: Icon(
+          Icons.vpn_key,
+          color: active ? const Color(0xFF4ADE80) : Colors.white30,
+        ),
         // 이름만 표시(비번은 QR 보기·편집에서 확인).
         title: Text(g.name),
         subtitle: isDefault
-            ? Text(L.t('cctv_default_badge'),
-                style: const TextStyle(fontSize: 11, color: Colors.white38))
+            ? Text(
+                L.t('cctv_default_badge'),
+                style: const TextStyle(fontSize: 11, color: Colors.white38),
+              )
             : null,
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1137,8 +1242,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                 border: const OutlineInputBorder(),
                 counterText: '',
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -1154,18 +1261,23 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                 border: const OutlineInputBorder(),
                 counterText: '',
                 isDense: true,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 14,
+                ),
               ),
             ),
           ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(L.t('cancel'))),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(L.t('cancel')),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true), child: Text(L.t('ok'))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(L.t('ok')),
+          ),
         ],
       ),
     );
@@ -1177,8 +1289,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     // 비밀번호는 숫자 6자리 고정.
     if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_6digit'))));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(L.t('cctv_pw_6digit'))));
       }
       return;
     }
@@ -1196,8 +1309,11 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   Future<void> _editCode(CctvShareGroup g) => _codeDialog(g: g);
 
   Future<void> _deleteCode(CctvShareGroup g) async {
-    if (!await confirmDialog(context, L.t('confirm_remove_code'),
-        confirmLabel: L.t('delete'))) {
+    if (!await confirmDialog(
+      context,
+      L.t('confirm_remove_code'),
+      confirmLabel: L.t('delete'),
+    )) {
       return;
     }
     await CctvStore.removeShareGroup(g.id);
@@ -1226,10 +1342,13 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(L.t('cancel'))),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(L.t('cancel')),
+          ),
           FilledButton(
-              onPressed: () => Navigator.pop(ctx, true), child: Text(L.t('ok'))),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(L.t('ok')),
+          ),
         ],
       ),
     );
@@ -1243,8 +1362,11 @@ class _CctvHubScreenState extends State<CctvHubScreen>
 
   // 코드 재발급: 새 코드로 교체(그룹/비번 유지 → QR만 새 코드로). 기존 QR은 전부 무효.
   Future<void> _reissueCode() async {
-    if (!await confirmDialog(context, L.t('cctv_reissue_confirm'),
-        confirmLabel: L.t('cctv_reissue'))) {
+    if (!await confirmDialog(
+      context,
+      L.t('cctv_reissue_confirm'),
+      confirmLabel: L.t('cctv_reissue'),
+    )) {
       return;
     }
     final oldCode = _myCode;
@@ -1256,13 +1378,17 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         final name = await DeviceId.name();
         await DirectoryService.unregisterCctvCamera(oldCode);
         await DirectoryService.registerCctvCamera(
-            code: newCode, uuid: uuid, name: name.isNotEmpty ? name : 'CCTV');
+          code: newCode,
+          uuid: uuid,
+          name: name.isNotEmpty ? name : 'CCTV',
+        );
       } catch (_) {}
     }
     await _load();
     if (mounted) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(L.t('cctv_reissue_done'))));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(L.t('cctv_reissue_done'))));
     }
   }
 
@@ -1277,23 +1403,30 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         child: Padding(
           // 하단 시스템바/네비게이션바 높이 + 여유를 더해 내용이 가리지 않게 한다.
           padding: EdgeInsets.fromLTRB(
-              20, 0, 20, MediaQuery.of(ctx).viewPadding.bottom + 56),
+            20,
+            0,
+            20,
+            MediaQuery.of(ctx).viewPadding.bottom + 56,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // 기기 이름(QR에 담겨 상대 목록에 표시됨).
               if (_myName.isNotEmpty) ...[
-                Text(_myName,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold)),
+                Text(
+                  _myName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 2),
               ],
-              Text(g.name,
-                  style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14)),
+              Text(
+                g.name,
+                style: const TextStyle(color: Colors.white70, fontSize: 14),
+              ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -1305,7 +1438,11 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                   width: 170,
                   height: 170,
                   child: PrettyQrView.data(
-                    data: AppConfig.cctvLink(_myCode, pin: g.pin, name: _myName),
+                    data: AppConfig.cctvLink(
+                      _myCode,
+                      pin: g.pin,
+                      name: _myName,
+                    ),
                     decoration: const PrettyQrDecoration(
                       shape: PrettyQrSmoothSymbol(color: Color(0xFF000000)),
                     ),
@@ -1313,16 +1450,24 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                 ),
               ),
               const SizedBox(height: 14),
-              Text('${L.t('cctv_code')}: $_myCode',
-                  style: const TextStyle(color: Colors.white70)),
+              Text(
+                '${L.t('cctv_code')}: $_myCode',
+                style: const TextStyle(color: Colors.white70),
+              ),
               const SizedBox(height: 4),
-              Text('${L.t('cctv_password')}: ${g.pin}',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold)),
+              Text(
+                '${L.t('cctv_password')}: ${g.pin}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
-              Text(L.t('cctv_share_hint'),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13, color: Colors.white70)),
+              Text(
+                L.t('cctv_share_hint'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13, color: Colors.white70),
+              ),
             ],
           ),
         ),
