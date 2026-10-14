@@ -481,6 +481,10 @@ class L {
       'ko': '이 기기의 이름과 공유 비밀번호를 정해주세요.\n이름은 QR로 공유할 때 상대 기기 목록에 표시됩니다.',
       'en': 'Set this device\'s name and share password.\nThe name is shown in the viewer\'s list when you share via QR.',
     },
+    'cctv_setup_desc_simple': {
+      'ko': '이 기기의 이름을 정해주세요.\n이름은 QR로 공유할 때 상대 기기 목록에 표시됩니다.',
+      'en': 'Set this device\'s name.\nThe name is shown in the viewer\'s list when you share via QR.',
+    },
     'cctv_setup_name': {'ko': '기기 이름', 'en': 'Device name'},
     'cctv_name_sub': {
       'ko': 'QR로 공유할 때 상대 목록에 이 이름이 표시됩니다.',

@@ -42,8 +42,12 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   List<CctvViewer> _viewers = [];
   bool _viewersLoading = false;
 
-  static const int _friendsTabIndex = 2; // 시청/녹화/친구목록/QR목록
+  static const int _friendsTabIndex = 2; // 시청/녹화/친구목록(…/QR목록)
   late final TabController _tabs;
+
+  // 표시할 탭 수: 웹=1(시청만), 심플=3(시청/녹화/친구목록), 풀=4(+QR목록).
+  int get _tabCount =>
+      kIsWeb ? 1 : (AppConfig.cctvSimple ? 3 : 4);
 
   // CCTV 전용 모드에서 홈이 이 화면이라, 들어오는 CCTV 딥링크(?cctv=)를 여기서 처리.
   AppLinks? _appLinks;
@@ -53,8 +57,8 @@ class _CctvHubScreenState extends State<CctvHubScreen>
   @override
   void initState() {
     super.initState();
-    // 웹은 시청 탭 1개만, 앱은 4개(시청/녹화/친구목록/QR목록).
-    _tabs = TabController(length: kIsWeb ? 1 : 4, vsync: this);
+    // 탭 수: 웹=시청 1개 / 심플=시청·녹화·친구목록 3개 / 풀=+QR목록 4개.
+    _tabs = TabController(length: _tabCount, vsync: this);
     // 친구목록 탭으로 전환할 때마다 시청자 목록을 새로고침.
     _tabs.addListener(() {
       if (!_tabs.indexIsChanging && _tabs.index == _friendsTabIndex) {
@@ -334,19 +338,46 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     await DirectoryService.updateCctvPins(_myCode, pins, name: _myName);
   }
 
-  /// "이 기기를 CCTV로 공유" — 기본 비밀번호를 확인한 뒤에만 송출 시작.
-  /// (아무나 송출을 켜지 못하도록. 기본 그룹이 아직 없으면 송출 화면에서 첫 코드 설정 유도.)
+  /// "이 기기를 CCTV로 공유" — 송출 시작 전 비밀번호 처리.
+  ///  - 풀 모드: 기존 기본 비번을 "확인"(인증)한 뒤에만 송출.
+  ///  - 심플 모드: 새 비번을 "설정"(유효 pin에 추가, 기존 비번도 계속 유효). 빈칸이면 유지.
   Future<void> _startShare() async {
     final groups = await CctvStore.shareGroups();
     if (!mounted) return;
-    if (groups.isNotEmpty) {
-      final basePin = groups.first.pin;
+    if (AppConfig.cctvSimple) {
+      // 심플: 새 비번 설정(추가). 빈칸이면 기존 유지(최초엔 비번 필수).
       final p = await _promptPin();
       if (p == null || !mounted) return;
-      if (p.trim() != basePin) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_wrong'))));
-        return;
+      final pin = p.trim();
+      if (pin.isEmpty) {
+        if (groups.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(L.t('cctv_need_password'))));
+          return;
+        }
+      } else {
+        if (!RegExp(r'^\d{6}$').hasMatch(pin)) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_6digit'))));
+          return;
+        }
+        // 입력한 비번을 "유일한" 공유 비번으로 설정 → 이전 비번은 무효화(변경된
+        // 비번만 접속 가능). 송출 화면이 방을 새 비번으로 재생성해 이전 비번 시청자는
+        // 끊긴다. 서버 반영은 송출 화면 _init 이 하므로 여기선 로컬만 바꾼다
+        // (네트워크 대기 중 홈 화면이 잠깐 보이는 깜빡임 방지).
+        await CctvStore.setSolePin(pin);
+      }
+    } else {
+      // 풀: 기존 기본비번 확인 후 송출.
+      if (groups.isNotEmpty) {
+        final basePin = groups.first.pin;
+        final p = await _promptPin();
+        if (p == null || !mounted) return;
+        if (p.trim() != basePin) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(L.t('cctv_pw_wrong'))));
+          return;
+        }
       }
     }
     if (!mounted) return;
@@ -568,41 +599,48 @@ class _CctvHubScreenState extends State<CctvHubScreen>
             child: Center(child: VersionBadge()),
           ),
         ],
-        // 웹은 시청(보기) 전용 → 탭바는 유지하되 "시청" 탭 1개만.
-        // (송출·친구목록·QR목록은 앱 전용 호스트 기능이라 웹에선 숨김)
+        // 웹=시청만 / 심플=시청·녹화·친구목록 / 풀=+QR목록. (탭바는 항상 유지)
         bottom: TabBar(
           controller: _tabs,
           isScrollable: true,
           tabAlignment: TabAlignment.center,
-          tabs: kIsWeb
-              ? [
-                  Tab(icon: const Icon(Icons.play_circle_outline),
-                      text: L.t('cctv_tab_view')),
-                ]
-              : [
-                  Tab(icon: const Icon(Icons.play_circle_outline),
-                      text: L.t('cctv_tab_view')),
-                  Tab(icon: const Icon(Icons.videocam),
-                      text: L.t('cctv_tab_share')),
-                  Tab(icon: const Icon(Icons.people_outline),
-                      text: L.t('cctv_tab_friends')),
-                  Tab(icon: const Icon(Icons.qr_code_2),
-                      text: L.t('cctv_tab_qrlist')),
-                ],
+          tabs: _buildTabs(),
         ),
       ),
       body: TabBarView(
         controller: _tabs,
-        children: kIsWeb
-            ? [_viewTab()]
-            : [
-                _viewTab(),
-                _shareTab(),
-                _friendsTab(),
-                _qrListTab(),
-              ],
+        children: _buildTabViews(),
       ),
     );
+  }
+
+  // 탭/화면 구성(순서 동일). _tabCount 와 반드시 일치해야 한다.
+  List<Tab> _buildTabs() {
+    final t = <Tab>[
+      Tab(icon: const Icon(Icons.play_circle_outline),
+          text: L.t('cctv_tab_view')),
+    ];
+    if (!kIsWeb) {
+      t.add(Tab(icon: const Icon(Icons.videocam),
+          text: L.t('cctv_tab_share')));
+      t.add(Tab(icon: const Icon(Icons.people_outline),
+          text: L.t('cctv_tab_friends')));
+      if (!AppConfig.cctvSimple) {
+        t.add(Tab(icon: const Icon(Icons.qr_code_2),
+            text: L.t('cctv_tab_qrlist')));
+      }
+    }
+    return t;
+  }
+
+  List<Widget> _buildTabViews() {
+    final v = <Widget>[_viewTab()];
+    if (!kIsWeb) {
+      v.add(_shareTab());
+      v.add(_friendsTab());
+      if (!AppConfig.cctvSimple) v.add(_qrListTab());
+    }
+    return v;
   }
 
   // 시청 탭:

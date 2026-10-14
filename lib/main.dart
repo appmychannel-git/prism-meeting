@@ -222,8 +222,9 @@ class _IdSetupGateState extends State<_IdSetupGate> {
   Future<void> _check() async {
     final name = await DeviceId.name();
     var need = name.trim().isEmpty;
-    // CCTV 전용 앱: 이름뿐 아니라 기본 공유 비번(기본 그룹)도 있어야 설정 완료로 본다.
-    if (AppConfig.cctvOnly && !need) {
+    // CCTV 전용 앱(풀 모드): 이름뿐 아니라 기본 공유 비번(기본 그룹)도 있어야 설정 완료.
+    // 심플 모드는 이름만 받으므로(비번은 송출 때 설정) 그룹 유무는 보지 않는다.
+    if (AppConfig.cctvOnly && !AppConfig.cctvSimple && !need) {
       final groups = await CctvStore.shareGroups();
       if (groups.isEmpty) need = true;
     }

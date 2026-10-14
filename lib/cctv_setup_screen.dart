@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FilteringTextInputFormatter;
 
 import 'cctv_store.dart';
+import 'config.dart';
 import 'device_id.dart';
 import 'directory.dart';
 import 'l10n.dart';
@@ -43,9 +44,11 @@ class _CctvSetupScreenState extends State<CctvSetupScreen> {
     super.dispose();
   }
 
+  // 심플 모드는 이름만 필수(비번은 송출 때 설정). 풀 모드는 이름+6자리 비번.
   bool get _valid =>
       _nameCtrl.text.trim().isNotEmpty &&
-      RegExp(r'^\d{6}$').hasMatch(_pinCtrl.text.trim());
+      (AppConfig.cctvSimple ||
+          RegExp(r'^\d{6}$').hasMatch(_pinCtrl.text.trim()));
 
   Future<void> _start() async {
     if (!_valid || _saving) return;
@@ -53,16 +56,19 @@ class _CctvSetupScreenState extends State<CctvSetupScreen> {
     final name = _nameCtrl.text.trim();
     final pin = _pinCtrl.text.trim();
     await DeviceId.setName(name);
-    // 입력한 기본 비번을 항상 적용한다. 그룹이 없으면 "기본" 그룹 생성,
-    // 이미 있으면(예: 구버전 자동 pin 마이그레이션) 첫(기본) 그룹의 비번을 입력값으로 갱신.
-    // (이 갱신을 빼면 구버전 잔존 비번이 유지돼 입력값이 무시되는 버그가 난다)
-    final groups = await CctvStore.shareGroups();
-    if (groups.isEmpty) {
-      await CctvStore.addShareGroup(L.t('cctv_code_default'), pin);
-    } else {
-      await CctvStore.updateShareGroup(groups.first.id, pin: pin);
+    // 풀 모드만 기본 비번(기본 그룹)을 설정한다. 심플 모드는 이름만 받고 비번은
+    // 송출 때 설정하므로 여기선 그룹을 만들지 않는다.
+    if (!AppConfig.cctvSimple) {
+      // 입력한 기본 비번을 항상 적용. 그룹 없으면 생성, 있으면(구버전 마이그레이션 등)
+      // 첫 그룹의 비번을 입력값으로 갱신.
+      final groups = await CctvStore.shareGroups();
+      if (groups.isEmpty) {
+        await CctvStore.addShareGroup(L.t('cctv_code_default'), pin);
+      } else {
+        await CctvStore.updateShareGroup(groups.first.id, pin: pin);
+      }
     }
-    // 이름·비번을 디렉터리에 게시 → 코드 추가 시 이름 표시 + 원격 깨우기 비번 대조.
+    // 이름(+있으면 비번)을 디렉터리에 게시 → 코드 추가 시 이름 표시 + 깨우기 비번 대조.
     try {
       final (code, _) = await CctvStore.myShareCredentials();
       final pins = await CctvStore.enabledSharePins();
@@ -106,7 +112,9 @@ class _CctvSetupScreenState extends State<CctvSetupScreen> {
                   const Icon(Icons.videocam, size: 56, color: Colors.white38),
                   const SizedBox(height: 16),
                   Text(
-                    L.t('cctv_setup_desc'),
+                    AppConfig.cctvSimple
+                        ? L.t('cctv_setup_desc_simple')
+                        : L.t('cctv_setup_desc'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70),
                   ),
@@ -123,27 +131,33 @@ class _CctvSetupScreenState extends State<CctvSetupScreen> {
                     ),
                     onChanged: (_) => setState(() {}),
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _pinCtrl,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    obscureText: true,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: InputDecoration(
-                      labelText: L.t('cctv_setup_pw'),
-                      hintText: L.t('cctv_pw_hint6'),
-                      border: const OutlineInputBorder(),
-                      counterText: '',
+                  // 심플 모드는 비번 설정 없음(이름만). 송출 때 비번을 정한다.
+                  if (!AppConfig.cctvSimple) ...[
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _pinCtrl,
+                      keyboardType: TextInputType.number,
+                      maxLength: 6,
+                      obscureText: true,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly
+                      ],
+                      decoration: InputDecoration(
+                        labelText: L.t('cctv_setup_pw'),
+                        hintText: L.t('cctv_pw_hint6'),
+                        border: const OutlineInputBorder(),
+                        counterText: '',
+                      ),
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _start(),
                     ),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _start(),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    L.t('cctv_setup_pw_desc'),
-                    style: const TextStyle(fontSize: 12, color: Colors.white54),
-                  ),
+                    const SizedBox(height: 8),
+                    Text(
+                      L.t('cctv_setup_pw_desc'),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.white54),
+                    ),
+                  ],
                   const SizedBox(height: 24),
                   FilledButton(
                     onPressed: _valid && !_saving ? _start : null,

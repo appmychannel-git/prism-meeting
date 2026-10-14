@@ -131,6 +131,15 @@ class AppConfig {
   static const bool cctvOnly =
       bool.fromEnvironment('CCTV_ONLY', defaultValue: false);
 
+  /// 심플 CCTV 모드. --dart-define=SIMPLE_CCTV=true
+  ///  - 첫 실행: 이름만 입력(기본 비번 설정 없음)
+  ///  - QR목록(그룹별 코드/비번) 탭 숨김
+  ///  - "이 기기를 CCTV로 공유": 기존 비번 확인 대신 새 비번을 설정(유효 pin에 추가,
+  ///    기존 비번도 계속 유효)
+  /// false(기본) = 현재 풀버전(그룹/QR목록/공유 시 기존 비번 확인).
+  static const bool cctvSimple =
+      bool.fromEnvironment('SIMPLE_CCTV', defaultValue: false);
+
   /// 서버측 STT 모드(기본 off). 켜면 앱은 기기 음성인식을 쓰지 않고, 방에 들어온
   /// STT 에이전트(서버)가 발행한 자막을 "받아서 표시만" 한다. 언어팩 없는 TV/셋톱에서도
   /// 자막이 되게 하는 용도. --dart-define=SERVER_STT=true

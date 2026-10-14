@@ -24,6 +24,9 @@ brand_config() {
   # 빈 값이면 기본(브랜드명+아이콘) 다크 스플래시. SPLASH_BG=이미지 뒤 여백 배경색(hex).
   SPLASH_IMAGE=""
   SPLASH_BG=""
+  # 심플 CCTV: 첫 실행 이름만(비번X) · QR목록 없음 · 공유 시 새 비번 설정(추가).
+  # false면 현재 풀버전(그룹/QR목록/공유 시 기존비번 확인). 아래 case 에서 브랜드별 지정.
+  SIMPLE_CCTV=false
   case "$1" in
     #             APP_BRAND            FRIENDS CALL  CCTV  TRANSLATION START_CAMERA E2EE
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
@@ -38,6 +41,12 @@ brand_config() {
     viewpluscctv) APP_BRAND="CCTV"   ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true ;;
     freedomcctv)  APP_BRAND="Freedom CCTV"     ; FRIENDS=false; CALL=false; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; CCTV_ONLY=true; DEFAULT_LANG="en" ;;
     *) echo "알 수 없는 브랜드: $1  ($BRAND_LIST|all)"; exit 1 ;;
+  esac
+  # 심플 CCTV 적용 브랜드(+그 cctv 변형). prism/viewplus/gbled/ecoglow=true,
+  # mychannel/freedom(+freedomcctv)=false. ${1%cctv}로 cctv 변형은 베이스 브랜드를 따름.
+  case "${1%cctv}" in
+    prism|viewplus|gbled|ecoglow) SIMPLE_CCTV=true ;;
+    *)                            SIMPLE_CCTV=false ;;
   esac
   # 브랜드 전용 스플래시 이미지(assets/splash/<값> 번들됨, 확장자 포함). 배경색은 해당
   # flavor 의 ic_launcher_background 와 맞춘다(이미지 여백 색). prism 은 전용 이미지가

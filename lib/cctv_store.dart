@@ -174,6 +174,14 @@ class CctvStore {
     await _saveGroups(gs);
   }
 
+  /// 심플 모드용: 이 비번을 "유일한" 공유 비번으로 설정 — 기존 그룹을 모두 지우고
+  /// 새 비번 1개만 남긴다. 비번을 바꾸면 이전 비번으로는 더 이상 접속할 수 없다
+  /// (변경된 비번만 유효). 송출 시 방이 새 비번 집합으로 재생성되어, 이전 비번으로
+  /// 접속해 있던 시청자는 끊기고 이전 비번으론 새 접속도 거부된다.
+  static Future<void> setSolePin(String pin, {String name = '공유'}) async {
+    await _saveGroups([CctvShareGroup(id: _newGroupId(), name: name, pin: pin)]);
+  }
+
   static Future<void> updateShareGroup(String id,
       {String? name, String? pin, bool? enabled}) async {
     final gs = await shareGroups();

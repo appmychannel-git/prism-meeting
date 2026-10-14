@@ -110,8 +110,6 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
         return;
       }
     }
-    // 이름·비번을 디렉터리에 게시(코드 추가 시 이름 표시 + 원격 깨우기 비번 대조용).
-    DirectoryService.updateCctvPins(code, _pins, name: _name);
     _pin = _pins.first; // e2ee 키/표시용 대표 비번
     // E2EE(옵션): 대표 비번을 공유키로.
     final e2ee = (AppConfig.e2ee && _pin.isNotEmpty)
@@ -131,6 +129,12 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
       ..on<ParticipantDisconnectedEvent>((_) => _updateViewers());
     _roomReady = true;
     await _connect();
+    // 방 접속(create=true) 이후에 이름·비번을 디렉터리에 게시한다. 비번을 바꿔
+    // 재송출하면 create=true 가 "비번 집합 변경"을 감지해 방을 재생성(이전 비번
+    // 시청자 끊김)하는데, 그 전에 meta.pins 를 미리 덮어쓰면 변경 감지가 무력화되어
+    // 이전 비번 시청자가 유지된다. 그래서 반드시 접속 후에 게시한다.
+    // (코드 추가 시 이름 표시 + 원격 깨우기 비번 대조용 Firestore 갱신 포함)
+    DirectoryService.updateCctvPins(_code, _pins, name: _name);
   }
 
   // 활성 코드가 하나도 없을 때(첫 사용) 첫 코드(이름+비번)를 바로 추가하도록 유도.
@@ -606,6 +610,9 @@ class _CctvShareScreenState extends State<CctvShareScreen> {
             ),
           ),
           const SizedBox(height: 8),
+          // 코드·비밀번호를 텍스트로도 노출 → QR 스캔이 어려우면 시청에서 직접 입력.
+          _kv(L.t('cctv_code'), _code),
+          const SizedBox(height: 4),
           _kv(L.t('cctv_password'), g.pin),
         ],
       ),
