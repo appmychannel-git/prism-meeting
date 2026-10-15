@@ -263,8 +263,16 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
 
   // 내 ID 링크(딥링크)로 앱이 열렸을 때: 친구추가 + 통화 옵션 시트.
   Future<void> _handleIdLink(String uid, String name) async {
-    // 친구 기능 없는 브랜드 또는 제한 티어(미로그인/미인증)면 무시.
-    if (!AppConfig.friendsEnabled || !Access.canUseFriends) return;
+    if (!AppConfig.friendsEnabled) return; // 친구 기능 없는 브랜드는 무시
+    // 제한 티어(미로그인/미인증): 조용히 무시하지 않고 로그인을 유도한 뒤, 조건이
+    // 충족되면 계속 진행한다(내 아이디 공유로 받은 ID 추가 — 1-3 정책).
+    if (!Access.canUseFriends) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L.t('login_to_add_friend'))));
+      await promptAccountLogin(context);
+      if (!mounted || !Access.canUseFriends) return;
+    }
     final myUuid = await DeviceId.uuid();
     if (uid == myUuid) return; // 내 QR
     final myName = await DeviceId.name();
