@@ -850,20 +850,15 @@ class _CctvHubScreenState extends State<CctvHubScreen>
       drawer: AppConfig.cctvOnly ? _buildDrawer(context) : null,
       appBar: AppBar(
         centerTitle: true,
-        // 홈 상단에도 이 기기 이름을 표시(설정돼 있으면 이름 크게 + CCTV 작게).
-        title: _myName.isNotEmpty
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(_myName,
-                      style: const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.bold)),
-                  Text(L.t('menu_cctv'),
-                      style: const TextStyle(
-                          fontSize: 11, color: Colors.white70)),
-                ],
-              )
-            : Text(L.t('menu_cctv')),
+        // 홈 타이틀: 카메라 아이콘(왼쪽) + CCTV 글자(오른쪽) 가로 배치.
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.videocam, size: 22),
+            const SizedBox(width: 8),
+            Text(L.t('menu_cctv')),
+          ],
+        ),
         // 우측 상단: 앱 버전(5번 누르면 지원 기기 안내).
         actions: const [
           Padding(
