@@ -779,6 +779,42 @@ class _CctvHubScreenState extends State<CctvHubScreen>
         child: ListView(
           padding: EdgeInsets.zero,
           children: [
+            // 이 기기 이름(+코드) 헤더. 공유 QR뿐 아니라 여기서도 바로 보이게.
+            Container(
+              width: double.infinity,
+              color: const Color(0xFF2E5AC0),
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.videocam, color: Colors.white, size: 22),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _myName.isNotEmpty ? _myName : L.t('menu_cctv'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_myCode.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${L.t('cctv_code')}: $_myCode',
+                      style: const TextStyle(
+                          color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ],
+              ),
+            ),
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.language),
@@ -814,7 +850,20 @@ class _CctvHubScreenState extends State<CctvHubScreen>
       drawer: AppConfig.cctvOnly ? _buildDrawer(context) : null,
       appBar: AppBar(
         centerTitle: true,
-        title: Text(L.t('menu_cctv')),
+        // 홈 상단에도 이 기기 이름을 표시(설정돼 있으면 이름 크게 + CCTV 작게).
+        title: _myName.isNotEmpty
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(_myName,
+                      style: const TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.bold)),
+                  Text(L.t('menu_cctv'),
+                      style: const TextStyle(
+                          fontSize: 11, color: Colors.white70)),
+                ],
+              )
+            : Text(L.t('menu_cctv')),
         // 우측 상단: 앱 버전(5번 누르면 지원 기기 안내).
         actions: const [
           Padding(
