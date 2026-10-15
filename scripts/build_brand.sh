@@ -58,6 +58,12 @@ build_one() {
   # 제조사 플랫폼 키 서명(선탑재 기기)이면 파일명에 꼬리표(서명 다른 APK 구분, R5).
   # PLATFORM_SIGN 환경변수는 flutter build → gradle 로 전달돼 플랫폼 키로 서명된다.
   if [ -n "${PLATFORM_SIGN:-}" ]; then apk_name="${apk_name%.apk}-platform-${PLATFORM_SIGN}.apk"; fi
+  # 파일명 끝에 버전 이름(pubspec version 의 +앞부분). 그리고 전체를 소문자로.
+  # 예: meeting-gbled-platform-cubot-v1.0.30.apk
+  local app_vn
+  app_vn="$(grep -m1 '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//; s/+.*//' | tr -d '[:space:]')"
+  [ -n "$app_vn" ] && apk_name="${apk_name%.apk}-v${app_vn}.apk"
+  apk_name="$(printf '%s' "$apk_name" | tr '[:upper:]' '[:lower:]')"
   local apk_url="${base_url}download/${apk_name}"
   echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE cctvOnly=${CCTV_ONLY:-false}"
   echo "   base=$base_url"
