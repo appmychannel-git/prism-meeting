@@ -712,10 +712,10 @@ class _CctvHubScreenState extends State<CctvHubScreen>
     _open(e, askPin: false); // 방금 비번을 입력했으므로 바로 재생
   }
 
-  /// 저장된 CCTV 편집 — 이름·코드는 보기 전용, 메모·비밀번호는 변경 가능.
+  /// 저장된 CCTV 편집 — 이름·코드는 보기 전용, 메모만 변경 가능.
+  /// (비밀번호는 시청 시작 때마다 새로 입력받으므로 여기서 노출/수정하지 않는다.)
   Future<void> _editEntry(CctvEntry e) async {
     final noteCtrl = TextEditingController(text: e.note);
-    final pinCtrl = TextEditingController(text: e.pin);
     final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -751,23 +751,6 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-            // 비밀번호 변경(상대가 비번을 바꿨을 때 여기서 새 비번으로 갱신).
-            TextField(
-              controller: pinCtrl,
-              keyboardType: TextInputType.number,
-              obscureText: true,
-              decoration: InputDecoration(
-                labelText: L.t('cctv_password'),
-                border: const OutlineInputBorder(),
-                counterText: '',
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 14,
-                ),
-              ),
-            ),
           ],
         ),
         actions: [
@@ -783,13 +766,9 @@ class _CctvHubScreenState extends State<CctvHubScreen>
       ),
     );
     final newNote = noteCtrl.text.trim();
-    final newPin = pinCtrl.text.trim();
     noteCtrl.dispose();
-    pinCtrl.dispose();
     if (saved != true) return;
-    await CctvStore.add(
-      e.copyWith(note: newNote, pin: newPin.isNotEmpty ? newPin : e.pin),
-    );
+    await CctvStore.add(e.copyWith(note: newNote));
     await _load();
   }
 
