@@ -78,6 +78,17 @@ class StoreLogin {
     }
   }
 
+  /// 같은 기기 마켓앱의 versionCode(정책 API 전송용). 마켓 없음/안드로이드 아님=0.
+  static Future<int> marketVersionCode() async {
+    if (!_supported) return 0;
+    try {
+      final v = await _ch.invokeMethod<dynamic>('marketVersionCode');
+      return (v is num) ? v.toInt() : 0;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   /// 마켓 로그인 화면을 연다(viewplus://login?return=<내 패키지>).
   /// 로그인이 끝나면 호출한 앱으로 자동 복귀한다.
   static Future<bool> openStoreLogin() async {

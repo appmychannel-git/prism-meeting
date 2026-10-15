@@ -39,6 +39,19 @@ build_one() {
     *cctv) cert_brand="${brand%cctv}"; cert_app="cctv" ;;
     *)     cert_brand="$brand";        cert_app="meeting" ;;
   esac
+  # 서브앱 정책 API 의 브랜드별 고정값(cuid). 마켓앱 BuildConfig.CUID 와 동일.
+  local cuid
+  case "$cert_brand" in
+    prism)     cuid="CH64529599" ;;
+    viewplus)  cuid="CH26345929" ;;
+    gbled)     cuid="CH56672685" ;;
+    ecoglow)   cuid="CH33972612" ;;  # 마켓 ecoglowkc
+    koreaapp)  cuid="CH15412863" ;;
+    *)         cuid="" ;;            # freedom/mychannel 등 미지정
+  esac
+  # 앱 versionCode(정책 API 전송) — pubspec version 의 +숫자.
+  local app_vc
+  app_vc="$(grep -m1 '^version:' pubspec.yaml | sed 's/.*+//' | tr -d '[:space:]')"
   # 산출물 이름: 미팅=Meeting-<brand>.apk, CCTV전용=CCTV-<브랜드명>.apk (예: gbledcctv→CCTV-gbled.apk)
   local apk_name
   if [ "${CCTV_ONLY:-false}" = "true" ]; then apk_name="CCTV-${brand%cctv}.apk"; else apk_name="Meeting-${brand}.apk"; fi
@@ -67,6 +80,8 @@ build_one() {
     --dart-define=SHARE_BASE_URL=$share_url \
     --dart-define=CERT_BRAND=$cert_brand \
     --dart-define=CERT_APP=$cert_app \
+    --dart-define=CUID=$cuid \
+    --dart-define=APP_VERSION_CODE=${app_vc:-0} \
     --dart-define=APK_URL=$apk_url
   mkdir -p dist
   cp "build/app/outputs/flutter-apk/app-${brand}-release.apk" "dist/${apk_name}"

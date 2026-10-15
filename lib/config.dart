@@ -303,6 +303,22 @@ class AppConfig {
   static String get certifiedDevicesUrl =>
       '$certApiBase?brand=$certBrand&app=$certApp';
 
+  /// 서브앱 실행 권한 정책 API(브랜드별 cuid 필요). 응답 access_policy 로 티어 판정.
+  /// 규칙: md/subapp-access-policy-guide-2026-10-15.md
+  static String get appPolicyUrl =>
+      'https://platformtvapi.mychannel.co.kr/$certBrand'
+      '/appinterface/tv/1.0/app-policy.asp';
+
+  /// 브랜드별 고정값(cuid). build_brand.sh 가 브랜드별로 주입.
+  static const String cuid = String.fromEnvironment('CUID', defaultValue: '');
+
+  /// 이 앱의 versionCode(숫자). 정책 API 에 보낸다. pubspec version 의 +숫자와 맞춘다.
+  static const int appVersionCode =
+      int.fromEnvironment('APP_VERSION_CODE', defaultValue: 29);
+
+  /// 정책 API 의 app 코드: CCTV 전용 앱=cctv, 그 외(미팅)=meeting.
+  static String get policyAppCode => certApp.isNotEmpty ? certApp : 'meeting';
+
   /// 공유 페이지 URL 생성: 제목(t)·메시지(m)·대상링크(u)를 쿼리로 실어 보낸다.
   /// 이 URL을 QR로 만들어 두면, 휴대폰이 찍었을 때 공유 페이지가 열려
   /// [targetUrl]을 카톡·문자로 보낼 수 있다.

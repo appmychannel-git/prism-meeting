@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'access.dart';
+import 'app_policy.dart';
 import 'config.dart';
 import 'mobile_auth.dart';
 import 'store_login.dart';
@@ -30,6 +31,8 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     with WidgetsBindingObserver {
   bool _loaded = false; // 최초 티어 판정 완료 여부(짧은 스플래시 1회)
   bool _observing = false;
+  // 서버에서 받은 실행 권한 정책(기본 login — fail-open 기본값과 동일).
+  AccessPolicy _policy = AccessPolicy.login;
 
   @override
   void initState() {
@@ -58,10 +61,16 @@ class _StoreLoginGateState extends State<StoreLoginGate>
       return;
     }
 
+    // 서버 실행 권한 정책을 받아온다(하드코딩 대신). 마켓 버전을 함께 보내
+    // 구버전 마켓(registered 없음) 기기를 서버가 login 으로 낮출 수 있게 한다.
+    final mvc = await StoreLogin.marketVersionCode();
+    final res = await AppPolicy.fetch(marketVersionCode: mvc);
+    _policy = res.policy;
+
     final info = await StoreLogin.read();
     if (!mounted) return;
 
-    // 마켓앱 없음(모바일/웹) → 자체 로그인 세션이 있으면 그 계정 티어로.
+    // 마켓앱 없음(모바일/웹) → 자체 로그인 세션으로 티어 판정.
     if (info == null) {
       await _applyMobileSession();
       _done();
@@ -74,20 +83,32 @@ class _StoreLoginGateState extends State<StoreLoginGate>
       StoreLogin.observe(_onSessionChanged);
     }
 
-    if (!info.isValid) {
-      Access.set(AccessLevel.limited); // 로그아웃(차단하지 않음)
-      _done();
-      return;
-    }
-
-    // 로그인됨 → 시리얼 인증(registered)이면 full, 아니면 limited.
-    Access.set(info.registered ? AccessLevel.full : AccessLevel.limited);
+    // 정책 + 세션/인증으로 티어 결정.
+    Access.set(_tierFor(loggedIn: info.isValid, registered: info.registered));
     _done();
 
-    // 서버 검증은 백그라운드(네트워크 관대). 명시적 401이면 로그아웃 취급 → 제한.
-    final code = await StoreLogin.verify(info.sessionToken);
-    if (!mounted) return;
-    if (code == 401) Access.set(AccessLevel.limited);
+    // 로그인 상태면 서버 검증(401 → 로그아웃 취급).
+    if (info.isValid) {
+      final code = await StoreLogin.verify(info.sessionToken);
+      if (!mounted) return;
+      if (code == 401) {
+        Access.set(_tierFor(loggedIn: false, registered: false));
+      }
+    }
+  }
+
+  // 정책별 티어: none→full, login→세션있으면 full, registered→세션+인증이면 full.
+  AccessLevel _tierFor({required bool loggedIn, required bool registered}) {
+    switch (_policy) {
+      case AccessPolicy.none:
+        return AccessLevel.full;
+      case AccessPolicy.login:
+        return loggedIn ? AccessLevel.full : AccessLevel.limited;
+      case AccessPolicy.registered:
+        return (loggedIn && registered)
+            ? AccessLevel.full
+            : AccessLevel.limited;
+    }
   }
 
   // 마켓앱 로그아웃/로그인 변경 감지 시 티어 재설정.
@@ -99,26 +120,27 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     if (!mounted) return;
     if (info == null) {
       await _applyMobileSession(); // 모바일: 자체 로그인 세션 재확인
-    } else if (!info.isValid) {
-      Access.set(AccessLevel.limited);
     } else {
-      Access.set(info.registered ? AccessLevel.full : AccessLevel.limited);
+      Access.set(_tierFor(loggedIn: info.isValid, registered: info.registered));
     }
   }
 
   // 모바일(마켓앱 없음): viewplus 자체 로그인 세션이 있으면 me 로 티어 판정.
   Future<void> _applyMobileSession() async {
     try {
+      if (_policy == AccessPolicy.none) {
+        Access.set(AccessLevel.full);
+        return;
+      }
       if (await MobileAuth.instance.hasSession()) {
         final u = await MobileAuth.instance.me();
         if (!mounted) return;
-        Access.set((u?.registered ?? false)
-            ? AccessLevel.full
-            : AccessLevel.limited);
+        Access.set(
+            _tierFor(loggedIn: true, registered: u?.registered ?? false));
         return;
       }
     } catch (_) {}
-    Access.set(AccessLevel.limited);
+    Access.set(_tierFor(loggedIn: false, registered: false));
   }
 
   void _done() {

@@ -189,6 +189,8 @@ class MainActivity : FlutterActivity() {
                         runOnUiThread { result.success(code) }
                     }.start()
                 }
+                // 같은 기기 마켓앱의 versionCode(정책 API 전송용). 없으면 0.
+                "marketVersionCode" -> result.success(marketVersionCode())
                 // 마켓 로그인 화면을 연다(끝나면 return 패키지로 자동 복귀).
                 "openStoreLogin" -> result.success(openStoreLogin())
                 // 마켓 로그아웃 감지(마켓이 notifyChange를 쏜다) → onSessionChanged 콜백.
@@ -308,6 +310,23 @@ class MainActivity : FlutterActivity() {
             if (!done) "timeout" else if (opened.get()) "ok" else "blocked"
         } catch (e: Exception) {
             "unknown"
+        }
+    }
+
+    // 같은 기기 마켓앱의 versionCode. provider authority 로 패키지를 찾아 조회
+    // (패키지명이 브랜드마다 달라 하드코딩하지 않는다). 못 읽으면 0.
+    private fun marketVersionCode(): Long {
+        return try {
+            val pi = packageManager.resolveContentProvider(storeAuthority, 0)
+                ?: return 0L
+            val info = packageManager.getPackageInfo(pi.packageName, 0)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                info.longVersionCode
+            } else {
+                @Suppress("DEPRECATION") info.versionCode.toLong()
+            }
+        } catch (e: Exception) {
+            0L
         }
     }
 
