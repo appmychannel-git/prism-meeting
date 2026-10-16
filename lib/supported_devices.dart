@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import 'config.dart';
+import 'device_info_dialog.dart';
 import 'l10n.dart';
 
 /// 기능이 검증된("지원") 기기 목록 + 현재 기기 지원 여부 안내.
@@ -122,10 +123,30 @@ class _VersionBadgeState extends State<VersionBadge> {
 }
 
 /// 현재 기기 지원 여부 안내창(버전 5탭).
+/// 서명 라벨 → 한 글자 꼬리표(rumpus→R, cubot→C). 그 외/미확인은 없음.
+/// 같은 기종·버전이라도 서명이 다르면 로그인 공유·업데이트가 안 되므로,
+/// "이 기기" 뒤에 어떤 서명으로 설치됐는지 눈으로 구분하게 한다.
+Future<String> _signSuffix() async {
+  try {
+    final label = (await SupportedDevices._ch
+            .invokeMethod<dynamic>('signLabel'))
+        ?.toString();
+    switch (label) {
+      case 'rumpus':
+        return ' (R)';
+      case 'cubot':
+        return ' (C)';
+    }
+  } catch (_) {}
+  return '';
+}
+
 Future<void> showSupportedDeviceDialog(BuildContext context) async {
   final d = await SupportedDevices.current();
+  final signSuffix = await _signSuffix();
   if (!context.mounted) return;
-  final dev = '${d.manufacturer} ${d.model}'.trim();
+  final name = '${d.manufacturer} ${d.model}'.trim();
+  final dev = name.isEmpty ? '-' : '$name$signSuffix';
   await showDialog<void>(
     context: context,
     builder: (ctx) => AlertDialog(
@@ -171,6 +192,14 @@ Future<void> showSupportedDeviceDialog(BuildContext context) async {
             showSupportedDeviceListDialog(context);
           },
           child: Text(L.t('dev_list_btn')),
+        ),
+        // CS 진단용 상세(기기·앱 정보 + 전송). 서명키·네트워크 포함.
+        TextButton(
+          onPressed: () {
+            Navigator.pop(ctx);
+            showDeviceInfoDialog(context);
+          },
+          child: Text(L.t('di_detail_btn')),
         ),
         FilledButton(
             onPressed: () => Navigator.pop(ctx), child: Text(L.t('close'))),

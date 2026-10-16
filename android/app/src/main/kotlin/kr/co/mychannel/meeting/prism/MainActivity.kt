@@ -8,8 +8,16 @@ import android.database.ContentObserver
 import android.database.Cursor
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
+import java.io.ByteArrayInputStream
+import java.net.NetworkInterface
+import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
+import javax.security.auth.x500.X500Principal
 import android.os.Bundle
 import android.os.Handler
 import android.os.HandlerThread
@@ -106,6 +114,10 @@ class MainActivity : FlutterActivity() {
                             )
                         )
                     }
+                    // CS 진단용 기기·앱 정보 한 묶음(서명키·펌웨어·시리얼·네트워크 포함).
+                    "deviceReport" -> result.success(deviceReport())
+                    // 서명 라벨만 가볍게(지원 기기 팝업의 "이 기기" 뒤 (R)/(C) 표기).
+                    "signLabel" -> result.success(signatureLabel())
                     // 해당 앱의 "전체 화면 알림 허용" 설정 화면으로 이동.
                     "openFullScreenSettings" -> {
                         try {
@@ -329,6 +341,133 @@ class MainActivity : FlutterActivity() {
             0L
         }
     }
+
+    // ===== CS 진단용 기기·앱 정보(서명키·펌웨어·시리얼·네트워크 포함) =====
+    private fun deviceReport(): Map<String, Any?> {
+        val dm = resources.displayMetrics
+        val (netType, internetOk) = networkStatus()
+        return mapOf(
+            "manufacturer" to Build.MANUFACTURER,
+            "model" to Build.MODEL,
+            "device" to "${Build.MANUFACTURER}_${Build.MODEL}".replace(" ", "_"),
+            "firmwareModel" to firmwareModel(),
+            "hwSerial" to hwSerial(),
+            "buildId" to Build.DISPLAY,
+            "androidVersion" to "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
+            "screen" to "${dm.widthPixels}x${dm.heightPixels} / ${dm.densityDpi}dpi",
+            "androidId" to runCatching {
+                Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID)
+            }.getOrNull(),
+            "sign" to signatureLabel(),
+            "signHash" to signatureHash(),
+            "network" to netType,
+            "internetOk" to internetOk,
+            "localIp" to localIp(),
+            "marketVersionCode" to marketVersionCode(),
+        )
+    }
+
+    private fun firmwareModel(): String? = runCatching {
+        val cls = Class.forName("android.os.SystemProperties")
+        val get = cls.getMethod("get", String::class.java)
+        (get.invoke(null, "persist.sys.lz.MODEL") as? String)?.takeIf { it.isNotEmpty() }
+    }.getOrNull()
+
+    private fun hwSerial(): String = runCatching {
+        val s = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Build.getSerial()
+        } else {
+            @Suppress("DEPRECATION") Build.SERIAL
+        }
+        if (s.isNotEmpty() && s != Build.UNKNOWN) s else serialFromProp()
+    }.getOrElse { serialFromProp() }
+
+    private fun serialFromProp(): String = runCatching {
+        val cls = Class.forName("android.os.SystemProperties")
+        val get = cls.getMethod("get", String::class.java)
+        (get.invoke(null, "ro.serialno") as? String)?.takeIf { it.isNotEmpty() } ?: "-"
+    }.getOrDefault("-")
+
+    private fun networkStatus(): Pair<String, Boolean> = runCatching {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val n = cm.activeNetwork ?: return Pair("없음", false)
+        val cap = cm.getNetworkCapabilities(n) ?: return Pair("없음", false)
+        val type = when {
+            cap.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "Wi-Fi"
+            cap.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "이더넷"
+            cap.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "모바일"
+            else -> "연결됨"
+        }
+        Pair(type, cap.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+    }.getOrDefault(Pair("확인 불가", false))
+
+    private fun localIp(): String = runCatching {
+        NetworkInterface.getNetworkInterfaces().asSequence()
+            .flatMap { it.inetAddresses.asSequence() }
+            .firstOrNull { !it.isLoopbackAddress && it.hostAddress?.contains(':') == false }
+            ?.hostAddress ?: "-"
+    }.getOrDefault("-")
+
+    // ── 서명키: 실행 중 자기 인증서를 읽어 라벨/해시 판정(재서명당해도 사실을 보고) ──
+    private val pinnedSigns = mapOf(
+        "fd12b5fe8e80fc7b32cd51149117eecf430f3097a873ba53a718505fbaef6d60" to "rumpus",
+        "1c817acdb142d9dc0d4b471a2057f6a95ddd625655f90d1c519d7fe5e9c81682" to "cubot",
+    )
+    private var cachedCertDer: ByteArray? = null
+    private var cachedCertHash: String? = null
+
+    private fun signatureHash(): String = selfCertHash() ?: ""
+
+    private fun signatureLabel(): String {
+        val h = selfCertHash() ?: return "unknown"
+        return pinnedSigns[h] ?: certOrg() ?: "unknown"
+    }
+
+    private fun selfCertHash(): String? {
+        cachedCertHash?.let { return it }
+        val der = selfCertDer() ?: return null
+        val h = MessageDigest.getInstance("SHA-256").digest(der)
+            .joinToString("") { "%02x".format(it) }
+        cachedCertHash = h
+        return h
+    }
+
+    private fun selfCertDer(): ByteArray? {
+        cachedCertDer?.let { return it }
+        return runCatching {
+            val pm = packageManager
+            val der = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val s = pm.getPackageInfo(
+                    packageName, PackageManager.GET_SIGNING_CERTIFICATES).signingInfo
+                (if (s != null && s.hasMultipleSigners()) s.apkContentsSigners
+                else s?.apkContentsSigners)?.firstOrNull()?.toByteArray()
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
+                    .signatures?.firstOrNull()?.toByteArray()
+            }
+            cachedCertDer = der
+            der
+        }.getOrNull()
+    }
+
+    // 인증서 소유자 O=(없으면 CN=/OU=)를 소문자 영숫자 라벨로.
+    private fun certOrg(): String? = runCatching {
+        val der = selfCertDer() ?: return null
+        val cert = CertificateFactory.getInstance("X.509")
+            .generateCertificate(ByteArrayInputStream(der)) as X509Certificate
+        val dn = cert.subjectX500Principal.getName(X500Principal.RFC2253)
+        val parts = dn.split(Regex("""(?<!\\),"""))
+        listOf("O=", "CN=", "OU=").firstNotNullOfOrNull { key ->
+            parts.firstNotNullOfOrNull { part ->
+                part.trim().takeIf { it.startsWith(key, ignoreCase = true) }
+                    ?.substring(key.length)
+                    ?.replace("\\", "")?.lowercase()
+                    ?.filter { it in 'a'..'z' || it in '0'..'9' }
+                    ?.take(32)?.takeIf { it.isNotEmpty() }
+            }
+        }
+    }.getOrNull()
 
     // content://kr.co.viewplus.market.session 한 줄을 읽어 Map으로. 저장하지 않는다.
     private fun readSession(): Map<String, Any?>? {

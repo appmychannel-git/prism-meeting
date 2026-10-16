@@ -4,6 +4,7 @@ import 'access.dart';
 import 'config.dart';
 import 'l10n.dart';
 import 'mobile_auth.dart';
+import 'supported_devices.dart';
 
 /// 모바일 자체 로그인 화면(viewplus 계정) — 이메일 + 구글 + 카카오.
 /// 로그인 성공 시 계정의 기기시리얼 인증(registered)에 따라 [Access] 티어를 갱신하고
@@ -219,6 +220,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 20),
                     const Center(child: CircularProgressIndicator()),
                   ],
+                  // CS 진단: 로그인에서 막힌 사용자도 기기정보에 닿아야 한다(가이드 §4).
+                  const SizedBox(height: 24),
+                  const Center(child: VersionBadge()),
                 ],
               ),
             ),
