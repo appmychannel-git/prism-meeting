@@ -73,6 +73,7 @@ build_one() {
     --dart-define=ENABLE_FRIENDS=$FRIENDS --dart-define=ENABLE_CALL=$CALL --dart-define=ENABLE_CCTV=$CCTV
     --dart-define=SHOW_TRANSLATION=$TRANSLATION --dart-define=START_CAMERA=$START_CAMERA --dart-define=ENABLE_E2EE=$E2EE
     --dart-define=CCTV_ONLY=${CCTV_ONLY:-false}
+    --dart-define=USE_STORE_LOGIN=${USE_STORE_LOGIN:-false}
     --dart-define="INVITE_BASE_URL=$BASE" --dart-define="SHARE_BASE_URL=${BASE}share/"
   )
   if [ "$CODESIGN" = "1" ]; then

@@ -67,6 +67,7 @@ dependencies:
   # 카카오는 pub(pointycastle)이 livekit 과 충돌 → 네이티브(MethodChannel)로 처리.
   google_sign_in: ^6.2.1
   flutter_secure_storage: ^9.2.2
+  sign_in_with_apple: ^8.2.0
 
 dev_dependencies:
   flutter_test:

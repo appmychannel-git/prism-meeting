@@ -1,4 +1,8 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'access.dart';
 import 'config.dart';
@@ -184,6 +188,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Expanded(child: Divider()),
                   ]),
                   const SizedBox(height: 16),
+                  // 애플(iOS 전용) — App Store 가이드라인 4.8: 소셜로그인 제공 시 필수.
+                  // 애플 권장상 다른 소셜과 최소 동등하게 노출 → 맨 위에 공식 버튼.
+                  if (!kIsWeb && Platform.isIOS) ...[
+                    SignInWithAppleButton(
+                      onPressed: _busy
+                          ? () {}
+                          : () => _handle(() => MobileAuth.instance.loginApple()),
+                      style: SignInWithAppleButtonStyle.black,
+                      height: 48,
+                    ),
+                    const SizedBox(height: 10),
+                  ],
                   // 구글
                   OutlinedButton.icon(
                     onPressed: _busy

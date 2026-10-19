@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'l10n.dart';
 
@@ -176,6 +177,44 @@ class MobileAuth {
     return _authPost('api/mobile/auth/social/kakao',
         {'providerToken': accessToken, 'language': _lang},
         social: true);
+  }
+
+  // ── 애플 로그인(iOS, App Store 가이드라인 4.8 필수) ──
+  // sign_in_with_apple 로 identity token(JWT) + 최초 1회 이름을 받아 서버로 전송.
+  // 서버(viewplus)가 identityToken 을 Apple 공개키로 검증한다.
+  Future<VpAuthResult> loginApple() async {
+    AuthorizationCredentialAppleID cred;
+    try {
+      cred = await SignInWithApple.getAppleIDCredential(
+        scopes: const [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+    } on SignInWithAppleAuthorizationException catch (e) {
+      if (e.code == AuthorizationErrorCode.canceled) {
+        return const VpAuthResult(VpAuthStatus.cancelled);
+      }
+      return VpAuthResult(VpAuthStatus.error, message: e.message);
+    } catch (e) {
+      return VpAuthResult(VpAuthStatus.error, message: e.toString());
+    }
+    final idToken = cred.identityToken;
+    if (idToken == null || idToken.isEmpty) {
+      return const VpAuthResult(VpAuthStatus.error);
+    }
+    // 이름은 애플이 "최초 동의 시 1회만" 준다 → 있으면 함께 보낸다.
+    final name = [cred.givenName, cred.familyName]
+        .where((s) => (s ?? '').isNotEmpty)
+        .join(' ')
+        .trim();
+    return _authPost('api/mobile/auth/social/apple', {
+      'providerToken': idToken,
+      if (cred.authorizationCode.isNotEmpty) 'authorizationCode': cred.authorizationCode,
+      if (name.isNotEmpty) 'name': name,
+      if ((cred.email ?? '').isNotEmpty) 'email': cred.email,
+      'language': _lang,
+    }, social: true);
   }
 
   // 로그인/소셜 공통 POST → 토큰 저장 + 결과 매핑.
