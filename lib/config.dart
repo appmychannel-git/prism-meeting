@@ -319,6 +319,14 @@ class AppConfig {
   /// 정책 API 의 app 코드: CCTV 전용 앱=cctv, 그 외(미팅)=meeting.
   static String get policyAppCode => certApp.isNotEmpty ? certApp : 'meeting';
 
+  /// 실행 권한 정책의 "브랜드 기본값"(서버 무응답·미지정·캐시없음일 때 적용).
+  ///   - 대부분 'login' (로그인 필요)
+  ///   - mychannel 등 "지금은 무로그인" 브랜드 = 'none' → 서버가 나중에 login/
+  ///     registered 로 바꾸면 앱 재배포 없이 전환된다(app-policy.asp).
+  /// build_brand.sh / build_web.sh 가 브랜드별로 주입. 미지정이면 'login'.
+  static const String accessPolicyDefault =
+      String.fromEnvironment('ACCESS_POLICY_DEFAULT', defaultValue: 'login');
+
   /// 공유 페이지 URL 생성: 제목(t)·메시지(m)·대상링크(u)를 쿼리로 실어 보낸다.
   /// 이 URL을 QR로 만들어 두면, 휴대폰이 찍었을 때 공유 페이지가 열려
   /// [targetUrl]을 카톡·문자로 보낼 수 있다.

@@ -20,6 +20,9 @@ brand_config() {
   SERVER_STT=false  # 서버측 STT(자막봇) 사용. TV·셋톱 등 언어팩 없는 기기용. 예: freedom=true
   # 마켓앱 로그인 연동(안드로이드TV). 전 브랜드 적용. 마켓 없으면(모바일/웹) 미차단.
   USE_STORE_LOGIN=true
+  # 실행 권한 "브랜드 기본값"(서버 app-policy.asp 무응답·미지정일 때). 대부분 login.
+  # mychannel 은 "지금은 무로그인" → none (서버가 나중에 login/registered 로 전환).
+  ACCESS_POLICY_DEFAULT="login"
   # 시작 스플래시 — 브랜드 전용 이미지(assets/splash/<값>.png)가 있는 브랜드만 지정.
   # 빈 값이면 기본(브랜드명+아이콘) 다크 스플래시. SPLASH_BG=이미지 뒤 여백 배경색(hex).
   SPLASH_IMAGE=""
@@ -32,7 +35,7 @@ brand_config() {
     prism)        APP_BRAND="Prism Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     gbled)        APP_BRAND="Meeting"    ; FRIENDS=true ; CALL=true ; CCTV=false ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     viewplus)     APP_BRAND="Meeting" ; FRIENDS=true ; CALL=true ; CCTV=false ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
-    mychannel)    APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
+    mychannel)    APP_BRAND="Mychannel Meeting"; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false; ACCESS_POLICY_DEFAULT="none" ;;
     ecoglow)      APP_BRAND="ECO GLOW Meeting" ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=false; START_CAMERA=true;  E2EE=false ;;
     # ── 프리덤미디어(Freedom Media, 카자흐스탄) — 기본 언어 영어 ──
     freedom)      APP_BRAND="Freedom Meeting"  ; FRIENDS=true ; CALL=true ; CCTV=true ; TRANSLATION=true ; START_CAMERA=true;  E2EE=false; DEFAULT_LANG="en"; SERVER_STT=true ;;

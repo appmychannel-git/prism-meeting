@@ -387,6 +387,24 @@ class L {
     'dev_list_btn': {'ko': '검증 기기 목록', 'en': 'Verified devices'},
     'dev_list_title': {'ko': '검증 기기 목록', 'en': 'Verified devices'},
     'dev_this_badge': {'ko': '현재 기기', 'en': 'This device'},
+    // ── 강제/권장 업데이트 · 원격 차단 ──
+    'update_required_title': {'ko': '업데이트 필요', 'en': 'Update required'},
+    'update_required_msg': {
+      'ko': '계속 사용하려면 최신 버전으로 업데이트해 주세요.',
+      'en': 'Please update to the latest version to continue.',
+    },
+    'update_now': {'ko': '지금 업데이트', 'en': 'Update now'},
+    'update_later': {'ko': '나중에', 'en': 'Later'},
+    'update_available_title': {'ko': '새 버전이 있어요', 'en': 'Update available'},
+    'update_available_msg': {
+      'ko': '더 나은 사용을 위해 업데이트를 권장합니다.',
+      'en': 'We recommend updating for the best experience.',
+    },
+    'service_blocked_title': {'ko': '서비스 점검 중', 'en': 'Service unavailable'},
+    'service_blocked_msg': {
+      'ko': '현재 서비스를 이용할 수 없습니다. 잠시 후 다시 시도해 주세요.',
+      'en': 'The service is currently unavailable. Please try again later.',
+    },
     // ── 기기·앱 정보(CS 진단) ──
     'di_detail_btn': {'ko': '자세히', 'en': 'Details'},
     'di_title': {'ko': '기기·앱 정보', 'en': 'Device & app info'},

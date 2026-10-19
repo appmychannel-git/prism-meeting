@@ -118,6 +118,9 @@ class MainActivity : FlutterActivity() {
                     "deviceReport" -> result.success(deviceReport())
                     // 서명 라벨만 가볍게(지원 기기 팝업의 "이 기기" 뒤 (R)/(C) 표기).
                     "signLabel" -> result.success(signatureLabel())
+                    // 강제/권장 업데이트: 주어진 주소 or 자기 패키지의 스토어 열기.
+                    "openUrl" -> { openUrl(call.argument<String>("url") ?: ""); result.success(true) }
+                    "openStore" -> { openUrl("market://details?id=$packageName"); result.success(true) }
                     // 해당 앱의 "전체 화면 알림 허용" 설정 화면으로 이동.
                     "openFullScreenSettings" -> {
                         try {
@@ -343,6 +346,24 @@ class MainActivity : FlutterActivity() {
     }
 
     // ===== CS 진단용 기기·앱 정보(서명키·펌웨어·시리얼·네트워크 포함) =====
+    // 외부 주소 열기(업데이트 안내). market:// 가 안 열리면 https 플레이스토어로 폴백.
+    private fun openUrl(url: String) {
+        if (url.isEmpty()) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (e: Exception) {
+            if (url.startsWith("market://")) {
+                val id = Uri.parse(url).getQueryParameter("id") ?: return
+                runCatching {
+                    startActivity(Intent(Intent.ACTION_VIEW,
+                        Uri.parse("https://play.google.com/store/apps/details?id=$id"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
+        }
+    }
+
     private fun deviceReport(): Map<String, Any?> {
         val dm = resources.displayMetrics
         val (netType, internetOk) = networkStatus()

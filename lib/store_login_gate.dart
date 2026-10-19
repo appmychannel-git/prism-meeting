@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'access.dart';
+import 'app_gate_block.dart';
 import 'app_policy.dart';
 import 'config.dart';
 import 'mobile_auth.dart';
@@ -31,8 +32,11 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     with WidgetsBindingObserver {
   bool _loaded = false; // 최초 티어 판정 완료 여부(짧은 스플래시 1회)
   bool _observing = false;
+  bool _recommendedShown = false; // 권장 업데이트 안내 1회만
   // 서버에서 받은 실행 권한 정책(기본 login — fail-open 기본값과 동일).
   AccessPolicy _policy = AccessPolicy.login;
+  // 강제 업데이트·원격 차단 판정용 전체 결과(기본: 차단/업데이트 없음).
+  AppPolicyResult _res = const AppPolicyResult(AccessPolicy.login);
 
   @override
   void initState() {
@@ -65,6 +69,7 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     // 구버전 마켓(registered 없음) 기기를 서버가 login 으로 낮출 수 있게 한다.
     final mvc = await StoreLogin.marketVersionCode();
     final res = await AppPolicy.fetch(marketVersionCode: mvc);
+    _res = res;
     _policy = res.policy;
 
     final info = await StoreLogin.read();
@@ -116,6 +121,17 @@ class _StoreLoginGateState extends State<StoreLoginGate>
 
   Future<void> _refresh() async {
     if (!AppConfig.useStoreLogin) return;
+    // 정책도 다시 받아온다 — 백그라운드 복귀 시 원격 차단/강제 업데이트가 켜질 수 있다.
+    // (대개 캐시라 네트워크 없이 즉시. 차단 상태가 바뀌면 화면 갱신.)
+    final mvc = await StoreLogin.marketVersionCode();
+    final res = await AppPolicy.fetch(marketVersionCode: mvc);
+    if (!mounted) return;
+    final gateChanged =
+        res.blocked != _res.blocked || res.needsForceUpdate != _res.needsForceUpdate;
+    _res = res;
+    _policy = res.policy;
+    if (gateChanged) setState(() {});
+
     final info = await StoreLogin.read();
     if (!mounted) return;
     if (info == null) {
@@ -154,6 +170,25 @@ class _StoreLoginGateState extends State<StoreLoginGate>
         backgroundColor: Color(0xFF0E1116),
         body: Center(child: CircularProgressIndicator()),
       );
+    }
+    // 1) 원격 차단(점검/중단) — 서버가 명시할 때만.
+    if (_res.blocked) {
+      return AppGateBlockScreen.blocked(
+          message: _res.blockMessage, updateUrl: _res.updateUrl);
+    }
+    // 2) 강제 업데이트 — 설치 버전이 min_version_code 미만.
+    if (_res.needsForceUpdate) {
+      return AppGateBlockScreen.forceUpdate(
+          message: _res.updateMessage, updateUrl: _res.updateUrl);
+    }
+    // 3) 권장 업데이트(강제 아님) — 홈 진입 시 1회 안내(건너뛰기 가능).
+    if (_res.hasRecommendedUpdate && !_recommendedShown) {
+      _recommendedShown = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          showRecommendedUpdateDialog(context, updateUrl: _res.updateUrl);
+        }
+      });
     }
     return widget.child;
   }

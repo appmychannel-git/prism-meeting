@@ -79,6 +79,7 @@ build_one() {
     --dart-define=SIMPLE_CCTV=${SIMPLE_CCTV:-false} \
     --dart-define=SERVER_STT=${SERVER_STT:-false} \
     --dart-define=USE_STORE_LOGIN=${USE_STORE_LOGIN:-false} \
+    --dart-define=ACCESS_POLICY_DEFAULT=${ACCESS_POLICY_DEFAULT:-login} \
     --dart-define=SPLASH_IMAGE=${SPLASH_IMAGE:-} \
     --dart-define=SPLASH_BG=${SPLASH_BG:-} \
     --dart-define=DEFAULT_LANG=${DEFAULT_LANG:-} \
