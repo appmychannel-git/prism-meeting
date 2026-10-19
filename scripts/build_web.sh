@@ -28,9 +28,18 @@ build_web_one() {
   brand_config "$brand"
   local base; base="$(brand_base_url "$brand")"        # 예: https://.../apps/cctv/gbled/
   local href="${base#https://androidtv.mychannel.co.kr}" # base-href(경로만) = base에서 오리진 제거
-  # 산출물 이름: 미팅=Meeting-<brand>.apk, CCTV전용=CCTV-<브랜드명>.apk
+  # 웹 다운로드 링크 이름(apk_name): 버전을 안 붙인 "고정" 이름 → 매 릴리스마다 웹 URL이
+  # 바뀌지 않게(기존 링크/북마크 유지). 미팅=Meeting-<brand>.apk, CCTV=CCTV-<브랜드명>.apk.
   local apk_name
   if [ "${CCTV_ONLY:-false}" = "true" ]; then apk_name="CCTV-${brand%cctv}.apk"; else apk_name="Meeting-${brand}.apk"; fi
+  # 소스 파일 이름(apk_src): build_brand.sh 가 만든 실제 산출물(끝에 버전 + 전체 소문자).
+  # 웹은 일반 사용자용 기본(rumpus) 서명을 배포하므로 -platform-* 꼬리표는 없음.
+  # dist/ 에서 이 파일을 찾아 download/ 에는 고정 이름(apk_name)으로 넣는다.
+  local app_vn apk_src
+  app_vn="$(grep -m1 '^version:' pubspec.yaml | sed 's/version:[[:space:]]*//; s/+.*//' | tr -d '[:space:]')"
+  apk_src="${apk_name%.apk}"
+  [ -n "$app_vn" ] && apk_src="${apk_src}-v${app_vn}"
+  apk_src="$(printf '%s.apk' "$apk_src" | tr '[:upper:]' '[:lower:]')"
   echo "== 웹 빌드: $brand  (base-href=$href) =="
 
   flutter build web --release \
@@ -100,13 +109,14 @@ XML
   # 공유 페이지 동봉(브라우저로 열림 — 앱이 아님)
   mkdir -p "$out/share"
   cp share_page/index.html "$out/share/index.html"
-  # APK 배포 폴더 자리(여기에 dist/Meeting-<brand>.apk 를 복사해 올린다)
+  # APK 배포 폴더: dist/ 의 버전 포함 산출물(apk_src)을 찾아 고정 이름(apk_name)으로 복사.
+  # (build_brand.sh 가 만든 meeting-<brand>-v<버전>.apk → download/Meeting-<brand>.apk)
   mkdir -p "$out/download"
-  if [ -f "dist/${apk_name}" ]; then
-    cp "dist/${apk_name}" "$out/download/${apk_name}"
-    echo "   + download/${apk_name} 포함"
+  if [ -f "dist/${apk_src}" ]; then
+    cp "dist/${apk_src}" "$out/download/${apk_name}"
+    echo "   + download/${apk_name} 포함 (소스 dist/${apk_src})"
   else
-    echo "   (안내) dist/${apk_name} 없음 → build_brand.sh 로 APK 먼저 빌드하면 자동 포함"
+    echo "   (안내) dist/${apk_src} 없음 → build_brand.sh 로 APK 먼저 빌드하면 자동 포함"
   fi
   echo "   → $out  (서버 ${href} 에 업로드)"
 }
