@@ -150,7 +150,7 @@ class MobileAuth {
   // ── 이메일 로그인 ──
   Future<VpAuthResult> loginEmail(String email, String password) async {
     return _authPost('api/mobile/auth/login',
-        {'userId': email.trim(), 'password': password});
+        {'userId': email.trim(), 'password': password, 'language': _lang});
   }
 
   // ── 구글 로그인 ──

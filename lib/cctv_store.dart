@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config.dart';
+import 'l10n.dart';
 
 /// 저장된 CCTV(시청 목록) 한 건.
 class CctvEntry {
@@ -155,7 +156,8 @@ class CctvStore {
     // 마이그레이션: 과거 단일 비번(setMyPin)이 있으면 "기본" 그룹 1개로.
     final oldPin = sp.getString(_kMyPin) ?? '';
     if (oldPin.isNotEmpty) {
-      final g = CctvShareGroup(id: _newGroupId(), name: '기본', pin: oldPin);
+      final g = CctvShareGroup(
+          id: _newGroupId(), name: L.t('cctv_group_default'), pin: oldPin);
       await _saveGroups([g]);
       return [g];
     }
@@ -178,8 +180,11 @@ class CctvStore {
   /// 새 비번 1개만 남긴다. 비번을 바꾸면 이전 비번으로는 더 이상 접속할 수 없다
   /// (변경된 비번만 유효). 송출 시 방이 새 비번 집합으로 재생성되어, 이전 비번으로
   /// 접속해 있던 시청자는 끊기고 이전 비번으론 새 접속도 거부된다.
-  static Future<void> setSolePin(String pin, {String name = '공유'}) async {
-    await _saveGroups([CctvShareGroup(id: _newGroupId(), name: name, pin: pin)]);
+  static Future<void> setSolePin(String pin, {String? name}) async {
+    await _saveGroups([
+      CctvShareGroup(
+          id: _newGroupId(), name: name ?? L.t('cctv_group_share'), pin: pin)
+    ]);
   }
 
   static Future<void> updateShareGroup(String id,

@@ -53,6 +53,12 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.of(context).pop(true);
   }
 
+  // 서버 오류 문구: 비었거나 현재 언어가 아니면(한국어 아닌데 한글) 앱 문구로 대신.
+  String _srv(String? m, String fallbackKey) =>
+      (m != null && m.isNotEmpty && (L.lang == 'ko' || !RegExp(r'[가-힣]').hasMatch(m)))
+          ? m
+          : L.t(fallbackKey);
+
   Future<void> _handle(Future<VpAuthResult> Function() action) async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -72,16 +78,16 @@ class _LoginScreenState extends State<LoginScreen> {
         _snack(L.t('login_err_credential'));
         break;
       case VpAuthStatus.forbidden:
-        _snack(r.message ?? L.t('login_err_forbidden'));
+        _snack(_srv(r.message, 'login_err_forbidden'));
         break;
       case VpAuthStatus.rateLimited:
-        _snack(r.message ?? L.t('login_err_rate'));
+        _snack(_srv(r.message, 'login_err_rate'));
         break;
       case VpAuthStatus.networkError:
         _snack(L.t('login_err_network'));
         break;
       case VpAuthStatus.error:
-        _snack(r.message ?? L.t('login_err_generic'));
+        _snack(_srv(r.message, 'login_err_generic'));
         break;
     }
   }
@@ -122,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (r.status == VpAuthStatus.success) {
       await _onSuccess();
     } else {
-      _snack(r.message ?? L.t('login_err_generic'));
+      _snack(_srv(r.message, 'login_err_generic'));
     }
   }
 

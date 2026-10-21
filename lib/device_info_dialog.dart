@@ -112,6 +112,19 @@ class _DeviceInfoDialogState extends State<_DeviceInfoDialog> {
     return s.isEmpty ? fallback : s;
   }
 
+  // 네이티브가 주는 연결 종류(한국어 고정값)를 화면 언어로. 전송 데이터는 그대로 둔다.
+  String _netLabel(String v) {
+    const keys = {
+      '없음': 'di_net_none',
+      '이더넷': 'di_net_ethernet',
+      '모바일': 'di_net_mobile',
+      '연결됨': 'di_net_connected',
+      '확인 불가': 'di_net_unknown',
+    };
+    final k = keys[v];
+    return k == null ? v : L.t(k);
+  }
+
   @override
   Widget build(BuildContext context) {
     final d = widget.data;
@@ -153,7 +166,7 @@ class _DeviceInfoDialogState extends State<_DeviceInfoDialog> {
               _line(L.t('di_device_auth'), d.deviceAuth),
               _line(L.t('di_serial'), d.serialMasked),
               _header('[ ${L.t('di_sec_net')} ]'),
-              _line(L.t('di_conn'), _s('network')),
+              _line(L.t('di_conn'), _netLabel(_s('network'))),
               _line(L.t('di_internet'),
                   netOk ? L.t('di_net_ok') : L.t('di_net_no_internet')),
               _line('IP', _s('localIp')),

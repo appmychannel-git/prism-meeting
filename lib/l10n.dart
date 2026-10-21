@@ -30,6 +30,7 @@ class L {
   static const String _kLangPref = 'app_lang';
 
   /// 저장된 언어 복원(앱 시작 시 1회). 없으면 기기 언어 기본값 유지.
+  /// (사용자가 메뉴에서 고른 언어가 있으면 기기 언어보다 우선)
   static Future<void> load() async {
     try {
       final sp = await SharedPreferences.getInstance();
@@ -57,10 +58,10 @@ class L {
     // 1순위: 브랜드 기본 언어(빌드 설정 DEFAULT_LANG). Freedom 등은 'en'.
     final brand = AppConfig.defaultLang.toLowerCase();
     if (uiLanguages.containsKey(brand)) return brand;
-    // 2순위: 기기 언어. 지원 안 하면 한국어.
+    // 2순위: 기기 언어. 한국어 기기면 한국어, 그 외(일본어·중국어 등 포함)는 영어.
     final code = ui.PlatformDispatcher.instance.locale.languageCode
         .toLowerCase();
-    return uiLanguages.containsKey(code) ? code : 'ko';
+    return code == 'ko' ? 'ko' : 'en';
   }
 
   /// 키에 해당하는 현재 언어 문자열. 없으면 en→ko→키 순으로 폴백.
@@ -348,6 +349,33 @@ class L {
     'unnamed': {'ko': '이름 없음', 'en': 'Unnamed'},
 
     // ── 통화(발신/수신) ──
+    // ── 알림(푸시/로컬). 채널 이름은 기기 설정 > 알림에 보인다 ──
+    // 기기 정보(CS 진단) — 연결 종류 표시
+    'di_net_none': {'ko': '없음', 'en': 'None'},
+    'di_net_ethernet': {'ko': '이더넷', 'en': 'Ethernet'},
+    'di_net_mobile': {'ko': '모바일', 'en': 'Mobile data'},
+    'di_net_connected': {'ko': '연결됨', 'en': 'Connected'},
+    'di_net_unknown': {'ko': '확인 불가', 'en': 'Unknown'},
+    // CCTV 공유 그룹 기본 이름(만들 때의 언어로 저장된다)
+    'cctv_group_default': {'ko': '기본', 'en': 'Default'},
+    'cctv_group_share': {'ko': '공유', 'en': 'Shared'},
+    'notif_call_channel': {'ko': '수신 전화', 'en': 'Incoming calls'},
+    'notif_call_channel_desc': {
+      'ko': '친구의 음성·영상 통화 수신 알림',
+      'en': 'Voice and video call alerts from friends'
+    },
+    'notif_call': {'ko': '전화', 'en': 'Call'},
+    'notif_missed': {'ko': '부재중 전화', 'en': 'Missed call'},
+    'notif_cctv_start': {
+      'ko': 'CCTV 송출을 시작합니다',
+      'en': 'Starting CCTV broadcast'
+    },
+    'notif_cctv_channel': {'ko': 'CCTV 송출', 'en': 'CCTV broadcast'},
+    'notif_cctv_live': {'ko': '● CCTV 송출 중', 'en': '● CCTV broadcasting'},
+    'notif_cctv_live_body': {
+      'ko': '시청자 {n}명 · 카메라가 켜져 있습니다',
+      'en': 'Viewers: {n} · Camera is on'
+    },
     'incoming_voice': {'ko': '음성통화 수신', 'en': 'Incoming voice call'},
     'incoming_video': {'ko': '영상통화 수신', 'en': 'Incoming video call'},
     'call_accept': {'ko': '수락', 'en': 'Accept'},

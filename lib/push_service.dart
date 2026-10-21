@@ -20,6 +20,7 @@ import 'device_id.dart';
 import 'directory.dart';
 import 'friends.dart';
 import 'incoming_call_screen.dart';
+import 'l10n.dart';
 
 /// 앱 전역 Navigator 키. 백그라운드 알림 탭/수신 통화에서 화면 전환에 사용.
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
@@ -42,15 +43,16 @@ Future<void> showIncomingCallNotification({
   required bool video,
 }) async {
   try {
+    await L.load(); // 백그라운드 isolate 에서도 사용자가 고른 언어로
     final plugin = FlutterLocalNotificationsPlugin();
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     await plugin
         .initialize(settings: const InitializationSettings(android: androidInit));
     // 백그라운드 isolate 에도 채널이 있어야 하므로 멱등 생성.
-    const channel = AndroidNotificationChannel(
+    final channel = AndroidNotificationChannel(
       kCallChannelId,
-      '수신 전화',
-      description: '친구의 음성·영상 통화 수신 알림',
+      L.t('notif_call_channel'),
+      description: L.t('notif_call_channel_desc'),
       importance: Importance.max,
       playSound: true,
       sound: kCallSound, // 커스텀 벨소리
@@ -62,15 +64,15 @@ Future<void> showIncomingCallNotification({
 
     final details = AndroidNotificationDetails(
       kCallChannelId,
-      '수신 전화',
-      channelDescription: '친구의 음성·영상 통화 수신 알림',
+      L.t('notif_call_channel'),
+      channelDescription: L.t('notif_call_channel_desc'),
       importance: Importance.max,
       priority: Priority.max,
       category: AndroidNotificationCategory.call,
       fullScreenIntent: true, // 잠금화면 위로 통화 UI 실행(권한 허용 시)
       ongoing: true,
       autoCancel: false,
-      ticker: '수신 전화',
+      ticker: L.t('notif_call_channel'),
       visibility: NotificationVisibility.public,
       sound: kCallSound, // 커스텀 벨소리
       // FLAG_INSISTENT(4): 풀스크린 권한이 없어도 알림이 뜨는 동안 소리를 반복(계속 벨).
@@ -78,8 +80,8 @@ Future<void> showIncomingCallNotification({
     );
     await plugin.show(
       id: kIncomingCallNotifId,
-      title: fromName.isNotEmpty ? fromName : '전화',
-      body: video ? '영상통화 수신' : '음성통화 수신',
+      title: fromName.isNotEmpty ? fromName : L.t('notif_call'),
+      body: video ? L.t('incoming_video') : L.t('incoming_voice'),
       notificationDetails: NotificationDetails(android: details),
       payload: callId,
     );
@@ -115,22 +117,23 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// CCTV 원격 켜기 풀스크린 알림 — 잠금/대기화면 위로 앱을 실행해 송출 시작.
 Future<void> showCctvWakeNotification() async {
   try {
+    await L.load(); // 백그라운드 isolate 에서도 사용자가 고른 언어로
     final plugin = FlutterLocalNotificationsPlugin();
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     await plugin
         .initialize(settings: const InitializationSettings(android: androidInit));
-    const channel = AndroidNotificationChannel(
+    final channel = AndroidNotificationChannel(
       kCallChannelId,
-      '수신 전화',
+      L.t('notif_call_channel'),
       importance: Importance.max,
     );
     await plugin
         .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
-    const details = AndroidNotificationDetails(
+    final details = AndroidNotificationDetails(
       kCallChannelId,
-      '수신 전화',
+      L.t('notif_call_channel'),
       importance: Importance.max,
       priority: Priority.max,
       category: AndroidNotificationCategory.call,
@@ -141,8 +144,8 @@ Future<void> showCctvWakeNotification() async {
     await plugin.show(
       id: kCctvWakeNotifId,
       title: 'CCTV',
-      body: 'CCTV 송출을 시작합니다',
-      notificationDetails: const NotificationDetails(android: details),
+      body: L.t('notif_cctv_start'),
+      notificationDetails: NotificationDetails(android: details),
       payload: 'cctv_wake',
     );
   } catch (_) {}
@@ -157,13 +160,14 @@ Future<void> cancelCctvWakeNotification() async {
 /// CCTV 송출 중 상시 알림(방송 중임을 사용자가 항상 인지하도록).
 Future<void> showCctvLiveNotification(int viewers) async {
   try {
+    await L.load(); // 백그라운드 isolate 에서도 사용자가 고른 언어로
     final plugin = FlutterLocalNotificationsPlugin();
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
     await plugin
         .initialize(settings: const InitializationSettings(android: androidInit));
-    const channel = AndroidNotificationChannel(
+    final channel = AndroidNotificationChannel(
       'cctv_live',
-      'CCTV 송출',
+      L.t('notif_cctv_channel'),
       importance: Importance.low,
     );
     await plugin
@@ -172,7 +176,7 @@ Future<void> showCctvLiveNotification(int viewers) async {
         ?.createNotificationChannel(channel);
     final details = AndroidNotificationDetails(
       'cctv_live',
-      'CCTV 송출',
+      L.t('notif_cctv_channel'),
       importance: Importance.low,
       priority: Priority.low,
       ongoing: true,
@@ -183,8 +187,8 @@ Future<void> showCctvLiveNotification(int viewers) async {
     );
     await plugin.show(
       id: kCctvLiveNotifId,
-      title: '● CCTV 송출 중',
-      body: '시청자 $viewers명 · 카메라가 켜져 있습니다',
+      title: L.t('notif_cctv_live'),
+      body: L.t('notif_cctv_live_body', {'n': '$viewers'}),
       notificationDetails: NotificationDetails(android: details),
     );
   } catch (_) {}
@@ -313,10 +317,10 @@ class PushService with WidgetsBindingObserver {
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       await plugin.initialize(
           settings: const InitializationSettings(android: androidInit));
-      const channel = AndroidNotificationChannel(
+      final channel = AndroidNotificationChannel(
         kCallChannelId,
-        '수신 전화',
-        description: '친구의 음성·영상 통화 수신 알림',
+        L.t('notif_call_channel'),
+        description: L.t('notif_call_channel_desc'),
         importance: Importance.max,
         playSound: true,
         sound: kCallSound, // 커스텀 벨소리
@@ -416,26 +420,26 @@ class PushService with WidgetsBindingObserver {
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       await plugin.initialize(
           settings: const InitializationSettings(android: androidInit));
-      const channel = AndroidNotificationChannel(
+      final channel = AndroidNotificationChannel(
         'missed_calls',
-        '부재중 전화',
+        L.t('notif_missed'),
         importance: Importance.defaultImportance,
       );
       await plugin
           .resolvePlatformSpecificImplementation<
               AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(channel);
-      const details = AndroidNotificationDetails(
+      final details = AndroidNotificationDetails(
         'missed_calls',
-        '부재중 전화',
+        L.t('notif_missed'),
         importance: Importance.defaultImportance,
         priority: Priority.defaultPriority,
       );
       await plugin.show(
         id: 2001,
-        title: '부재중 전화',
-        body: fromName.isNotEmpty ? fromName : '전화',
-        notificationDetails: const NotificationDetails(android: details),
+        title: L.t('notif_missed'),
+        body: fromName.isNotEmpty ? fromName : L.t('notif_call'),
+        notificationDetails: NotificationDetails(android: details),
       );
     } catch (_) {}
   }
