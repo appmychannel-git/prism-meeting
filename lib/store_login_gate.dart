@@ -102,19 +102,8 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     }
   }
 
-  // 정책별 티어: none→full, login→세션있으면 full, registered→세션+인증이면 full.
-  AccessLevel _tierFor({required bool loggedIn, required bool registered}) {
-    switch (_policy) {
-      case AccessPolicy.none:
-        return AccessLevel.full;
-      case AccessPolicy.login:
-        return loggedIn ? AccessLevel.full : AccessLevel.limited;
-      case AccessPolicy.registered:
-        return (loggedIn && registered)
-            ? AccessLevel.full
-            : AccessLevel.limited;
-    }
-  }
+  AccessLevel _tierFor({required bool loggedIn, required bool registered}) =>
+      _policy.tierFor(loggedIn: loggedIn, registered: registered);
 
   // 마켓앱 로그아웃/로그인 변경 감지 시 티어 재설정.
   Future<void> _onSessionChanged() => _refresh();

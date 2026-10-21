@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'access.dart';
+import 'app_policy.dart';
 import 'config.dart';
 import 'l10n.dart';
 import 'mobile_auth.dart';
@@ -42,9 +43,13 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _onSuccess() async {
     // registered 는 로그인 응답에 없을 수 있어 me 로 한 번 더 확인.
     final u = await MobileAuth.instance.me() ?? MobileAuth.instance.user;
-    Access.set((u?.registered ?? false) ? AccessLevel.full : AccessLevel.limited);
+    // 티어는 서버 정책 기준(미팅=login 이면 시리얼 미인증이어도 full). 게이트와 같은 규칙.
+    final policy = (await AppPolicy.fetch()).policy;
+    final tier =
+        policy.tierFor(loggedIn: true, registered: u?.registered ?? false);
+    Access.set(tier);
     if (!mounted) return;
-    if (u != null && !u.registered) {
+    if (tier == AccessLevel.limited) {
       _snack(L.t('login_ok_unverified'));
     }
     Navigator.of(context).pop(true);

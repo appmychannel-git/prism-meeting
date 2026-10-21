@@ -80,6 +80,8 @@ class MobileAuth {
       '800914840538-k4ovs9na1rg7patpc2q85qk81dnagevv.apps.googleusercontent.com';
 
   static const _kRefresh = 'vp_refresh_token';
+  // 이번 세션에 로그인한 경로(email/google/kakao/apple) — 메뉴 아이콘 표시용.
+  static const _kMethod = 'vp_login_method';
   static const _storage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
@@ -125,7 +127,17 @@ class MobileAuth {
     _user = null;
     try {
       await _storage.delete(key: _kRefresh);
+      await _storage.delete(key: _kMethod);
     } catch (_) {}
+  }
+
+  /// 현재 세션의 로그인 경로(email/google/kakao/apple). 없으면 null.
+  Future<String?> loginMethod() async {
+    try {
+      return await _storage.read(key: _kMethod);
+    } catch (_) {
+      return null;
+    }
   }
 
   String get _lang => L.lang.isNotEmpty ? L.lang : 'ko';
@@ -242,6 +254,11 @@ class MobileAuth {
     if (resp.statusCode == 200 && data is Map) {
       final d = data.cast<String, dynamic>();
       await _saveTokens(d);
+      // 로그인 경로 기록: .../social/<provider> 또는 이메일.
+      final method = social ? path.split('/').last : 'email';
+      try {
+        await _storage.write(key: _kMethod, value: method);
+      } catch (_) {}
       if (social && d['needsOnboarding'] == true) {
         final email = (_user?.email ?? '');
         return VpAuthResult(VpAuthStatus.needsOnboarding,

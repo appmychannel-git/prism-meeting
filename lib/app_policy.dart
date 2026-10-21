@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'access.dart';
 import 'config.dart';
 import 'l10n.dart';
 
@@ -14,6 +15,22 @@ import 'l10n.dart';
 /// 규칙: md/subapp-access-policy-guide-2026-10-15.md
 ///       md/subapp-force-update-and-remote-block-2026-10-19.md
 enum AccessPolicy { none, login, registered }
+
+extension AccessPolicyTier on AccessPolicy {
+  /// 정책별 티어: none→full, login→세션있으면 full, registered→세션+인증이면 full.
+  AccessLevel tierFor({required bool loggedIn, required bool registered}) {
+    switch (this) {
+      case AccessPolicy.none:
+        return AccessLevel.full;
+      case AccessPolicy.login:
+        return loggedIn ? AccessLevel.full : AccessLevel.limited;
+      case AccessPolicy.registered:
+        return (loggedIn && registered)
+            ? AccessLevel.full
+            : AccessLevel.limited;
+    }
+  }
+}
 
 class AppPolicyResult {
   final AccessPolicy policy;

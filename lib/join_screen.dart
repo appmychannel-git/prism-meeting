@@ -606,6 +606,7 @@ class _JoinScreenState extends State<JoinScreen> with WidgetsBindingObserver {
               ),
               const Divider(),
             ],
+            if (AppConfig.useStoreLogin) const AccountMenuTile(),
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(L.t('app_language')),

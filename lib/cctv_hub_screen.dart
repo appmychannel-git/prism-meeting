@@ -816,6 +816,7 @@ class _CctvHubScreenState extends State<CctvHubScreen>
               ),
             ),
             const SizedBox(height: 8),
+            if (AppConfig.useStoreLogin) const AccountMenuTile(),
             ListTile(
               leading: const Icon(Icons.language),
               title: Text(L.t('app_language')),

@@ -54,7 +54,8 @@ class MainActivity : FlutterActivity() {
     private var sessionObserver: ContentObserver? = null
 
     // ===== 카카오 로그인(모바일 자체 로그인) =====
-    private val kakaoNativeKey = "bd28f3b76080e0b4d64865386a35319d"
+    // 브랜드(flavor)별 키 — build.gradle.kts 의 kakaoKey(...) 가 리소스로 넣는다.
+    private val kakaoNativeKey by lazy { getString(R.string.kakao_native_key) }
     private var kakaoInited = false
 
     // 수신 통화(풀스크린 인텐트)가 잠금화면 위로 뜨고 화면을 켜도록.

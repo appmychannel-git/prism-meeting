@@ -139,6 +139,10 @@ class L {
     },
     'onboarding_agree': {'ko': '동의하고 시작', 'en': 'Agree and continue'},
     'logout': {'ko': '로그아웃', 'en': 'Sign out'},
+    'logout_confirm': {
+      'ko': '로그아웃할까요?',
+      'en': 'Sign out of this account?',
+    },
     'login_to_add_friend': {
       'ko': '공유받은 ID를 추가하려면 로그인이 필요해요.',
       'en': 'Sign in to add the shared ID.'

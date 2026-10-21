@@ -41,6 +41,12 @@ val platformProperties = Properties().apply {
     }
 }
 
+// 카카오 키를 매니페스트 placeholder 와 string 리소스에 함께 넣는다.
+fun com.android.build.api.dsl.VariantDimension.kakaoKey(key: String) {
+    manifestPlaceholders["kakaoKey"] = key
+    resValue("string", "kakao_native_key", key)
+}
+
 android {
     namespace = "kr.co.mychannel.meeting.prism"
     compileSdk = flutter.compileSdkVersion
@@ -74,6 +80,10 @@ android {
         manifestPlaceholders["deepLinkPath"] = "/apps/meeting/prism/"
         // TV 런처 배너(매니페스트 android:banner). 기본은 런처 아이콘, 전용 배너가 있는 flavor만 덮어씀.
         manifestPlaceholders["appBanner"] = "@mipmap/ic_launcher"
+        // 카카오 네이티브 앱 키(브랜드/패키지별). 매니페스트 리다이렉트 scheme(kakao{키})과
+        // MainActivity 의 KakaoSdk.init 이 같은 값을 쓴다. 그 패키지가 카카오 콘솔에서
+        // 이 키에 등록돼 있어야 한다. 기본값 = 기존 공용 키(viewplus mychannel).
+        kakaoKey("bd28f3b76080e0b4d64865386a35319d")
         // Firestore/Firebase 등 메서드 수가 많아 64K DEX 한계 회피.
         multiDexEnabled = true
     }
@@ -94,12 +104,14 @@ android {
             applicationId = "kr.co.mychannel.meeting.gbled"
             manifestPlaceholders["appLabel"] = "Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/gbled/"
+            kakaoKey("6d61ca2ac4c26833b136abca29340bff") // 카카오 GBLED 앱 · gbled meeting
         }
         create("viewplus") {
             dimension = "brand"
             applicationId = "kr.co.mychannel.meeting.viewplus"
             manifestPlaceholders["appLabel"] = "Meeting"
             manifestPlaceholders["deepLinkPath"] = "/apps/meeting/viewplus/"
+            kakaoKey("e553fdccb0388b82bd60df626b4ae853") // 카카오 VIEWPLUS 앱 · viewplus meeting
             manifestPlaceholders["appBanner"] = "@drawable/banner"
         }
         create("mychannel") {
@@ -126,6 +138,7 @@ android {
             applicationId = "kr.co.mychannel.cctv.gbled"
             manifestPlaceholders["appLabel"] = "CCTV"
             manifestPlaceholders["deepLinkPath"] = "/apps/cctv/gbled/"
+            kakaoKey("8f83214986693cb6faff854d56923667") // 카카오 GBLED 앱 · gbled cctv
         }
         create("viewpluscctv") {
             dimension = "brand"
@@ -174,6 +187,11 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+            // R8 예외 규칙(카카오 SDK Retrofit/Gson 등). 없으면 카카오 로그인 시 앱 종료.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
         // debug 빌드 표식(버전명에 -dev). applicationId 는 release 와 동일하게 둔다.
         // (FCM 은 각 applicationId 가 Firebase 에 등록돼야 하므로 .dev 접미사를 쓰지 않음.

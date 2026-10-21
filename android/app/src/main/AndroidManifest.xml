@@ -101,7 +101,7 @@
         <meta-data
             android:name="io.flutter.embedding.android.EnableImpeller"
             android:value="false" />
-        <!-- 카카오 로그인 리다이렉트 처리(scheme = kakao{네이티브앱키}) -->
+        <!-- 카카오 로그인 리다이렉트 처리(scheme = kakao{네이티브앱키}, 키는 flavor별) -->
         <activity
             android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
             android:exported="true">
@@ -111,7 +111,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:host="oauth"
-                    android:scheme="kakaobd28f3b76080e0b4d64865386a35319d" />
+                    android:scheme="kakao${kakaoKey}" />
             </intent-filter>
         </activity>
     </application>
