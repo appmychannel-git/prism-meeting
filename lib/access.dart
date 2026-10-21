@@ -32,6 +32,17 @@ class Access {
     if (_level.value != l) _level.value = l;
   }
 
+  // 로그인은 했지만 기기 인증(시리얼)이 안 돼 제한된 상태면 안내 문구(서버 deny_message,
+  // 빈 문자열이면 기본 문구), 그 외(미로그인/전체허용)는 null.
+  static final ValueNotifier<String?> _verifyNeeded = ValueNotifier<String?>(null);
+
+  /// 배너 구독용 — null 이 아니면 "로그인" 대신 "기기 인증 필요" 안내.
+  static ValueListenable<String?> get verifyNeededListenable => _verifyNeeded;
+
+  static void setVerifyNeeded(String? message) {
+    if (_verifyNeeded.value != message) _verifyNeeded.value = message;
+  }
+
   // ── 티어별 기능 게이트 ──
   // (브랜드 플래그 friendsEnabled/callEnabled/cctvEnabled 와 AND 로 함께 쓴다.
   //  여기선 "로그인·인증 티어" 만 판단한다.)

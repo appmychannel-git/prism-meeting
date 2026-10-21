@@ -89,7 +89,7 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     }
 
     // 정책 + 세션/인증으로 티어 결정.
-    Access.set(_tierFor(loggedIn: info.isValid, registered: info.registered));
+    _apply(loggedIn: info.isValid, registered: info.registered);
     _done();
 
     // 로그인 상태면 서버 검증(401 → 로그아웃 취급).
@@ -97,13 +97,14 @@ class _StoreLoginGateState extends State<StoreLoginGate>
       final code = await StoreLogin.verify(info.sessionToken);
       if (!mounted) return;
       if (code == 401) {
-        Access.set(_tierFor(loggedIn: false, registered: false));
+        _apply(loggedIn: false, registered: false);
       }
     }
   }
 
-  AccessLevel _tierFor({required bool loggedIn, required bool registered}) =>
-      _policy.tierFor(loggedIn: loggedIn, registered: registered);
+  // 티어 + "기기 인증 필요" 안내(서버 deny_message)를 함께 반영.
+  void _apply({required bool loggedIn, required bool registered}) =>
+      _res.apply(loggedIn: loggedIn, registered: registered);
 
   // 마켓앱 로그아웃/로그인 변경 감지 시 티어 재설정.
   Future<void> _onSessionChanged() => _refresh();
@@ -126,7 +127,7 @@ class _StoreLoginGateState extends State<StoreLoginGate>
     if (info == null) {
       await _applyMobileSession(); // 모바일: 자체 로그인 세션 재확인
     } else {
-      Access.set(_tierFor(loggedIn: info.isValid, registered: info.registered));
+      _apply(loggedIn: info.isValid, registered: info.registered);
     }
   }
 
@@ -134,18 +135,17 @@ class _StoreLoginGateState extends State<StoreLoginGate>
   Future<void> _applyMobileSession() async {
     try {
       if (_policy == AccessPolicy.none) {
-        Access.set(AccessLevel.full);
+        _res.apply(loggedIn: false, registered: false); // none → full
         return;
       }
       if (await MobileAuth.instance.hasSession()) {
         final u = await MobileAuth.instance.me();
         if (!mounted) return;
-        Access.set(
-            _tierFor(loggedIn: true, registered: u?.registered ?? false));
+        _apply(loggedIn: true, registered: u?.registered ?? false);
         return;
       }
     } catch (_) {}
-    Access.set(_tierFor(loggedIn: false, registered: false));
+    _apply(loggedIn: false, registered: false);
   }
 
   void _done() {

@@ -305,8 +305,10 @@ class AppConfig {
 
   /// 서브앱 실행 권한 정책 API(브랜드별 cuid 필요). 응답 access_policy 로 티어 판정.
   /// 규칙: md/subapp-access-policy-guide-2026-10-15.md
-  static String get appPolicyUrl =>
-      'https://platformtvapi.mychannel.co.kr/$certBrand'
+  /// 주소는 전 브랜드 공통(경로의 gbled 고정) — 브랜드는 brand 파라미터로 구분한다.
+  /// (브랜드별 경로는 서버에 없음 → 404 → fail-open 이 됐었다)
+  static const String appPolicyUrl =
+      'https://platformtvapi.mychannel.co.kr/gbled'
       '/appinterface/tv/1.0/app-policy.asp';
 
   /// 브랜드별 고정값(cuid). build_brand.sh 가 브랜드별로 주입.

@@ -29,9 +29,14 @@ class VpUser {
 
   factory VpUser.fromJson(Map<String, dynamic> j) {
     // registration.registered 는 응답에 포함될 수 있다(계정 단위 시리얼 등록 여부).
+    // 응답 형태가 문서에 고정돼 있지 않아 여러 자리를 본다:
+    //  registration.registered(tv/pair 와 같은 형식) · registered · tvSerial(프로필 시리얼).
+    // 프로필 시리얼은 서버가 형식·발급목록 검사 후에만 저장하므로 있으면 인증으로 본다.
     bool reg = false;
     final r = j['registration'];
     if (r is Map && r['registered'] == true) reg = true;
+    if (j['registered'] == true) reg = true;
+    if ((j['tvSerial']?.toString() ?? '').trim().isNotEmpty) reg = true;
     return VpUser(
       id: (j['id'] ?? '').toString(),
       userId: (j['userId'] ?? '').toString(),
@@ -308,6 +313,7 @@ class MobileAuth {
     if (r == null || r.statusCode != 200) return null;
     final d = _data(r);
     if (d is Map) {
+      // me 응답엔 registration 이 없고 tvSerial 만 온다(2026-10-21 실측) → fromJson 참고.
       _user = VpUser.fromJson(d.cast<String, dynamic>());
       return _user;
     }

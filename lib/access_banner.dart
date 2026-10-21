@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'access.dart';
+import 'app_gate_block.dart' show openUpdate;
 import 'app_policy.dart';
 import 'l10n.dart';
 import 'login_screen.dart';
@@ -97,8 +98,7 @@ class _AccountMenuTileState extends State<AccountMenuTile> {
     );
     if (ok != true) return;
     await MobileAuth.instance.logout();
-    final policy = (await AppPolicy.fetch()).policy;
-    Access.set(policy.tierFor(loggedIn: false, registered: false));
+    (await AppPolicy.fetch()).apply(loggedIn: false, registered: false);
     if (mounted) Navigator.pop(context); // 드로어 닫기
   }
 
@@ -131,18 +131,116 @@ class _AccountMenuTileState extends State<AccountMenuTile> {
   }
 }
 
-/// 제한(limited) 티어 안내 배너 — "로그인·기기 인증하면 전체 기능".
-/// TV(마켓앱)는 마켓 로그인 화면을 열고, 모바일은 자체 로그인 화면을 연다.
-class AccessUpgradeBanner extends StatelessWidget {
+/// 기기 인증(TV 시리얼 등록) 웹 페이지 — 마이페이지 > 프로필 > TV 시리얼(소셜 가입자 포함).
+const String kVerifyUrl = 'https://viewplus.co.kr/my/profile';
+
+/// 제한(limited) 티어 안내 배너.
+///  - 미로그인: 화면별 문구 + [로그인] (TV=마켓 로그인, 모바일=자체 로그인 화면)
+///  - 로그인했지만 기기 미인증: 서버 deny_message(없으면 기본 문구) + [다시 확인]
+///    (다른 기기에서 시리얼 등록을 마친 뒤 앱을 다시 켜지 않고 바로 반영)
+class AccessUpgradeBanner extends StatefulWidget {
   const AccessUpgradeBanner({super.key, required this.message});
 
-  /// 화면별 설명 문구(미팅/CCTV 등).
+  /// 미로그인일 때의 화면별 설명 문구(미팅/CCTV 등).
   final String message;
 
-  Future<void> _login(BuildContext context) => promptAccountLogin(context);
+  @override
+  State<AccessUpgradeBanner> createState() => _AccessUpgradeBannerState();
+}
+
+class _AccessUpgradeBannerState extends State<AccessUpgradeBanner> {
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    L.localeNotifier.addListener(_onLocale);
+  }
+
+  @override
+  void dispose() {
+    L.localeNotifier.removeListener(_onLocale);
+    super.dispose();
+  }
+
+  // 언어를 바꾸면 서버 안내 문구도 그 언어로 다시 받는다(조용히).
+  void _onLocale() => _recheck(silent: true);
+
+  // 인증 상태 다시 읽기: TV=마켓 세션, 모바일=viewplus me.
+  Future<void> _recheck({bool silent = false}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final res = await AppPolicy.fetch();
+      final info = await StoreLogin.read();
+      if (info != null) {
+        res.apply(loggedIn: info.isValid, registered: info.registered);
+      } else if (await MobileAuth.instance.hasSession()) {
+        final u = await MobileAuth.instance.me();
+        res.apply(loggedIn: true, registered: u?.registered ?? false);
+      }
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (!silent && Access.verifyNeededListenable.value != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(L.t('verify_still_needed'))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: Access.verifyNeededListenable,
+      builder: (context, verifyMsg, _) {
+        final needVerify = verifyMsg != null;
+        // 인증 필요: 서버 안내 + "회의 참여는 지금도 가능"(막힌 것처럼 보이지 않게).
+        // 서버 문구가 비었거나 현재 언어가 아닌 것(한국어 아닌데 한글)은 앱 문구로 대신.
+        final serverOk = verifyMsg != null &&
+            verifyMsg.isNotEmpty &&
+            (L.lang == 'ko' || !RegExp(r'[가-힣]').hasMatch(verifyMsg));
+        final verifyText =
+            '${serverOk ? verifyMsg : L.t('access_need_verify')}'
+            '\n${L.t('access_join_ok')}';
+        return _box(
+          icon: needVerify ? Icons.verified_user_outlined : Icons.lock_outline,
+          text: needVerify ? verifyText : widget.message,
+          action: needVerify
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // 웹 마이페이지 > 프로필 > TV 시리얼. 돌아오면(앱 복귀) 게이트가 자동 재확인.
+                    TextButton(
+                      onPressed: () => openUpdate(kVerifyUrl),
+                      child: Text(L.t('verify_register')),
+                    ),
+                    TextButton(
+                      onPressed: _busy ? null : () => _recheck(),
+                      style: TextButton.styleFrom(
+                          foregroundColor: Colors.white54,
+                          visualDensity: VisualDensity.compact),
+                      child: _busy
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(L.t('verify_recheck'),
+                              style: const TextStyle(fontSize: 12)),
+                    ),
+                  ],
+                )
+              : TextButton(
+                  onPressed: () => promptAccountLogin(context),
+                  child: Text(L.t('login')),
+                ),
+        );
+      },
+    );
+  }
+
+  Widget _box(
+      {required IconData icon, required String text, required Widget action}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
@@ -154,17 +252,14 @@ class AccessUpgradeBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.lock_outline, size: 18, color: Color(0xFF5B8DEF)),
+          Icon(icon, size: 18, color: const Color(0xFF5B8DEF)),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(message,
+            child: Text(text,
                 style: const TextStyle(fontSize: 12, color: Colors.white70)),
           ),
           const SizedBox(width: 4),
-          TextButton(
-            onPressed: () => _login(context),
-            child: Text(L.t('login')),
-          ),
+          action,
         ],
       ),
     );

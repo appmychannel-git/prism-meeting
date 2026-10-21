@@ -108,6 +108,20 @@ class L {
       'ko': '회원가입·비밀번호 찾기는 viewplus.co.kr 에서 할 수 있어요.',
       'en': 'Sign up or reset your password at viewplus.co.kr.'
     },
+    'access_need_verify': {
+      'ko': '기기 인증(TV 시리얼 등록)이 필요해요. 인증하면 모든 기능을 쓸 수 있어요.',
+      'en': 'Device verification (TV serial) is required to unlock all features.'
+    },
+    'verify_recheck': {'ko': '다시 확인', 'en': 'Check again'},
+    'verify_register': {'ko': '등록하기', 'en': 'Register'},
+    'access_join_ok': {
+      'ko': '회의 참여는 지금도 할 수 있어요.',
+      'en': 'You can still join meetings.'
+    },
+    'verify_still_needed': {
+      'ko': '아직 기기 인증이 확인되지 않았어요.',
+      'en': 'Device verification is not confirmed yet.'
+    },
     'login_ok_unverified': {
       'ko': '로그인됐어요. 기기 인증(TV 시리얼 등록) 후 모든 기능을 쓸 수 있어요.',
       'en': 'Signed in. Verify your device (TV serial) to unlock all features.'

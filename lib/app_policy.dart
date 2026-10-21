@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'access.dart';
 import 'config.dart';
 import 'l10n.dart';
+import 'store_login.dart';
 
 /// 서브앱 실행 권한 정책(서버 app-policy.asp). 하드코딩 대신 서버 값으로 티어를 정한다.
 ///  - none       : 조건 없음 → 전체 허용
@@ -29,6 +30,17 @@ extension AccessPolicyTier on AccessPolicy {
             ? AccessLevel.full
             : AccessLevel.limited;
     }
+  }
+}
+
+extension AppPolicyApply on AppPolicyResult {
+  /// 정책 + 로그인/인증 상태로 [Access] 티어와 "기기 인증 필요" 안내를 함께 갱신한다.
+  void apply({required bool loggedIn, required bool registered}) {
+    final tier = policy.tierFor(loggedIn: loggedIn, registered: registered);
+    Access.set(tier);
+    // 로그인했는데도 제한 = 인증(시리얼) 때문 → 서버 안내 문구로 표시.
+    Access.setVerifyNeeded(
+        (loggedIn && tier == AccessLevel.limited) ? denyMessage : null);
   }
 }
 
@@ -84,6 +96,8 @@ class AppPolicy {
   static const _kUpdateMsg = 'app_policy_update_msg';
   static const _kBlocked = 'app_policy_blocked';
   static const _kBlockMsg = 'app_policy_block_msg';
+  // 캐시를 받을 때의 언어 — 안내 문구(deny/update/block)가 언어별이라 바뀌면 다시 받는다.
+  static const _kLang = 'app_policy_lang';
 
   /// 브랜드 기본 정책(서버 무응답·미지정·캐시없음일 때). mychannel='none' 등.
   /// (config 값은 리터럴로만 해석 — 모르는 값은 login.)
@@ -132,14 +146,17 @@ class AppPolicy {
 
   /// 정책 조회. 캐시가 유효하면 그대로, 실패하면 fail-open(캐시값 → 브랜드 기본).
   /// cuid 가 없어도 호출한다(강제 업데이트·원격 차단은 모든 브랜드에 적용돼야 하므로).
+  /// [marketVersionCode] 를 안 주면 직접 조회한다(로그인 화면 등 어디서 불러도 같은 값).
   static Future<AppPolicyResult> fetch(
-      {int marketVersionCode = 0, String model = ''}) async {
+      {int? marketVersionCode, String model = ''}) async {
+    final mvc = marketVersionCode ?? await StoreLogin.marketVersionCode();
     final sp = await SharedPreferences.getInstance();
     final now = DateTime.now().millisecondsSinceEpoch;
 
     // 1. 캐시 유효하면 그대로.
     final exp = sp.getInt(_kExpiry) ?? 0;
-    if (now < exp && sp.getString(_kValue) != null) {
+    final lang = L.lang.isNotEmpty ? L.lang : 'ko';
+    if (now < exp && sp.getString(_kValue) != null && sp.getString(_kLang) == lang) {
       return _fromCache(sp);
     }
 
@@ -149,8 +166,11 @@ class AppPolicy {
       'brand': AppConfig.certBrand,
       if (AppConfig.cuid.isNotEmpty) 'cuid': AppConfig.cuid,
       'app_version_code': '${AppConfig.appVersionCode}',
-      if (marketVersionCode > 0) 'market_version_code': '$marketVersionCode',
-      'language': L.lang.isNotEmpty ? L.lang : 'ko',
+      if (mvc > 0) 'market_version_code': '$mvc',
+      // 모바일 여부: 마켓앱이 없으면 모바일(Y) — 앱이 자체 로그인을 쓰는 기준과 같다.
+      // (마켓 있는 TV=N. 서버가 구버전 마켓 다운그레이드와 모바일을 구분하는 용도)
+      'isMobile': mvc > 0 ? 'N' : 'Y',
+      'language': lang,
       if (model.isNotEmpty) 'model': model,
     };
     try {
@@ -179,6 +199,7 @@ class AppPolicy {
           await sp.setString(_kUpdateMsg, updateMsg);
           await sp.setBool(_kBlocked, blocked);
           await sp.setString(_kBlockMsg, blockMsg);
+          await sp.setString(_kLang, lang);
           await sp.setInt(_kExpiry, now + cacheSec * 1000);
           return AppPolicyResult(
             _parse(raw),
