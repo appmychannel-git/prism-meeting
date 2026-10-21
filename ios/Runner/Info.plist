@@ -59,6 +59,21 @@
 				<string>prismmeeting</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>kakao</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakaobd28f3b76080e0b4d64865386a35319d</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>kakaokompassauth</string>
+		<string>kakaolink</string>
 	</array>
 	<key>RTCAppGroupIdentifier</key>
 	<string>group.kr.co.mychannel.meeting.prism</string>

@@ -30,6 +30,10 @@ flutter_ios_podfile_setup
 target 'Runner' do
   use_frameworks!
 
+  # 카카오 로그인 — pub 의 kakao_flutter_sdk 는 pointycastle 3.x 가 livekit 과 충돌하므로
+  # 네이티브 SDK 를 직접 쓴다(안드로이드도 같은 이유로 네이티브). KakaoSDKAuth/Common 포함.
+  pod 'KakaoSDKUser', '~> 2.20'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths

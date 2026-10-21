@@ -3,13 +3,22 @@ import UIKit
 import PushKit
 import CallKit
 import flutter_callkit_incoming
+import KakaoSDKCommon
+import KakaoSDKAuth
+import KakaoSDKUser
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, PKPushRegistryDelegate {
+  // 카카오 네이티브 앱 키(viewplus 카카오앱). 브랜드가 여러 키로 나뉘면 Info.plist 로 뺀다.
+  private let kakaoNativeAppKey = "bd28f3b76080e0b4d64865386a35319d"
+
   override func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
+    // 카카오 SDK 초기화(super 전).
+    KakaoSDK.initSDK(appKey: kakaoNativeAppKey)
+
     // VoIP(PushKit) 등록 — 꺼진 앱도 통화 푸시로 깨워 CallKit 을 띄우기 위함.
     let voipRegistry = PKPushRegistry(queue: DispatchQueue.main)
     voipRegistry.delegate = self
@@ -29,6 +38,59 @@ import flutter_callkit_incoming
 
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
+    setupKakaoChannel(engineBridge)
+    setupFullscreenChannel(engineBridge)
+  }
+
+  // ── 카카오 로그인 채널(app/kakao) ──
+  // Dart loginKakao() 계약: login → accessToken, 취소 → "cancelled", 실패 → "kakao".
+  private func setupKakaoChannel(_ engineBridge: FlutterImplicitEngineBridge) {
+    guard let reg = engineBridge.pluginRegistry.registrar(forPlugin: "AppKakaoChannel") else { return }
+    let ch = FlutterMethodChannel(name: "app/kakao", binaryMessenger: reg.messenger())
+    ch.setMethodCallHandler { call, result in
+      guard call.method == "login" else { result(FlutterMethodNotImplemented); return }
+      let done: (OAuthToken?, Error?) -> Void = { token, error in
+        if let token = token { result(token.accessToken); return }
+        if let e = error as? SdkError, case .ClientFailed(let reason, _) = e, reason == .Cancelled {
+          result(FlutterError(code: "cancelled", message: "user cancelled", details: nil)); return
+        }
+        result(FlutterError(code: "kakao", message: error?.localizedDescription ?? "login failed", details: nil))
+      }
+      if UserApi.isKakaoTalkLoginAvailable() {
+        UserApi.shared.loginWithKakaoTalk { token, error in
+          // 톡 로그인 실패(취소 제외) → 카카오계정(웹)으로 폴백 — 안드로이드와 동일.
+          if token == nil, let e = error as? SdkError, case .ClientFailed(let r, _) = e, r == .Cancelled {
+            done(nil, error)
+          } else if token == nil {
+            UserApi.shared.loginWithKakaoAccount(completion: done)
+          } else {
+            done(token, nil)
+          }
+        }
+      } else {
+        UserApi.shared.loginWithKakaoAccount(completion: done)
+      }
+    }
+  }
+
+  // ── [등록하기]·업데이트 열기 채널(app/fullscreen) ──
+  private func setupFullscreenChannel(_ engineBridge: FlutterImplicitEngineBridge) {
+    guard let reg = engineBridge.pluginRegistry.registrar(forPlugin: "AppFullscreenChannel") else { return }
+    let ch = FlutterMethodChannel(name: "app/fullscreen", binaryMessenger: reg.messenger())
+    ch.setMethodCallHandler { call, result in
+      switch call.method {
+      case "openUrl":
+        if let s = (call.arguments as? [String: Any])?["url"] as? String, let u = URL(string: s) {
+          UIApplication.shared.open(u)
+        }
+        result(true)
+      case "openStore":
+        // App Store 등록 후 실제 앱 ID 로 교체: itms-apps://apps.apple.com/app/id<APP_ID>
+        result(false)
+      default:
+        result(FlutterMethodNotImplemented)   // 안드로이드 전용 메서드(전체화면 알림 설정 등)
+      }
+    }
   }
 
   // VoIP 토큰 갱신 → 플러그인에 전달(=Dart 가 서버 deviceTokens 에 저장).
