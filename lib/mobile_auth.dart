@@ -220,16 +220,17 @@ class MobileAuth {
     if (idToken == null || idToken.isEmpty) {
       return const VpAuthResult(VpAuthStatus.error);
     }
-    // 이름은 애플이 "최초 동의 시 1회만" 준다 → 있으면 함께 보낸다.
+    // 이름은 애플이 "최초 동의 시 1회만" 준다 → 있으면 함께 보낸다(놓치면 "apple 사용자"로 저장).
     final name = [cred.givenName, cred.familyName]
         .where((s) => (s ?? '').isNotEmpty)
         .join(' ')
         .trim();
+    // 서버 스펙(§4-3): body 는 {providerToken, name, language} 뿐.
+    // authorizationCode 는 서버가 서명을 직접 검증하므로 불필요, email 은 서버가
+    // identityToken 에서 추출(body 값은 신뢰하지 않음) → 둘 다 보내지 않는다.
     return _authPost('api/mobile/auth/social/apple', {
       'providerToken': idToken,
-      if (cred.authorizationCode.isNotEmpty) 'authorizationCode': cred.authorizationCode,
       if (name.isNotEmpty) 'name': name,
-      if ((cred.email ?? '').isNotEmpty) 'email': cred.email,
       'language': _lang,
     }, social: true);
   }
