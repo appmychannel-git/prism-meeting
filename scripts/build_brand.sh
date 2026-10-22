@@ -67,7 +67,10 @@ build_one() {
   local apk_url="${base_url}download/${apk_name}"
   echo "   brand=$APP_BRAND friends=$FRIENDS call=$CALL cctv=$CCTV translation=$TRANSLATION startCamera=$START_CAMERA e2ee=$E2EE_EFFECTIVE cctvOnly=${CCTV_ONLY:-false}"
   echo "   base=$base_url"
-  flutter build apk --release --flavor "$brand" \
+  # --aab: 구글 플레이 업로드용 App Bundle(.aab). 설정·서명은 APK 와 같다.
+  local build_kind="apk"
+  [ "$DO_AAB" = "1" ] && build_kind="appbundle"
+  flutter build "$build_kind" --release --flavor "$brand" \
     --dart-define="APP_BRAND=$APP_BRAND" \
     --dart-define=ENABLE_FRIENDS=$FRIENDS \
     --dart-define=ENABLE_CALL=$CALL \
@@ -91,6 +94,12 @@ build_one() {
     --dart-define=APP_VERSION_CODE=${app_vc:-0} \
     --dart-define=APK_URL=$apk_url
   mkdir -p dist
+  if [ "$DO_AAB" = "1" ]; then
+    local aab_name="${apk_name%.apk}.aab"
+    cp "build/app/outputs/bundle/${brand}Release/app-${brand}-release.aab" "dist/${aab_name}"
+    echo "   → dist/${aab_name}"
+    return 0
+  fi
   cp "build/app/outputs/flutter-apk/app-${brand}-release.apk" "dist/${apk_name}"
   echo "   → dist/${apk_name}"
   if [ "$DO_INSTALL" = "1" ]; then
@@ -99,14 +108,16 @@ build_one() {
 }
 
 BRAND="${1:-}"
-[ -z "$BRAND" ] && { echo "사용법: ./scripts/build_brand.sh <brand> [--install] [--e2ee]"; exit 1; }
+[ -z "$BRAND" ] && { echo "사용법: ./scripts/build_brand.sh <brand> [--install] [--e2ee] [--aab]"; exit 1; }
 shift || true
 
 DO_INSTALL=0
+DO_AAB=0
 FORCE_E2EE=0
 for a in "$@"; do
   case "$a" in
     --install) DO_INSTALL=1 ;;
+    --aab)     DO_AAB=1 ;;      # 구글 플레이용 .aab (설치 안 함)
     --e2ee)    FORCE_E2EE=1 ;;  # 이번 빌드만 E2EE 강제 on(표 설정과 무관)
   esac
 done
