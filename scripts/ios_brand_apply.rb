@@ -22,6 +22,9 @@ GOOGLE_IOS = {
   'viewplus' => '800914840538-84imtcij272icat6n5eh0tbgqfo1v29m',
   # 'gbled'  => '800914840538-xxxx',   # gbled iOS 클라이언트 ID 발급 후 추가
 }.freeze
+# 서버(웹) 클라이언트 ID — 전 브랜드 공용. id_token 의 aud 가 이 값이 되어야 서버 대조 통과.
+# GIDServerClientID 로 Info.plist 에 넣는다(Dart serverClientId 와 동일값, 이게 더 확실).
+GOOGLE_SERVER = '800914840538-k4ovs9na1rg7patpc2q85qk81dnagevv.apps.googleusercontent.com'
 # 카카오 네이티브 앱 키 — 기본값(e553, viewplus)과 다른 브랜드만 여기서 override.
 KAKAO_KEY = {
   # 'gbled' => '....',
@@ -96,7 +99,8 @@ if (gid = GOOGLE_IOS[brand])
     client = "#{gid}.apps.googleusercontent.com"
     rev    = "com.googleusercontent.apps.#{gid}"
     gx = gx.sub(%r{(<key>CFBundleURLTypes</key>)},
-                "<key>GIDClientID</key>\n\t<string>#{client}</string>\n\t\\1")
+                "<key>GIDClientID</key>\n\t<string>#{client}</string>\n\t" \
+                "<key>GIDServerClientID</key>\n\t<string>#{GOOGLE_SERVER}</string>\n\t\\1")
     gdict = "\n\t\t<dict>\n\t\t\t<key>CFBundleTypeRole</key>\n\t\t\t<string>Editor</string>" \
             "\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>google</string>" \
             "\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>#{rev}</string>" \

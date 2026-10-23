@@ -294,6 +294,12 @@ class MobileAuth {
     }
     switch (resp.statusCode) {
       case 401:
+        // 소셜 401 = SOCIAL_TOKEN_INVALID(토큰/aud 문제) — "이메일/비밀번호" 문구는 오해.
+        if (social) {
+          final code = env['code']?.toString();
+          return VpAuthResult(VpAuthStatus.error,
+              message: msg ?? (code != null ? '소셜 로그인 오류($code)' : null));
+        }
         return VpAuthResult(VpAuthStatus.wrongCredential, message: msg);
       case 403:
         return VpAuthResult(VpAuthStatus.forbidden, message: msg);
