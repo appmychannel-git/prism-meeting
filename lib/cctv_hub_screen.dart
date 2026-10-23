@@ -336,10 +336,15 @@ class _CctvHubScreenState extends State<CctvHubScreen>
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
+                          // 좁은 폰에선 9칸(+대시) 고정폭이 다이얼로그 폭을 넘어 칸이
+                          // 잘리고 어긋났다 → FittedBox 로 화면 폭에 맞춰 축소(정렬 유지).
                           IgnorePointer(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: cells,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: cells,
+                              ),
                             ),
                           ),
                           Positioned.fill(
