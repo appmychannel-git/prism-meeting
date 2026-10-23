@@ -7,8 +7,8 @@ struct Brand { let name: String; let fg: String; let bg: (CGFloat, CGFloat, CGFl
 let base = "android/app/src"
 let brands = [
   // gbled/viewplus 전경은 풀블리드 완성 디자인(파랑/노랑 배경 포함) → inset 0, 배경색은 가장자리 보정용.
-  Brand(name: "gbled",     fg: "gbled/res/drawable-xxxhdpi/ic_launcher_foreground.png",     bg: (0x00/255.0, 0x82/255.0, 0xF8/255.0), inset: 0.0),
-  Brand(name: "viewplus",  fg: "viewplus/res/drawable-xxxhdpi/ic_launcher_foreground.png",  bg: (0xFE/255.0, 0xCD/255.0, 0x06/255.0), inset: 0.0),
+  Brand(name: "gbled",     fg: "gbled/res/drawable-xxxhdpi/ic_launcher_foreground.png",     bg: (0x00/255.0, 0x82/255.0, 0xF8/255.0), inset: -0.20),
+  Brand(name: "viewplus",  fg: "viewplus/res/drawable-xxxhdpi/ic_launcher_foreground.png",  bg: (0xFE/255.0, 0xCD/255.0, 0x06/255.0), inset: -0.20),
   Brand(name: "mychannel", fg: "mychannel/res/drawable-xxxhdpi/ic_launcher_foreground.png", bg: (0x5E/255.0, 0x86/255.0, 0xA6/255.0), inset: 0.0),
   Brand(name: "ecoglow",   fg: "ecoglow/res/mipmap-xxxhdpi/ic_launcher_fg.png",             bg: (1, 1, 1),                      inset: 0.02),
   // CCTV 전용 앱(로고에 CCTV 뱃지). 회의 브랜드와 같은 배경색.
