@@ -2,7 +2,6 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import 'access.dart';
 import 'app_policy.dart';
@@ -210,14 +209,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   ]),
                   const SizedBox(height: 16),
                   // 애플(iOS 전용) — App Store 가이드라인 4.8: 소셜로그인 제공 시 필수.
-                  // 애플 권장상 다른 소셜과 최소 동등하게 노출 → 맨 위에 공식 버튼.
+                  // 애플 HIG 상 다른 소셜과 최소 동등 크기여야 함 → 구글/카카오와 동일한
+                  // 커스텀 버튼(공식 위젯은 높이에 비례해 글씨가 과하게 커짐). 맨 위에 노출.
                   if (!kIsWeb && Platform.isIOS) ...[
-                    SignInWithAppleButton(
+                    OutlinedButton.icon(
                       onPressed: _busy
-                          ? () {}
+                          ? null
                           : () => _handle(() => MobileAuth.instance.loginApple()),
-                      style: SignInWithAppleButtonStyle.black,
-                      height: 48,
+                      icon: const Icon(Icons.apple, size: 22),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.black,
+                      ),
+                      label: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(L.t('login_apple')),
+                      ),
                     ),
                     const SizedBox(height: 10),
                   ],

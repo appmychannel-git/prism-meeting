@@ -101,6 +101,7 @@ class L {
     'login_or': {'ko': '또는', 'en': 'or'},
     'login_google': {'ko': 'Google로 계속하기', 'en': 'Continue with Google'},
     'login_kakao': {'ko': '카카오로 계속하기', 'en': 'Continue with Kakao'},
+    'login_apple': {'ko': 'Apple로 계속하기', 'en': 'Continue with Apple'},
     'login_enter_both': {
       'ko': '이메일과 비밀번호를 입력하세요.',
       'en': 'Enter your email and password.'
