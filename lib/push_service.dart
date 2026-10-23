@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -225,6 +226,7 @@ class PushService with WidgetsBindingObserver {
     }
     try {
       await Firebase.initializeApp();
+      await _configureFirestore();
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
       // iOS: VoIP(PushKit)+CallKit 로 꺼진 앱에서도 수신 통화(안드로이드는 FCM 그대로).
       await CallKitService.instance.init(appNavigatorKey);
@@ -236,14 +238,16 @@ class PushService with WidgetsBindingObserver {
 
       _myUuid = await DeviceId.uuid();
       // Firestore 접근 전에 우리 uuid 로 로그인(보안 규칙용). 실패해도 진행.
-      await AuthService.ensureSignedIn(_myUuid!);
-      await _registerDevice();
+      // 아래 Firestore 작업은 서버 응답을 기다리므로 제한시간을 둔다 — 멈춰도
+      // 수신 통화 리스너 등 나머지 초기화는 계속되게.
+      await _limit(AuthService.ensureSignedIn(_myUuid!));
+      await _limit(_registerDevice());
       msg.onTokenRefresh.listen((_) => _registerDevice());
       // iOS VoIP 토큰도 서버가 읽는 deviceTokens 에 저장.
-      await CallKitService.instance.registerVoipToken(_myUuid!);
+      await _limit(CallKitService.instance.registerVoipToken(_myUuid!));
       // 앱 시작 시엔 통화 중일 수 없다. 이전 세션이 강제종료/크래시로 통화중(inCall)
       // 상태를 못 내린 경우가 있으므로 여기서 확실히 해제(친구목록 "통화중" 잔상 제거).
-      await setInCall(false);
+      await _limit(setInCall(false));
 
       // presence: 앱이 떠 있는 동안 주기적으로 lastSeen 갱신 + 생명주기 관찰.
       WidgetsBinding.instance.addObserver(this);
@@ -251,14 +255,14 @@ class PushService with WidgetsBindingObserver {
 
       // 재설치 후 로컬 친구목록이 비어도, 서버(내가 추가한 edge)에서 복구.
       try {
-        final mine = await DirectoryService.myFriends(_myUuid!);
+        final mine = await DirectoryService.myFriends(_myUuid!)
+            .timeout(const Duration(seconds: 8));
         await FriendStore.mergeAll(mine);
       } catch (_) {}
 
       // 끝났거나 오래된 통화 문서 정리(비용↓). 진행 중 통화는 안 건드림.
-      try {
-        await CallSignaling.sweepMyOldCalls(_myUuid!);
-      } catch (_) {}
+      // 기다릴 필요 없는 정리 작업이라 백그라운드로.
+      unawaited(CallSignaling.sweepMyOldCalls(_myUuid!).catchError((_) {}));
 
       // 포그라운드 수신
       FirebaseMessaging.onMessage.listen(_onRemoteMessage);
@@ -279,10 +283,44 @@ class PushService with WidgetsBindingObserver {
       // 콜드 스타트가 CCTV 원격 켜기로 시작됐으면 송출 화면으로(Navigator 준비 후).
       WidgetsBinding.instance
           .addPostFrameCallback((_) => _checkPendingWake());
+      // 초기화가 runApp 뒤 백그라운드라, 이미 그려진 화면이면 다음 프레임을 요청해
+      // 위의 postFrame 콜백(알림으로 시작·원격 켜기 라우팅)이 실행되게 한다.
+      WidgetsBinding.instance.scheduleFrame();
 
       _started = true;
     } catch (e) {
       debugPrint('[PushService] init skipped: $e');
+    }
+  }
+
+  // 서버 응답을 기다리는 초기화 단계의 제한시간. 넘으면 기다리지 않고 다음으로
+  // (작업 자체는 Firestore 가 계속 진행). 예외도 삼킨다.
+  static Future<void> _limit(Future<void> f) =>
+      f.timeout(const Duration(seconds: 8)).catchError((_) {});
+
+  /// Firestore 설정: 오프라인 캐시(로컬 영속성) 끔 + 이전 캐시 1회 삭제.
+  /// 이 앱은 오프라인 데이터가 필요 없다. TV 박스처럼 늘 켜진 기기에서
+  /// 못 보낸 쓰기(heartbeat 등)가 캐시에 쌓이면 시작 때 FirestoreWorker 가
+  /// CPU 100% 로 이를 처리하며 다른 요청을 막는 현상이 있었다(2026-10-23).
+  /// 반드시 첫 Firestore 사용 전에 호출해야 한다.
+  static const _kFsCacheCleared = 'fs_cache_cleared_v1';
+  Future<void> _configureFirestore() async {
+    final fs = FirebaseFirestore.instance;
+    // 설정은 다른 어떤 호출보다 먼저(이후엔 바꿀 수 없음).
+    try {
+      fs.settings = const Settings(persistenceEnabled: false);
+    } catch (e) {
+      debugPrint('[PushService] firestore settings skipped: $e');
+    }
+    // 이전 버전이 남긴 디스크 캐시(쌓인 쓰기 포함)를 1회 삭제.
+    try {
+      final sp = await SharedPreferences.getInstance();
+      if (sp.getBool(_kFsCacheCleared) != true) {
+        await fs.clearPersistence().timeout(const Duration(seconds: 5));
+        await sp.setBool(_kFsCacheCleared, true);
+      }
+    } catch (e) {
+      debugPrint('[PushService] clearPersistence skipped: $e');
     }
   }
 

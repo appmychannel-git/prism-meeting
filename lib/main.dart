@@ -20,10 +20,15 @@ Future<void> main() async {
   await DeviceQuirks.load(); // 기기별 보정(카메라 상하반전 기기 자동 판정) — AppSettings보다 먼저
   await AppSettings.load(); // 사용자 설정(수락형 등). 반전 토글 기본값이 자동 판정값을 참조
   await L.load(); // 저장된 앱 언어 복원(없으면 기기 언어)
-  // 통화/친구 기능이 켜진 모바일에서만 Firebase(FCM/Firestore) 초기화.
-  // (내부에서 예외를 삼키므로 구성이 없어도 앱 실행엔 영향 없음.)
-  await PushService.instance.initIfEnabled();
+  // 브랜드 전용(가로형) 스플래시를 띄울 "큰 화면" 여부를 네이티브로 미리 판별.
+  // (Flutter 첫 프레임 MediaQuery 가 부정확해 폰에서 TV 스플래시가 잘려 뜨던 문제 해결)
+  AppConfig.isBigScreen = await DeviceId.isBigScreen();
   runApp(const PrismMeetingApp());
+  // 통화/친구 기능이 켜진 모바일에서만 Firebase(FCM/Firestore) 초기화.
+  // 첫 화면을 막지 않도록 runApp 뒤에 백그라운드로 — Firestore 가 느리거나 멈추면
+  // (TV 박스에서 FirestoreWorker 100% CPU 루프 실측, 2026-10-23) 스플래시에서 영원히
+  // 멈췄었다. 내부에서 예외를 삼키므로 구성이 없어도 앱 실행엔 영향 없음.
+  unawaited(PushService.instance.initIfEnabled());
 }
 
 class PrismMeetingApp extends StatelessWidget {
@@ -109,7 +114,8 @@ class _SplashGateState extends State<_SplashGate> {
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(seconds: 4), () {
+    // TV는 4초 브랜드 화면, 폰은 짧게 2초(시작 지연 최소화).
+    _timer = Timer(Duration(seconds: AppConfig.isBigScreen ? 4 : 2), () {
       if (mounted) setState(() => _done = true);
     });
   }
@@ -122,11 +128,12 @@ class _SplashGateState extends State<_SplashGate> {
 
   @override
   Widget build(BuildContext context) {
-    // 가로(TV)이고 브랜드 전용 이미지가 있을 때만 4초 브랜드 스플래시를 띄운다.
-    // 모바일(세로)은 가로형 이미지가 잘리므로 Flutter 스플래시를 생략하고
-    // OS 네이티브 스플래시만 쓴다. 전용 이미지가 없는 브랜드(prism)도 네이티브만.
-    final useSplash = AppConfig.splashImage.isNotEmpty &&
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    // 브랜드 전용 스플래시: 브랜드 이미지가 있으면 폰·TV 모두 띄운다.
+    //  - TV(큰 화면): cover 로 꽉 채움.
+    //  - 폰: contain 으로 전체를 잘림 없이(가로형 이미지가 세로 폰에서 안 잘리게).
+    // (크기 판별 isBigScreen 은 main()에서 네이티브로 — 첫 프레임 MediaQuery 오판 방지.
+    //  전용 이미지 없는 브랜드(prism)는 splashImage 가 비어 네이티브 스플래시만.)
+    final useSplash = AppConfig.splashImage.isNotEmpty;
     if (_done || !useSplash) return widget.child;
     return const _SplashScreen();
   }
@@ -155,11 +162,12 @@ class _SplashScreen extends StatelessWidget {
       backgroundColor: _bgColor(),
       body: Stack(
         children: [
-          // 브랜드 이미지 — 화면을 꽉 채운다(가로 TV 기준).
+          // 브랜드 이미지 — TV는 꽉 채우고(cover), 폰은 전체를 잘림 없이(contain).
+          // 폰은 배경색(splashBg)이 이미지 여백을 채워 로고가 중앙에 온전히 보인다.
           Positioned.fill(
             child: Image.asset(
               'assets/splash/${AppConfig.splashImage}',
-              fit: BoxFit.cover,
+              fit: AppConfig.isBigScreen ? BoxFit.cover : BoxFit.contain,
               // 에셋 누락 등 로드 실패 시 배경색만.
               errorBuilder: (context, error, stack) => const SizedBox.shrink(),
             ),
