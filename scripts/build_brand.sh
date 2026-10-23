@@ -92,6 +92,7 @@ build_one() {
     --dart-define=CERT_APP=$cert_app \
     --dart-define=CUID=$cuid \
     --dart-define=APP_VERSION_CODE=${app_vc:-0} \
+    --dart-define=APP_VERSION=${app_vn:-} \
     --dart-define=APK_URL=$apk_url
   mkdir -p dist
   if [ "$DO_AAB" = "1" ]; then

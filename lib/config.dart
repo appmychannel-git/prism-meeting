@@ -19,8 +19,10 @@ import 'package:flutter/foundation.dart'
 ///        --dart-define=LK_TOKEN_URL=http://[PC의 LAN IP]:3000/token
 class AppConfig {
   /// 앱 표시 버전. 입장 화면 우측 상단에 노출한다.
-  /// pubspec.yaml 의 version 과 함께 올린다(수동 동기화).
-  static const String appVersion = '1.0.30';
+  /// 빌드 시 build_brand.sh 가 pubspec.yaml 의 version 을 --dart-define=APP_VERSION
+  /// 으로 주입한다(자동 동기화). 미주입(수동 flutter run 등) 시 아래 기본값 사용.
+  static const String appVersion =
+      String.fromEnvironment('APP_VERSION', defaultValue: '1.0.31');
 
   /// 앱 표시 브랜드명(브라우저 타이틀 + 입장화면 제목).
   /// 기본 'Prism Meeting'. 거래처 시연 등 브랜드를 숨길 땐
@@ -321,7 +323,7 @@ class AppConfig {
 
   /// 이 앱의 versionCode(숫자). 정책 API 에 보낸다. pubspec version 의 +숫자와 맞춘다.
   static const int appVersionCode =
-      int.fromEnvironment('APP_VERSION_CODE', defaultValue: 30);
+      int.fromEnvironment('APP_VERSION_CODE', defaultValue: 31);
 
   /// 정책 API 의 app 코드: CCTV 전용 앱=cctv, 그 외(미팅)=meeting.
   static String get policyAppCode => certApp.isNotEmpty ? certApp : 'meeting';
