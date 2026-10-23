@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 런치 스플래시(기본=폰): 브랜드 색상만. splash.jpg(1920x1080)를 깔면 폰 폭(<1920px)
+     에서 좌우가 잘리므로 제외한다. 이미지 스플래시는 drawable-sw600dp(큰 화면/TV)에서만. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/ic_launcher_background" />
-    <item>
-        <bitmap android:gravity="center" android:src="@drawable/splash" />
-    </item>
 </layer-list>

@@ -74,4 +74,18 @@ class DeviceId {
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_kName, name.trim());
   }
+
+  /// "큰 화면(TV/디스플레이)" 여부 — 네이티브 DisplayMetrics 의 최단변 dp 로 판별.
+  /// Flutter 첫 프레임 MediaQuery 는 DPR 미확정으로 부정확할 수 있어 네이티브로 읽는다.
+  /// 폰(최단변 ≤ ~480dp)=false, TV 박스(≥ ~600dp, 예: D23=617)=true.
+  /// 안드로이드 외 플랫폼/조회 실패는 false(폰 취급 → 브랜드 스플래시 생략).
+  static Future<bool> isBigScreen() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      final dp = await _native.invokeMethod<int>('screenShortestDp');
+      return (dp ?? 0) >= 540;
+    } catch (_) {
+      return false;
+    }
+  }
 }

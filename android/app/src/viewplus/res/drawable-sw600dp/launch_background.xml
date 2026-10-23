@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 런치 스플래시(sw>=600dp=TV/디스플레이): 브랜드 색상 + splash.jpg 중앙.
+     큰 화면은 1920px 폭을 담을 수 있어 잘리지 않는다. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+    <item>
+        <bitmap android:gravity="center" android:src="@drawable/splash" />
+    </item>
+</layer-list>

@@ -119,6 +119,13 @@ class MainActivity : FlutterActivity() {
                     "deviceReport" -> result.success(deviceReport())
                     // 서명 라벨만 가볍게(지원 기기 팝업의 "이 기기" 뒤 (R)/(C) 표기).
                     "signLabel" -> result.success(signatureLabel())
+                    // 화면 최단변 dp(브랜드 스플래시 판별용). Flutter 첫 프레임 MediaQuery 는
+                    // 부정확할 수 있어, 네이티브 DisplayMetrics(밀도 변경 반영)로 정확히 준다.
+                    "screenShortestDp" -> {
+                        val dm = resources.displayMetrics
+                        val dp = (minOf(dm.widthPixels, dm.heightPixels) / dm.density).toInt()
+                        result.success(dp)
+                    }
                     // 강제/권장 업데이트: 주어진 주소 or 자기 패키지의 스토어 열기.
                     "openUrl" -> { openUrl(call.argument<String>("url") ?: ""); result.success(true) }
                     "openStore" -> { openUrl("market://details?id=$packageName"); result.success(true) }

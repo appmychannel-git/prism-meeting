@@ -70,6 +70,11 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// "큰 화면(TV/디스플레이)" 여부. 브랜드 전용(가로형) 스플래시를 띄울지 판단용.
+  /// main()에서 네이티브 화면 최단변(dp)으로 1회 설정한다(폰=작음→false).
+  /// 네이티브(안드로이드) 외 플랫폼·조회 실패는 false(폰 취급, 브랜드 스플래시 생략).
+  static bool isBigScreen = false;
+
   /// 마켓앱 로그인 연동(안드로이드TV). true면 기동 시 마켓앱의
   /// ContentProvider(content://kr.co.viewplus.market.session)에서 로그인 세션을
   /// 읽어온다.
