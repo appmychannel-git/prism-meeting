@@ -16,6 +16,17 @@ display  = ARGV[2]
 withExt  = ARGV[3] == '1'
 scheme   = ARGV[4] # nil 이면 스킴 변경 안 함
 
+# 구글 iOS OAuth 클라이언트 ID(번들별로 다름 — GCP 프로젝트 800914840538 "viewplus").
+# ".apps.googleusercontent.com" 앞부분만 적는다. 없는 브랜드는 iOS 구글 버튼이 숨겨진다.
+GOOGLE_IOS = {
+  'viewplus' => '800914840538-84imtcij272icat6n5eh0tbgqfo1v29m',
+  # 'gbled'  => '800914840538-xxxx',   # gbled iOS 클라이언트 ID 발급 후 추가
+}.freeze
+# 카카오 네이티브 앱 키 — 기본값(e553, viewplus)과 다른 브랜드만 여기서 override.
+KAKAO_KEY = {
+  # 'gbled' => '....',
+}.freeze
+
 proj = 'ios/Runner.xcodeproj'
 p = Xcodeproj::Project.open(proj)
 
@@ -77,5 +88,31 @@ if scheme && !scheme.empty?
 end
 File.write(info, ixml)
 
+# 6) 구글 로그인(iOS 클라이언트 ID — 번들별). 맵에 있으면 GIDClientID + 역순 URL 스킴 주입.
+#    없으면 GIDClientID 부재 → iOS 에서 구글 버튼 자동 숨김(네이티브 크래시 방지).
+if (gid = GOOGLE_IOS[brand])
+  gx = File.read(info)
+  unless gx.include?('<key>GIDClientID</key>')
+    client = "#{gid}.apps.googleusercontent.com"
+    rev    = "com.googleusercontent.apps.#{gid}"
+    gx = gx.sub(%r{(<key>CFBundleURLTypes</key>)},
+                "<key>GIDClientID</key>\n\t<string>#{client}</string>\n\t\\1")
+    gdict = "\n\t\t<dict>\n\t\t\t<key>CFBundleTypeRole</key>\n\t\t\t<string>Editor</string>" \
+            "\n\t\t\t<key>CFBundleURLName</key>\n\t\t\t<string>google</string>" \
+            "\n\t\t\t<key>CFBundleURLSchemes</key>\n\t\t\t<array>\n\t\t\t\t<string>#{rev}</string>" \
+            "\n\t\t\t</array>\n\t\t</dict>"
+    gx = gx.sub(%r{(<key>CFBundleURLTypes</key>\s*<array>)}m, "\\1#{gdict}")
+    File.write(info, gx)
+  end
+end
+
+# 7) 카카오 키 — 기본(e553)과 다른 브랜드만 override(앱키 + kakao<key> 스킴 동시 교체).
+if (kk = KAKAO_KEY[brand])
+  kx = File.read(info)
+  kx = kx.sub(%r{(<key>KAKAO_APP_KEY</key>\s*<string>).*?(</string>)}m, "\\1#{kk}\\2")
+  kx = kx.sub(/kakao[0-9a-f]{32}/, "kakao#{kk}")
+  File.write(info, kx)
+end
+
 p.save
-puts "[ios_brand_apply] brand=#{brand} bundle=#{bundleId} name=#{display} ext=#{withExt}"
+puts "[ios_brand_apply] brand=#{brand} bundle=#{bundleId} name=#{display} ext=#{withExt} google=#{GOOGLE_IOS[brand] ? 'y' : 'n'}"

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -91,6 +93,20 @@ class MobileAuth {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
   );
   static const _kakaoCh = MethodChannel('app/kakao');
+  static const _fullscreenCh = MethodChannel('app/fullscreen');
+
+  /// iOS 구글 로그인 사용 가능 여부(Info.plist 에 GIDClientID 가 있어야 함).
+  /// 없으면 GoogleSignIn 이 네이티브에서 크래시하므로 버튼을 숨기고 호출도 막는다.
+  /// iOS 외(안드로이드/웹)는 항상 true.
+  static Future<bool> isGoogleAvailable() async {
+    if (kIsWeb || !Platform.isIOS) return true;
+    try {
+      final id = await _fullscreenCh.invokeMethod<String>('googleClientId');
+      return id != null && id.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
 
   String? _accessToken; // 메모리에만
   VpUser? _user;
@@ -155,6 +171,10 @@ class MobileAuth {
 
   // ── 구글 로그인 ──
   Future<VpAuthResult> loginGoogle() async {
+    // iOS 에 GIDClientID 가 없으면 GoogleSignIn 호출이 네이티브에서 죽는다 → 사전 차단.
+    if (!await isGoogleAvailable()) {
+      return const VpAuthResult(VpAuthStatus.error, message: '구글 로그인은 현재 준비 중입니다.');
+    }
     String? idToken;
     try {
       final gsi = GoogleSignIn(

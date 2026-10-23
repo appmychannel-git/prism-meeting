@@ -9,8 +9,12 @@ import KakaoSDKUser
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, PKPushRegistryDelegate {
-  // 카카오 네이티브 앱 키(viewplus 카카오앱). 브랜드가 여러 키로 나뉘면 Info.plist 로 뺀다.
-  private let kakaoNativeAppKey = "bd28f3b76080e0b4d64865386a35319d"
+  // 카카오 네이티브 앱 키 — Info.plist 의 KAKAO_APP_KEY(브랜드별 변형이 주입).
+  // URL 스킴(kakao<key>)과 반드시 일치해야 한다. 미설정 시 viewplus 기본값.
+  private var kakaoNativeAppKey: String {
+    (Bundle.main.object(forInfoDictionaryKey: "KAKAO_APP_KEY") as? String)
+      ?? "e553fdccb0388b82bd60df626b4ae853"
+  }
 
   override func application(
     _ application: UIApplication,
@@ -54,7 +58,9 @@ import KakaoSDKUser
         if let e = error as? SdkError, case .ClientFailed(let reason, _) = e, reason == .Cancelled {
           result(FlutterError(code: "cancelled", message: "user cancelled", details: nil)); return
         }
-        result(FlutterError(code: "kakao", message: error?.localizedDescription ?? "login failed", details: nil))
+        // 진단용 상세(case+reason+KOE/메시지) — String(describing:) 이 연관값까지 찍는다.
+        let detail = error.map { String(describing: $0) } ?? "unknown"
+        result(FlutterError(code: "kakao", message: detail, details: nil))
       }
       if UserApi.isKakaoTalkLoginAvailable() {
         UserApi.shared.loginWithKakaoTalk { token, error in
@@ -87,6 +93,9 @@ import KakaoSDKUser
       case "openStore":
         // App Store 등록 후 실제 앱 ID 로 교체: itms-apps://apps.apple.com/app/id<APP_ID>
         result(false)
+      case "googleClientId":
+        // GIDClientID 미설정이면 GoogleSignIn 이 네이티브에서 죽으므로, Dart 가 먼저 확인.
+        result(Bundle.main.object(forInfoDictionaryKey: "GIDClientID") as? String)
       default:
         result(FlutterMethodNotImplemented)   // 안드로이드 전용 메서드(전체화면 알림 설정 등)
       }

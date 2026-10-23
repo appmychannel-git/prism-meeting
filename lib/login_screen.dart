@@ -25,6 +25,18 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
   bool _busy = false;
+  // 구글: iOS 는 GIDClientID 설정 전까지 숨긴다(미설정 시 네이티브 크래시). 확인 전 기본 숨김.
+  bool _googleReady = !(!kIsWeb && Platform.isIOS);
+
+  @override
+  void initState() {
+    super.initState();
+    if (!kIsWeb && Platform.isIOS) {
+      MobileAuth.isGoogleAvailable().then((ok) {
+        if (mounted) setState(() => _googleReady = ok);
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -209,18 +221,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 10),
                   ],
-                  // 구글
-                  OutlinedButton.icon(
-                    onPressed: _busy
-                        ? null
-                        : () => _handle(() => MobileAuth.instance.loginGoogle()),
-                    icon: const Icon(Icons.g_mobiledata, size: 28),
-                    label: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Text(L.t('login_google')),
+                  // 구글 (iOS 는 GIDClientID 설정 완료 후에만 노출)
+                  if (_googleReady) ...[
+                    OutlinedButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () => _handle(() => MobileAuth.instance.loginGoogle()),
+                      icon: const Icon(Icons.g_mobiledata, size: 28),
+                      label: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        child: Text(L.t('login_google')),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
+                    const SizedBox(height: 10),
+                  ],
                   // 카카오
                   OutlinedButton.icon(
                     onPressed: _busy
