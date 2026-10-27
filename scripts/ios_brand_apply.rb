@@ -19,8 +19,10 @@ scheme   = ARGV[4] # nil 이면 스킴 변경 안 함
 # 구글 iOS OAuth 클라이언트 ID(번들별로 다름 — GCP 프로젝트 800914840538 "viewplus").
 # ".apps.googleusercontent.com" 앞부분만 적는다. 없는 브랜드는 iOS 구글 버튼이 숨겨진다.
 GOOGLE_IOS = {
-  'viewplus' => '800914840538-84imtcij272icat6n5eh0tbgqfo1v29m',
-  'gbled'    => '800914840538-fbnmau61j0gk5qu8gog07466879pam18',
+  'viewplus'     => '800914840538-84imtcij272icat6n5eh0tbgqfo1v29m',
+  'gbled'        => '800914840538-fbnmau61j0gk5qu8gog07466879pam18',
+  'viewpluscctv' => '800914840538-33u0sg31b720q5tjp4m7s6kruq5eca8h',
+  'gbledcctv'    => '800914840538-h14p945bvfnptnrralu8c12e1u1odja7',
 }.freeze
 # 서버(웹) 클라이언트 ID — 전 브랜드 공용. id_token 의 aud 가 이 값이 되어야 서버 대조 통과.
 # GIDServerClientID 로 Info.plist 에 넣는다(Dart serverClientId 와 동일값, 이게 더 확실).
@@ -28,7 +30,9 @@ GOOGLE_SERVER = '800914840538-k4ovs9na1rg7patpc2q85qk81dnagevv.apps.googleuserco
 # 카카오 네이티브 앱 키 — 기본값(e553, viewplus)과 다른 브랜드만 여기서 override.
 # (카카오앱 1개당 번들 5개 제한이라 viewplus/gbled 를 별도 카카오앱으로 분리)
 KAKAO_KEY = {
-  'gbled' => '6d61ca2ac4c26833b136abca29340bff',
+  'gbled'        => '6d61ca2ac4c26833b136abca29340bff',
+  'viewpluscctv' => '5d5bc35f7aec22213a449db779170be3',  # 카카오앱 "viewplus cctv"
+  'gbledcctv'    => '8f83214986693cb6faff854d56923667',  # 카카오앱 "gbled cctv"
 }.freeze
 
 proj = 'ios/Runner.xcodeproj'
