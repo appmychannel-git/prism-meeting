@@ -210,6 +210,9 @@ class PushService with WidgetsBindingObserver {
   bool _started = false;
   String? _myUuid;
   Timer? _heartbeat;
+  // presence 는 앱이 화면에 있거나 통화 중일 때만 갱신(홈으로 나가면 멈춤 — Firestore 쓰기 절감).
+  bool _foreground = true;
+  bool _inCall = false;
 
   /// 이미 처리(표시)한 통화 ID — 스트림/푸시 중복 표시 방지.
   final Set<String> _handled = <String>{};
@@ -251,7 +254,7 @@ class PushService with WidgetsBindingObserver {
 
       // presence: 앱이 떠 있는 동안 주기적으로 lastSeen 갱신 + 생명주기 관찰.
       WidgetsBinding.instance.addObserver(this);
-      _startHeartbeat();
+      _syncHeartbeat();
 
       // 재설치 후 로컬 친구목록이 비어도, 서버(내가 추가한 edge)에서 복구.
       try {
@@ -410,9 +413,16 @@ class PushService with WidgetsBindingObserver {
   }
 
   // ── presence(온라인 표시) ──
-  void _startHeartbeat() {
-    _heartbeat?.cancel();
-    _heartbeat = Timer.periodic(const Duration(seconds: 45), (_) => _touch());
+  // 화면에 있거나 통화 중이면 45초마다 lastSeen 갱신, 아니면(홈/백그라운드) 멈춤.
+  // 멈춘 기기는 90초 뒤 친구 목록에서 오프라인으로 보인다(통화·원격 켜기는 FCM 이라 무관).
+  void _syncHeartbeat() {
+    if (_foreground || _inCall) {
+      _heartbeat ??=
+          Timer.periodic(const Duration(seconds: 45), (_) => _touch());
+    } else {
+      _heartbeat?.cancel();
+      _heartbeat = null;
+    }
   }
 
   Future<void> _touch() async {
@@ -429,8 +439,16 @@ class PushService with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _foreground = true;
+      _syncHeartbeat();
       _touch();
       _checkPendingWake(); // 백그라운드서 깨워졌으면 송출 화면으로 이동
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      // inactive(다이얼로그·알림창 등 잠깐 가림)는 제외 — 앱이 아직 화면에 있다.
+      _foreground = false;
+      _syncHeartbeat();
     }
   }
 
@@ -441,6 +459,8 @@ class PushService with WidgetsBindingObserver {
 
   /// 통화 시작/종료 시 통화중 상태 갱신(친구 목록의 "통화중" 표시용).
   Future<void> setInCall(bool value) async {
+    _inCall = value;
+    if (_started) _syncHeartbeat(); // 통화 중엔 홈에 나가 있어도 갱신 유지
     final uuid = _myUuid;
     if (uuid == null) return;
     try {
