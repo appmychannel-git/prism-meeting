@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'config.dart';
 import 'l10n.dart';
 
 /// 방 접속에 필요한 서버 URL + 참가자 토큰.
@@ -38,6 +40,11 @@ class ConnectionService {
   static String? _cachedAppId;
   static Future<String> _appId() async {
     if (_cachedAppId != null) return _cachedAppId!;
+    // 웹은 packageName 이 모든 브랜드 공통(prism_meeting)이라 브랜드를 알 수 없다 →
+    // 'web.<앱>.<브랜드>' 로 보낸다(서버 사용량 집계·자막봇 freedom 판별이 패키지명처럼 읽음).
+    if (kIsWeb) {
+      return _cachedAppId = 'web.${AppConfig.certApp}.${AppConfig.certBrand}';
+    }
     try {
       final info = await PackageInfo.fromPlatform();
       _cachedAppId = info.packageName; // 예: kr.co.mychannel.meeting.prism

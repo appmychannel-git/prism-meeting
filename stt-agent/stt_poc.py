@@ -63,7 +63,12 @@ TRANSLATE_PROVIDER = os.environ.get("TRANSLATE_PROVIDER", "")  # 빈값=서버 �
 
 # 감시 모드에서 제외할 방 이름 접두사(쉼표). CCTV 방은 자막 대상이 아니라 기본 제외.
 WATCH_SKIP_PREFIXES = tuple(
-    s.strip() for s in os.environ.get("WATCH_SKIP_PREFIXES", "cctv-").split(",") if s.strip())
+    s.strip() for s in os.environ.get("WATCH_SKIP_PREFIXES", "cctv-,dm-").split(",") if s.strip())
+# 감시 모드가 들어갈 앱(쉼표, 참가자 metadata.appId 패키지명에 포함되는 문자열).
+# 서버 자막(SERVER_STT)은 freedom 만 쓰므로 기본 freedom — 다른 브랜드 회의엔 들어가지 않아
+# Azure Speech 비용이 나가지 않는다. 비우면 예전처럼 모든 방에 들어간다.
+WATCH_ONLY_APPS = tuple(
+    s.strip() for s in os.environ.get("WATCH_ONLY_APPS", "freedom").split(",") if s.strip())
 
 # ---- STT 엔진 선택(관리자) ----
 # 'azure'(기본) 또는 'deepl'. .env STT_ENGINE 으로만 바꾼다(사용자 앱엔 노출 안 함).
@@ -624,6 +629,25 @@ async def run_single(room_name: str):
         await session.close()
 
 
+async def _room_has_watched_app(lkapi, room_name: str) -> bool:
+    """방에 WATCH_ONLY_APPS 앱(토큰서버가 metadata.appId 에 심은 패키지명) 참가자가 있는지."""
+    if not WATCH_ONLY_APPS:
+        return True
+    try:
+        resp = await lkapi.room.list_participants(api.ListParticipantsRequest(room=room_name))
+    except Exception as e:
+        log.warning("참가자 조회 실패(%s): %s", room_name, e)
+        return False
+    for p in resp.participants:
+        try:
+            app_id = json.loads(p.metadata or "{}").get("appId", "") or ""
+        except Exception:
+            app_id = ""
+        if any(a in app_id for a in WATCH_ONLY_APPS):
+            return True
+    return False
+
+
 async def run_watch(poll_sec: float):
     """감시 모드(--watch). 상시 켜두면 새 방이 생길 때마다 자동으로 자막을 시작하고,
     방이 비면 자동으로 정리한다. 방코드를 몰라도 됨."""
@@ -634,6 +658,8 @@ async def run_watch(poll_sec: float):
     active: dict[str, RoomSession] = {}
 
     log.info("감시 모드 시작: %ds 마다 방 확인. 참가자 있는 방에 자동으로 자막을 붙입니다. (Ctrl+C 종료)", poll_sec)
+    log.info("대상 앱: %s / 제외 방: %s",
+             ", ".join(WATCH_ONLY_APPS) or "전체", ", ".join(WATCH_SKIP_PREFIXES) or "없음")
     try:
         while True:
             try:
@@ -655,6 +681,8 @@ async def run_watch(poll_sec: float):
                 continue
 
             for name in live - set(active):
+                if not await _room_has_watched_app(lkapi, name):
+                    continue  # 대상 앱 참가자가 없음 — 다음 확인 때 다시 본다
                 try:
                     session = RoomSession(name, loop)
                     await session.connect()
