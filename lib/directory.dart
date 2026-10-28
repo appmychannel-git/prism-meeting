@@ -40,10 +40,10 @@ class DeviceStatus {
     required this.lastSeenMs,
   });
 
-  /// 최근 90초 내 heartbeat 가 있으면 온라인으로 본다.
+  /// 최근 7분 내 heartbeat(3분 주기) 가 있으면 온라인으로 본다(한 번 놓쳐도 유지).
   bool get online =>
       lastSeenMs > 0 &&
-      DateTime.now().millisecondsSinceEpoch - lastSeenMs < 90000;
+      DateTime.now().millisecondsSinceEpoch - lastSeenMs < 7 * 60 * 1000;
 
   /// 통화 중 표시(온라인이면서 inCall). 오프라인이면 stale 로 보고 통화중 아님.
   bool get busy => online && inCall;

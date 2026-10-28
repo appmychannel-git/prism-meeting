@@ -413,12 +413,13 @@ class PushService with WidgetsBindingObserver {
   }
 
   // ── presence(온라인 표시) ──
-  // 화면에 있거나 통화 중이면 45초마다 lastSeen 갱신, 아니면(홈/백그라운드) 멈춤.
-  // 멈춘 기기는 90초 뒤 친구 목록에서 오프라인으로 보인다(통화·원격 켜기는 FCM 이라 무관).
+  // 화면에 있거나 통화 중이면 3분마다 lastSeen 갱신, 아니면(홈/백그라운드) 멈춤.
+  // 멈춘 기기는 최대 7분 뒤 친구 목록에서 오프라인으로 보인다(통화·원격 켜기는 FCM 이라 무관).
+  // 45초였을 땐 상시 켜둔 TV 1대가 하루 1,920회 써서 Firestore 무료 한도(2만/일)에 닿았다.
   void _syncHeartbeat() {
     if (_foreground || _inCall) {
       _heartbeat ??=
-          Timer.periodic(const Duration(seconds: 45), (_) => _touch());
+          Timer.periodic(const Duration(minutes: 3), (_) => _touch());
     } else {
       _heartbeat?.cancel();
       _heartbeat = null;
